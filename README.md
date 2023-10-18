@@ -3,11 +3,14 @@ GenPod - frontend app (low-code / no-code) for generating infra files and applic
 
 ## Development guidelines:
 **Should leverage storybookjs, dhiwise, devcontainer.json, codiumAI + codeiumAI to develop GenPod. There are no exceptions/excuses in this selection.**
-  > Use ReactFlow + Zustand
 
-  > Use open API specifications for designing and developing any APIs - leverage [Insomnia](https://insomnia.rest/) tool for this
+**Should leverage [DeepSource](https://app.deepsource.com/login), [Guardrails](https://dashboard.guardrails.io/login), [Snyk](https://app.snyk.io/login) in your forked repo itself and resolve all security issues within your forked repo and then only submit PR to upstream main repo.** 
+
+  > Use ReactFlow + Zustand for canvas & state management.
+
+  > Use open API specifications for designing and developing any APIs - leverage [Insomnia](https://insomnia.rest/) tool for this.
   
-  > **Test-Driven development approach is mandatory**
+  > **Test-Driven development approach is mandatory**.
 
   > Items should be configurable from one place (folder/file(s)) for - colors, styles, images, icons, charts (apache echart, react d3js), etc. This means that the common items should be organized so that they can be used anywhere in the code, and if changed in the future they should be modified in one place, and that change should reflect in all places that are using those items.
 
