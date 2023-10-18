@@ -12,6 +12,8 @@ GenPod - frontend app (low-code / no-code) for generating infra files and applic
   
   > **Test-Driven development approach is mandatory**.
 
+  > Leverage tools like [cypress](https://www.cypress.io/), [miragejs](https://miragejs.com/), [microcks](https://microcks.io/) for functional testing (behavioral testing, api testing, E2E testing, etc.).
+
   > Items should be configurable from one place (folder/file(s)) for - colors, styles, images, icons, charts (apache echart, react d3js), etc. This means that the common items should be organized so that they can be used anywhere in the code, and if changed in the future they should be modified in one place, and that change should reflect in all places that are using those items.
 
   > Always check for the latest versions of dependency packages and update them - we already have scanning tools enabled on this repo. Look at the PRs & Security tab every week to check the security enhancement suggestions those tools provide and keep up with implementing them.
