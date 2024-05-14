@@ -1,0 +1,32 @@
+{
+  "name": "user-service",
+  "language": "python",
+  "restConfig": {
+    "server": {
+      "sqlDB": "MySQL",
+      "port": "3000",
+      "resources": [
+        {
+          "name": "User",
+          "allowedMethods": [
+            "POST",
+            "LIST",
+            "GET",
+            "PUT",
+            "DELETE"
+          ],
+          "fields": {
+            "Name": {
+              "datatype": "string"
+            },
+            "City": {
+              "datatype": "string"
+            }
+          }
+        }
+      ]
+    },
+    "framework": "fastapi"
+  }
+}
+  
