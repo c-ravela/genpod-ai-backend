@@ -1,5 +1,5 @@
 {
-  "prompt": "Instrument the code you generate with latest version of opentelemetry sdk so that this REST API service can send data to opentelemetry collector agent for observability purposes.",
+  "prompt": "Create a REST api service by taking the inputs provided to you using python language using fastapi. Instrument the code you generate with latest version of opentelemetry sdk so that this REST API service can send data to opentelemetry collector agent for observability purposes.",
   "name": "user-service",
   "language": "python",
   "restConfig": {
@@ -7,7 +7,7 @@
       "sqlDB": "MySQL",
       "port": "3000",
       "resources": [
-        {
+        { 
           "name": "User",
           "allowedMethods": [
             "POST",
