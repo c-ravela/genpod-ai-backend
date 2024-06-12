@@ -25,3 +25,8 @@ tree-sitter==0.22.0
 typing-inspect==0.9.0
 typing_extensions==4.11.0
 urllib3==2.2.1
+beautifulsoup4==4.12.3
+unstructured==0.14.3
+unstructured[pdf]
+unstructured[xlsx]
+unstructured[docx]
