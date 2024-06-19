@@ -1,5 +1,5 @@
 # Base Image
-FROM ubuntu:latest
+FROM python:3.12.3
 
 # Working directory in the container
 WORKDIR /opt/genpod
@@ -8,6 +8,6 @@ WORKDIR /opt/genpod
 COPY . .
 
 # update and install necessary packages
-RUN apt-get update && apt-get install -y make less python3 python3-pip && pip install jupyter
+RUN apt-get update && apt-get install -y make less && pip install -r requirements.txt
 
 CMD ["sleep", "infinity"]

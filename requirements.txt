@@ -30,3 +30,4 @@ unstructured==0.14.3
 unstructured[pdf]
 unstructured[xlsx]
 unstructured[docx]
+notebook
