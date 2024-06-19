@@ -19,7 +19,7 @@ The Docker container is set to `sleep infinity`.
 To get shell access to the running container, open a new terminal tab and run the following command:
 
 ```bash
-docker exec -it <container_name>
+docker exec -it <container_name> /bin/bash
 ```
 
 Replace `<container_name>` with the name of your Docker container. You can find the name of the container using the `docker ps` command.
