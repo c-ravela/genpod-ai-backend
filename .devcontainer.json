@@ -1,0 +1,31 @@
+{
+    "name": "Genpod Development Environment",
+    "dockerComposeFile": ["docker-compose.yml"],
+    "service": "genpod",
+    "workspaceFolder": "/opt/genpod",
+    "shutdownAction": "stopCompose",
+    "customizations": {
+        "vscode": {
+            "extensions": [
+                "ms-python.python",
+                "ms-python.vscode-pylance",
+                "ms-toolsai.jupyter"
+            ],
+            "settings": {
+                "editor.formatOnSave": true,
+                "python.linting.enabled": true,
+                "terminal.integrated.shell.linux": "/bin/bash",
+                "python.pythonPath": "/usr/local/bin/python3",
+                "python.debugging.puppyPauseOnEntry": false,
+                "python.debugging.puppyRemoteRoot": "/opt/genpod"
+            }
+        }
+
+    },
+    "forwardPorts": [8888],
+    "remoteEnv": {
+        "OPENAPI_KEY": "your_openapi_key_here",
+        "PROJECT_PATH" : "/", 
+        "STORE_TO_DB" : "NO"
+    }
+}
