@@ -1,14 +1,26 @@
 """
-Architect agent prompts file
+This module contains all the prompt templates for the Architect agent.
+
+Each prompt in this module is designed to guide the Architect agent in 
+performing its tasks. The prompts cover a wide range of scenarios, from 
+analyzing user input and creating comprehensive requirements documents, to 
+breaking down projects into independent tasks and enforcing best practices in
+microservice architecture, project folder structure, and clean-code development.
+
+The prompts are used to instruct the Architect agent on how to respond to user 
+inputs and how to structure its outputs. They are essential for ensuring that 
+the Architect agent can effectively assist users in implementing their projects.
 """
 
 from langchain_core.prompts import ChatPromptTemplate
 from langchain_core.prompts import MessagesPlaceholder
 
+from models.enums import ChatRoles
+
 architect_prompt = ChatPromptTemplate.from_messages(
     [
         (
-            "system",
+            ChatRoles.SYSTEM.value,
             """<instructions> 
                 You are a Development Lead in charge of implementing the given project. Thoroughly analyze the user input and build a thorough requirements document needed to implement the project. 
                 You should also be able to break them into independent tasks that can be assigned to other team memeber.\
