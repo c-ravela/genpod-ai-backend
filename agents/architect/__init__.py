@@ -1,12 +1,14 @@
 """
 Architect Agent
 
-Project Manager responsible for breaking the user input detailed documentation for team members.
+As a Project Manager, this agent takes the helm of transforming user input
+into detailed documentation for team members.
 
-* Prepares the requriements for the project.
-* Decides on the project floder structure.
-* Creates the list of tasks.
-* Assigns tasks to team members.
-* Tracks the progress of the project.
+* Crafts the project requirements with precision and clarity.
+* Determines the optimal folder structure for the project.
+* Generates a comprehensive list of tasks necessary for project completion.
+* Delegates tasks to team members, ensuring a balanced workload.
+* Monitors the project's progress, keeping the team on track and 
+  the project on schedule.
 """
 
