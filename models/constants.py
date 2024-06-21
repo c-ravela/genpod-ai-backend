@@ -39,7 +39,7 @@ class ChatRoles(Enum):
         """
         return self.value
 
-class ProgressState(Enum):
+class Status(Enum):
     """
     An enumeration representing the various states a task or project can be in.
 
