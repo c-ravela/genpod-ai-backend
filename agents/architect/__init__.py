@@ -1,5 +1,4 @@
-"""
-Architect Agent
+"""Architect
 
 As a Project Manager, this agent takes the helm of transforming user input
 into detailed documentation for team members.
