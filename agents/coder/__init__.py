@@ -1,7 +1,9 @@
-"""
-Coder Agent
+"""Coder Agent
 
-Computer Programmer responsible for finshing up the project development by taking inputs from architect.
+A dedicated Computer Programmer tasked with bringing the project to 
+completion, guided by the blueprint provided by the architect.
 
-* Develop the project by following the steps of architect.
+* Embarks on the project development journey, meticulously 
+  following the architect's roadmap.
+* Accomplishes the assigned task with diligence and precision.
 """

@@ -24,36 +24,33 @@ class ArchitectState(TypedDict):
     project_folders: list[str]
     current_task: Task
     project_state: str
-    messages: list[str]
+    message: list[tuple[str, str]]
 
-def toggle_error(state: ArchitectState) -> ArchitectState:
-    """
-    Toggles the error field in the state. If the error is True, it becomes 
-    False and vice versa.
+    def toggle_error(self) -> None:
+        """
+        Toggles the error field in the state. If the error is True, it becomes 
+        False and vice versa.
 
-    Args:
-        state (ArchitectState): The current state of the Architect agent.
+        Args:
+            state (ArchitectState): The current state of the Architect agent.
 
-    Returns:
-        ArchitectState: The updated state with the toggled error field.
-    """
+        Returns:
+            ArchitectState: The updated state with the toggled error field.
+        """
 
-    state['error'] = not state['error']
-    
-    return state
+        self.state['error'] = not self.state['error']
 
-def add_message(state: ArchitectState, message: tuple[str, str]) -> ArchitectState:
-    """
-    Adds a single message to the messages field in the state.
+    def add_message(self, message: tuple[str, str]) -> None:
+        """
+        Adds a single message to the messages field in the state.
 
-    Args:
-        state (ArchitectState): The current state of the Architect agent.
-        message (tuple[str, str]): The message to be added.
+        Args:
+            state (ArchitectState): The current state of the Architect agent.
+            message (tuple[str, str]): The message to be added.
 
-    Returns:
-        ArchitectState: The updated state with the new message added to the 
-        messages field.
-    """
+        Returns:
+            ArchitectState: The updated state with the new message added to the 
+            messages field.
+        """
 
-    state['messages'] += [message]
-    return state
+        self.state['messages'] += [message]
