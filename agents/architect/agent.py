@@ -12,8 +12,6 @@ from prompts.architect import architect_prompt
 from models.enums import ProgressState
 from models.architect import RequirementsDoc
 
-from agents.architect.state import add_message
-from agents.architect.state import toggle_error
 from agents.architect.state import ArchitectState
 
 import ast
@@ -54,7 +52,7 @@ class ArchitectAgent:
         architect_solution = {}
 
         if state['error']:
-            state = toggle_error(state)
+            state.toggle_error()
         
         if state['project_state'] == ProgressState.NEW.value:
             print(state)
@@ -70,13 +68,13 @@ class ArchitectAgent:
             raw_output = architect_solution['raw']
             error = architect_solution['parsing_error']
 
-            state = toggle_error(state)
+            state.toggle_error()
             state = add_message(state, (
                 "user",
                 f"ERROR: parsing your output! Be sure to invoke the tool. Output: {raw_output}. \n Parse error: {error}"
             ))
         elif missing_keys:
-            state = toggle_error(state)
+            state.toggle_error()
             state = add_message(state, (
                     "user",
                     f"ERROR: Now, try again. Invoke the RequirementsDoc tool to structure the output with a project_name, well_documented, tasks, project_folder_structure, next_task and call_next, you missed {missing_keys} in your previous response",        

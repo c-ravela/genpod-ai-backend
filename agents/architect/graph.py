@@ -7,6 +7,7 @@ of control between different states of the Architect agent.
 
 from langgraph.graph import END
 from langgraph.graph import StateGraph
+from langgraph.graph.graph import CompiledGraph 
 
 from agents.architect.agent import ArchitectAgent
 from agents.architect.state import ArchitectState
@@ -30,7 +31,7 @@ class Architect:
         self.agent = ArchitectAgent(llm)
         self.app = self.define_graph()
 
-    def define_graph(self) -> any:
+    def define_graph(self) -> CompiledGraph:
         """
         Defines the state graph for the Architect agent. The graph includes 
         nodes representing different states of the agent and edges 
