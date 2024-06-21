@@ -9,6 +9,7 @@ the readability and maintainability of the code.
 
 from pydantic import Field
 from pydantic import BaseModel
+from models.constants import Status
 
 class Task(BaseModel):
     """
@@ -17,11 +18,19 @@ class Task(BaseModel):
     """
 
     description: str = Field(
-        description="A brief description outlining the objective of the task", 
+        description="A brief description outlining the objective of the task",
         required=True
     )
-    
-    state: str = Field(
-        description="The current state indicating the progress of the task", 
+
+    task_status: Status = Field(
+        description="The current status indicating the progress of the task",
         required=True
+    )
+
+    additional_info: str = Field(
+        description="Additional info requested."
+    )
+
+    question: str = Field(
+        description="Question to supervisor if additional information is needed to proceed with task execution."
     )
