@@ -15,7 +15,7 @@ the Architect agent can effectively assist users in implementing their projects.
 from langchain_core.prompts import ChatPromptTemplate
 from langchain_core.prompts import MessagesPlaceholder
 
-from models.enums import ChatRoles
+from models.constants import ChatRoles
 
 architect_prompt = ChatPromptTemplate.from_messages(
     [
