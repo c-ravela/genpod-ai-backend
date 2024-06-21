@@ -9,7 +9,7 @@ from langchain_core.output_parsers import JsonOutputParser
 
 from prompts.architect import architect_prompt
 
-from models.enums import ProgressState
+from models.constants import Status
 from models.architect import RequirementsDoc
 
 from agents.architect.state import add_message
@@ -56,7 +56,7 @@ class ArchitectAgent:
         if state['error']:
             state = toggle_error(state)
         
-        if state['project_state'] == ProgressState.NEW.value:
+        if state['project_state'] == Status.NEW.value:
             print(state)
             architect_solution = self.architect_chain.invoke(state['messages'])
             expected_keys = [item for item in RequirementsDoc.__annotations__ if item != "description"]
@@ -66,7 +66,7 @@ class ArchitectAgent:
             if key not in architect_solution['parsed']:
                 missing_keys.append(key)
 
-        if (state['project_state'] == ProgressState.NEW.value) and architect_solution['parsing_error']:
+        if (state['project_state'] == Status.NEW.value) and architect_solution['parsing_error']:
             raw_output = architect_solution['raw']
             error = architect_solution['parsing_error']
 
@@ -81,13 +81,13 @@ class ArchitectAgent:
                     "user",
                     f"ERROR: Now, try again. Invoke the RequirementsDoc tool to structure the output with a project_name, well_documented, tasks, project_folder_structure, next_task and call_next, you missed {missing_keys} in your previous response",        
             ))
-        elif state['project_state'] == ProgressState.AWAITING.value:
+        elif state['project_state'] == Status.AWAITING.value:
             state['current_task'] = state['tasks'].pop(0)
             
             if state['current_task'] is None:
-                state['project_state'] = ProgressState.DONE.value
+                state['project_state'] = Status.DONE.value
             else:
-                state['project_state'] = ProgressState.INPROGRESS.value
+                state['project_state'] = Status.INPROGRESS.value
 
             state = add_message(state, (
                 "assistant",
@@ -99,7 +99,7 @@ class ArchitectAgent:
             state['project_folder_structure'] = architect_solution['parsed']['project_folder_structure']
             state['tasks'] = ast.literal_eval(architect_solution['parsed']['tasks'])
             state['current_task'] = state['tasks'].pop(0)
-            state['curr_task_status'] = ProgressState.NEW.value
+            state['curr_task_status'] = Status.NEW.value
 
             state = add_message(state, (
                 "assistant",
@@ -114,10 +114,10 @@ class ArchitectAgent:
         agent and returns the name of the next agent or "__end__".
         """
 
-        if state['error'] or (state['project_state'] == ProgressState.AWAITING.value):
+        if state['error'] or (state['project_state'] == Status.AWAITING.value):
             return self.name
     
-        if state['project_state'] == ProgressState.DONE.value:
+        if state['project_state'] == Status.DONE.value:
             return "__end__"
         
         return "__end__"
