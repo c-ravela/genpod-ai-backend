@@ -6,15 +6,18 @@ generating appropriate responses.
 """
 
 from langchain_core.output_parsers import JsonOutputParser
+from langchain_core.runnables.base import RunnableSequence
 
-from prompts.architect import architect_prompt
+from prompts.architect import ArchitectPrompts
+
+from models.models import Task
 
 from models.constants import Status
+from models.constants import ChatRoles
+from models.architect import QueryResult
 from models.architect import RequirementsDoc
 
 from agents.architect.state import ArchitectState
-
-import ast
 
 class ArchitectAgent:
     """
@@ -25,7 +28,10 @@ class ArchitectAgent:
     a chain of tools to parse the user input and generate a structured output.
     """
 
-    name = "architect"
+    name: str = "architect"
+    state: ArchitectState = ArchitectState()
+    requirements_genetation_chain: RunnableSequence
+    additional_information_chain: RunnableSequence
 
     def __init__(self, llm) -> None:
         """
@@ -35,76 +41,105 @@ class ArchitectAgent:
 
         self.llm = llm
         
-        # architect chain
-        self.architect_chain = (
-            architect_prompt
+        # This chain is used initially when the project requirements need to be generated
+        self.requirements_genetation_chain = (
+            {
+                "user_request": lambda x: x["user_request"],
+                "user_requested_standards": lambda x: x["user_requested_standards"]
+            }
+            | ArchitectPrompts.requirements_generation_prompt(RequirementsDoc)
             | self.llm.with_structured_output(RequirementsDoc, include_raw=True)
             | JsonOutputParser()
         )
+
+        # This chain is used when team member requests for additional information to complete 
+        # the task
+        self.additional_information_chain = (
+            {
+                "chat_history": lambda x: x["messages"],
+                "requirements_document": lambda x: x["requirements_overview"],
+                "current_task": lambda x: x["current_task"],
+                "question": lambda x: x["question"]
+            }
+            | ArchitectPrompts.additional_info_prompt(QueryResult)
+            | self.llm.with_structured_output(QueryResult, include_raw=True)
+            | JsonOutputParser()
+        )
+
+    def toggle_error(self) -> None:
+        """
+        Toggles the error field in the state. If the error is True, it becomes 
+        False and vice versa.
+
+        Returns:
+            ArchitectState: The updated state with the toggled error field.
+        """
+
+        self.state['error'] = not self.state['error']
+
+    def add_message(self, message: tuple[str, str]) -> None:
+        """
+        Adds a single message to the messages field in the state.
+
+        Args:
+            message (tuple[str, str]): The message to be added.
+
+        Returns:
+            ArchitectState: The updated state with the new message added to the 
+            messages field.
+        """
+
+        self.state['messages'] += [message]
 
     def node(self, state: ArchitectState) -> ArchitectState:
         """
         Processes the current state of the Architect agent, updates the state 
         based on the user input, and returns the updated state.
         """
+        self.state = state
 
-        expected_keys = []
-        architect_solution = {}
+        if self.state['project_state'] == Status.NEW:
+            architect_solution = self.requirements_genetation_chain.invoke({
+                "user_request": self.state['user_request'],
+                "user_requested_standards": self.state["user_requested_standards"]
+            })
 
-        if state['error']:
-            state.toggle_error()
-        
-        if state['project_state'] == Status.NEW.value:
-            print(state)
-            architect_solution = self.architect_chain.invoke(state['messages'])
-            expected_keys = [item for item in RequirementsDoc.__annotations__ if item != "description"]
-        
-        missing_keys = [] 
-        for key in expected_keys:
-            if key not in architect_solution['parsed']:
-                missing_keys.append(key)
+            self.state["project_name"] = architect_solution['parsed']['project_name']
+            self.state["requirements_overview"] = architect_solution['parsed']['well_documented']
+            self.state["project_folder_strucutre"] = architect_solution['parsed']['project_folder_strucutre']
+            self.state["tasks"] = architect_solution['parsed']['tasks']
 
-        if (state['project_state'] == Status.NEW.value) and architect_solution['parsing_error']:
-            raw_output = architect_solution['raw']
-            error = architect_solution['parsing_error']
-
-            state.toggle_error()
-            state = add_message(state, (
-                "user",
-                f"ERROR: parsing your output! Be sure to invoke the tool. Output: {raw_output}. \n Parse error: {error}"
+            self.add_message((
+                ChatRoles.AI.value,
+                "The project implementation has been successfully initiated. Please proceed "
+                "with the next steps as per the requirements documents.",
             ))
-        elif missing_keys:
-            state.toggle_error()
-            state = add_message(state, (
-                    "user",
-                    f"ERROR: Now, try again. Invoke the RequirementsDoc tool to structure the output with a project_name, well_documented, tasks, project_folder_structure, next_task and call_next, you missed {missing_keys} in your previous response",        
-            ))
-        elif state['project_state'] == Status.AWAITING.value:
-            state['current_task'] = state['tasks'].pop(0)
-            
-            if state['current_task'] is None:
-                state['project_state'] = Status.DONE.value
+
+        elif self.state['current_task'].task_status == Status.AWAITING:
+            architect_solution = self.additional_information_chain.invoke({
+                "chat_history": self.state['messages'],
+                "current_task": self.state['current_task'].description,
+                "requirements_document": self.state["requirements_overview"],
+                "question": self.state['current_task'].question
+            })
+
+            if architect_solution['parsed']['is_answer_found']:
+                self.state["current_task"].additional_info = architect_solution['parsed']['response_text']
+
+                self.add_message((
+                    ChatRoles.AI.value,
+                    "Additional information has been successfully provided. You may now proceed "
+                    "with task completion."
+                ))
             else:
-                state['project_state'] = Status.INPROGRESS.value
-
-            state = add_message(state, (
-                "assistant",
-                f"A new task: '{state['current_task']}' has been assigned! Please check the details and start working on it."
-            ))
-        else:
-            state['requirements_overview'] = architect_solution['parsed']['well_documented']
-            state['project_name'] = architect_solution['parsed']['project_name']
-            state['project_folder_structure'] = architect_solution['parsed']['project_folder_structure']
-            state['tasks'] = ast.literal_eval(architect_solution['parsed']['tasks'])
-            state['current_task'] = state['tasks'].pop(0)
-            state['curr_task_status'] = Status.NEW.value
-
-            state = add_message(state, (
-                "assistant",
-                "Well documented requirements are present now. see what task needs to be completed and please do that now.",
-            )) 
+                self.add_message((
+                    ChatRoles.AI.value,
+                    "Unfortunately, I couldn't provide the additional information requested. "
+                    "Please assess if you can complete the task with the existing details, or "
+                    "consider abandoning the task if necessary."
+                ))
         
-        return state
+        return {**self.state}
     
     def router(self, state: ArchitectState) -> str:
         """
@@ -112,11 +147,4 @@ class ArchitectAgent:
         agent and returns the name of the next agent or "__end__".
         """
 
-        if state['error'] or (state['project_state'] == Status.AWAITING.value):
-            return self.name
-    
-        if state['project_state'] == Status.DONE.value:
-            return "__end__"
-        
         return "__end__"
-
