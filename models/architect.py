@@ -31,13 +31,14 @@ class RequirementsDoc(BaseModel):
 
     well_documented: str = Field(
         description="A comprehensive requirements document constructed from"
-        " the user's input", 
+        " the user's input in a markdown format.", 
         required=True
     )
 
-    tasks: str = Field(
-        description="A list of tasks derived from the detailed requirements, "
-        "each providing sufficient context crucial for the completion process", 
+    tasks: list[str] = Field(
+        description="The list of tasks derived from the detailed requirements, "
+        "each providing sufficient context with detailed information crucial for "
+        "the task completion process", 
         required=True
     )
 
@@ -48,3 +49,18 @@ class RequirementsDoc(BaseModel):
    
     description: ClassVar[str] = "Schema representing the documents to be "
     "generated based on the project requirements."
+
+class QueryResult(BaseModel):
+    """
+    This model represents the result of a query or question. It contains information 
+    about whether an answer was found and what the answer is.
+    """
+
+    is_answer_found: bool = Field(
+        description="Indicates if an answer was found or provided in response to the question",
+        required=True
+    )
+
+    response_text: str = Field(
+        description="The response provided to the user's question"
+    )
