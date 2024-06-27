@@ -7,8 +7,7 @@ are used to structure the data in a consistent and organized manner, enhancing
 the readability and maintainability of the code.
 """
 
-from pydantic import Field
-from pydantic import BaseModel
+from pydantic import Field, BaseModel
 from models.constants import Status
 
 class Task(BaseModel):

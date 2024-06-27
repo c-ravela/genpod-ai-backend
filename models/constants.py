@@ -74,3 +74,38 @@ class Status(Enum):
             str: The value of the Enum member.
         """
         return self.value
+
+
+class PStatus(Enum):
+    """
+    An enumeration representing the various states a project can be in.
+
+    This class is used to track the progress of a project. The states
+    include 'NEW', 'INITIAL', 'EXECUTING', 'MONITORING', and 'HALTED'. These
+    states help in identifying the current status of a task or project.
+
+    Attributes:
+        NEW (str): Represents the Pre-init state of a project.
+        INITIAL (str): Represents the inital state when a project is waiting
+          for the setup to be completed.
+        EXECUTING (str): Represents the state of the project when a task is
+          currently being worked on.
+        MONITORING (str): Represents the state of the project when an issue as
+          arised while executing a task.
+        HALTED (str): Represents the final state of the project when all tasks
+          have been completed or something could not be resolved so, use this to loop in HUMAN.
+    """
+    NEW: str = "NEW"
+    INITIAL: str = "INITIAL"
+    EXECUTING: str = "EXECUTING"
+    MONITORING: str = "MONITORING"
+    HALTED: str = "HALTED"
+
+    def __str__(self):
+        """
+        Returns the string representation of the Enum member.
+
+        Returns:
+            str: The value of the Enum member.
+        """
+        return self.value
