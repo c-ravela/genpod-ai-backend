@@ -6,54 +6,104 @@ state.
 """
 
 from typing_extensions import TypedDict
+from typing_extensions import Annotated
 
 from models.models import Task
+from models.constants import Status
 
 class ArchitectState(TypedDict): 
     """
     ArchitectState Class
 
-    This class represents the state of the Architect agent. It includes fields 
-    for error status, tasks, project folders, current task, project state, and 
-    messages. Each field has a specific type and role in maintaining the state 
-    of the agent.
+    This class encapsulates the state of the Architect agent, providing a 
+    snapshot of the ongoing project's status and progress. 
+
+    Attributes:
+        user_request (str): The original set of requirements provided by the user, 
+        serving as the foundation for the project.
+
+        user_requested_standards (str): The specific standards or protocols the user has 
+        requested to be implemented in the project, which could include coding standards, 
+        design patterns, or industry-specific standards.
+
+        project_name (str): The name of the project.
+
+        project_folder_structure (str): The organized layout of directories and subdirectories 
+        that form the project's file system, adhering to best practices for project structure.
+
+        requirements_overview (str): A comprehensive, well-structured document in markdown 
+        format that outlines the project's requirements derived from the user's request. 
+        This serves as a guide for the development process.
+
+        tasks (list[Task]): A list of Task objects, each encapsulating a distinct unit of work 
+        necessary for the project's completion. These tasks are meant to be carried out by the 
+        entire team collectively.
+
+        current_task (Task): The Task object currently in focus, representing the active task 
+        that team members are working on.
+
+        project_state (Status): An enumerated value reflecting the project's current lifecycle 
+        stage, providing real-time tracking of project progress.
+
+        messages (list[tuple[str, str]]): A chronological list of tuples representing the 
+        conversation history between the system, user, and AI. Each tuple contains a role 
+        identifier (e.g., 'AI', 'tool', 'user', 'system') and the corresponding message.
     """
 
-    error: str
-    tasks: list[Task]
-    project_folders: list[str]
-    current_task: Task
-    project_state: str
-    messages: list[str]
+    user_request: Annotated[
+        str,
+        "The original set of requirements provided by the user, serving as the "
+        "foundation for the project."
+    ]
 
-def toggle_error(state: ArchitectState) -> ArchitectState:
-    """
-    Toggles the error field in the state. If the error is True, it becomes 
-    False and vice versa.
+    user_requested_standards: Annotated[
+        str,
+        "The specific standards or protocols the user has requested to be implemented"
+        " in the project, which could include coding standards, design patterns, or "
+        "industry-specific standards."
+    ]
 
-    Args:
-        state (ArchitectState): The current state of the Architect agent.
+    project_name: Annotated[
+        str, 
+        "The name of the project."
+    ]
 
-    Returns:
-        ArchitectState: The updated state with the toggled error field.
-    """
+    project_folder_strucutre: Annotated[
+        str,
+        "The organized layout of directories and subdirectories that form the project's "
+        "file system, adhering to best practices for project structure."
+    ]
 
-    state['error'] = not state['error']
-    
-    return state
+    requirements_overview: Annotated[
+        str, 
+        "A comprehensive, well-structured document in markdown format that outlines "
+        "the project's requirements derived from the user's request. This serves as a "
+        "guide for the development process."
+    ]
 
-def add_message(state: ArchitectState, message: tuple[str, str]) -> ArchitectState:
-    """
-    Adds a single message to the messages field in the state.
+    tasks: Annotated[
+        list[Task],
+        "A list of Task objects, each encapsulating a distinct unit of work necessary "
+        "for the project's completion. These tasks are meant to be carried out by the "
+        "entire team collectively."
+    ]
 
-    Args:
-        state (ArchitectState): The current state of the Architect agent.
-        message (tuple[str, str]): The message to be added.
+    current_task: Annotated[
+        Task,
+        "The Task object currently in focus, representing the active task that team "
+        "members are working on."
+    ]
 
-    Returns:
-        ArchitectState: The updated state with the new message added to the 
-        messages field.
-    """
+    project_state: Annotated[
+        Status,
+        "An enumerated value reflecting the project's current lifecycle stage, providing "
+        "real-time tracking of project progress."
+    ]
 
-    state['messages'] += [message]
-    return state
+    messages: Annotated[
+        list[tuple[str, str]], 
+        "A chronological list of tuples representing the conversation history between the "
+        "system, user, and AI. Each tuple contains a role identifier (e.g., 'AI', 'tool', "
+        "'user', 'system') and the corresponding message."
+    ]
+

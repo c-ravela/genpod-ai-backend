@@ -1,6 +1,8 @@
 {
     "name": "Genpod Development Environment",
-    "dockerComposeFile": ["docker-compose.yml"],
+    "dockerComposeFile": [
+        "docker-compose.yml"
+    ],
     "service": "genpod",
     "workspaceFolder": "/opt/genpod",
     "shutdownAction": "stopCompose",
@@ -20,12 +22,13 @@
                 "python.debugging.puppyRemoteRoot": "/opt/genpod"
             }
         }
-
     },
-    "forwardPorts": [8888],
+    "forwardPorts": [
+        8888
+    ],
     "remoteEnv": {
         "OPENAPI_KEY": "your_openapi_key_here",
-        "PROJECT_PATH" : "/", 
-        "STORE_TO_DB" : "NO"
+        "PROJECT_PATH": "/",
+        "STORE_TO_DB": "NO"
     }
 }

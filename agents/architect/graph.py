@@ -7,13 +7,14 @@ of control between different states of the Architect agent.
 
 from langgraph.graph import END
 from langgraph.graph import StateGraph
+from langgraph.graph.graph import CompiledGraph 
 
 from agents.architect.agent import ArchitectAgent
 from agents.architect.state import ArchitectState
 
-class Architect:
+class ArchitectGraph:
     """
-    Architect Class
+    ArchitectGraph Class
 
     This class defines the state graph for the Architect agent. The state 
     graph is used to manage the flow of control between different states of 
@@ -29,8 +30,9 @@ class Architect:
                
         self.agent = ArchitectAgent(llm)
         self.app = self.define_graph()
+        self.state = {}
 
-    def define_graph(self) -> any:
+    def define_graph(self) -> CompiledGraph:
         """
         Defines the state graph for the Architect agent. The graph includes 
         nodes representing different states of the agent and edges 
@@ -53,71 +55,23 @@ class Architect:
             }
         )
 
+        # entry point
         architect_flow.set_entry_point(self.agent.name)
+
         return architect_flow.compile()
-    
 
-if __name__ == "__main__":
-    from langchain_openai import ChatOpenAI
-    from pprint import pprint
-    import json
-
-    def read_input_json(file_path) -> str:
-        """Reads JSON data from a file and returns it as a string.
+    def update_state(self, state: any) -> any:
+        """
+        The method takes in a state, updates the current state of the object with the 
+        provided state, and then returns the updated state.
 
         Args:
-            file_path: The path to the JSON file.
+            state (any): The state to update the current state of the object with.
 
         Returns:
-            A string representation of the JSON data.
+            any: The updated state of the object.
         """
-        with open(file_path, 'r') as user_input_file:
-            data = json.load(user_input_file)
         
-        user_input = json.dumps(data)
-        license_txt = data["LICENSE_TEXT"]
+        self.state.update(state)
 
-        return user_input, license_txt
-    
-    llm = ChatOpenAI(model="gpt-4o-2024-05-13", temperature=0, max_retries=5, streaming=True, seed=4000)
-
-    try:
-        app = Architect(llm=llm)
-        user_input, license_text = read_input_json("../configs/rest_api.json")
-
-        new_state = {
-            "error": False,
-            "tasks": [],
-            "project_folders":"",
-            "current_task": {
-                'task': '',
-                'state': ''
-            },
-            "project_state": 'NEW',
-            "messages": []
-        }
-
-        events = app.stream(
-            {   
-                **new_state,
-                "messages": [
-                    (   "user",
-                        f"Create this project for me in '/opt/genpod/output'." 
-                        f"Requirements are {user_input}."
-                        f"{license_text} must be present at the top of each file created as part of the project." 
-                        "Once you code it up, finish."
-                    )
-                ]
-            },
-            # Maximum number of steps to take in the graph and the thread ID to be used to persist the memory.
-            {
-                "recursion_limit": 200,
-                "configurable": {"thread_id": "1"}
-            },
-        )
-
-        for s in events:
-            pprint(s)
-
-    except AssertionError as ae:
-        print(f"Assertion Error Occured: {ae}")
+        return {**self.state}
