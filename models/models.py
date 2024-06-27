@@ -19,18 +19,23 @@ class Task(BaseModel):
 
     description: str = Field(
         description="A brief description outlining the objective of the task",
+        default="",
         required=True
     )
 
     task_status: Status = Field(
         description="The current status indicating the progress of the task",
+        default= Status.NONE,
         required=True
     )
 
     additional_info: str = Field(
-        description="Additional info requested."
+        description="Additional info requested.",
+        default=""
     )
 
     question: str = Field(
-        description="Question to supervisor if additional information is needed to proceed with task execution."
+        description="Question to supervisor if additional information is needed"
+        " to proceed with task execution.",
+        default=""
     )

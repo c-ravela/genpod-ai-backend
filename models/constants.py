@@ -48,6 +48,7 @@ class Status(Enum):
     states help in identifying the current status of a task or project.
 
     Attributes:
+        NONE (str): Represents the task is empty.
         NEW (str): Represents the initial state of a task or project.
         AWAITING (str): Represents the state when a task or project is waiting
           for some event or dependency.
@@ -58,6 +59,7 @@ class Status(Enum):
         DONE (str): Represents the state when a task or project has been 
           completed.
     """
+    NONE: str = "NONE"
     NEW: str = "NEW"
     AWAITING: str = "AWAITING"
     INPROGRESS: str = "INPROGRESS"
