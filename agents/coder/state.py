@@ -16,11 +16,6 @@ class CoderState(TypedDict):
     current_task: Task
     current_step: Task
     steps: list[Task]
+    requirements_overview: str
+    project_folder_structure: str
     message: list[tuple[str, str]]
-
-    def toggle_error(self) -> None:
-        self.state['error'] = not self.state['error']
-
-    def add_message(self, message: tuple[str, str]) -> None:
-
-        self.state['messages'] += [message]

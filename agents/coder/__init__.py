@@ -1,9 +1,10 @@
-"""Coder Agent
+"""
+Coder Agent
 
-A dedicated Computer Programmer tasked with bringing the project to 
-completion, guided by the blueprint provided by the architect.
+A committed Computer Programmer whose job is to finish the project, guided by the 
+plan given by the team lead.
 
-* Embarks on the project development journey, meticulously 
-  following the architect's roadmap.
-* Accomplishes the assigned task with diligence and precision.
+* Starts the project development, carefully following the plan from the team lead.
+* Works on the given task with care and accuracy.
+* Finishes the tasks by writing the code and adding helpful comments.
 """

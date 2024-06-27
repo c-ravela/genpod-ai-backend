@@ -40,8 +40,8 @@ class CoderModel(BaseModel):
     )
 
     code: str = Field(
-        description="The complete, well-documented code that adheres to all "
-        "naming standards and is necessary to complete the task", 
+        description="The complete, well-documented working code that adheres to all "
+        "standards requested with the programming language, framework user requested ", 
         required=True
     )
     

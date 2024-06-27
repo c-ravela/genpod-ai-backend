@@ -4,7 +4,7 @@
 from langchain_core.output_parsers import JsonOutputParser
 
 from agents.coder.state import CoderState
-from models.enums import ChatRoles, ProgressState
+from models.constants import ChatRoles, Status
 from prompts.coder import coder_prompt
 
 from models.coder import CoderModel
