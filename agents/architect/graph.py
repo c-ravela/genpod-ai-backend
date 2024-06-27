@@ -43,20 +43,45 @@ class ArchitectGraph:
         architect_flow = StateGraph(ArchitectState)
 
         # node
-        architect_flow.add_node(self.agent.name, self.agent.node)
+        architect_flow.add_node(self.agent.architect, self.agent.node)
+        architect_flow.add_node(self.agent.write_requirements, self.agent.write_requirements_to_local)
+        architect_flow.add_node(self.agent.tasks_seperation, self.agent.tasks_seperation_node)
 
         # edges
         architect_flow.add_conditional_edges(
-            self.agent.name,
+            self.agent.architect,
             self.agent.router, 
             {
-                self.agent.name: self.agent.name,
+                self.agent.architect: self.agent.architect,
+                self.agent.tasks_seperation: self.agent.tasks_seperation,
+                self.agent.write_requirements:self.agent.write_requirements,
                 END:END
             }
         )
 
+        architect_flow.add_conditional_edges(
+            self.agent.tasks_seperation,
+            self.agent.router, 
+            {
+                self.agent.architect: self.agent.architect,
+                self.agent.tasks_seperation: self.agent.tasks_seperation,
+                self.agent.write_requirements:self.agent.write_requirements,
+                END:END
+            }
+        )
+
+        architect_flow.add_conditional_edges(
+            self.agent.write_requirements,
+            self.agent.router, 
+            {
+                self.agent.architect: self.agent.architect,
+                self.agent.tasks_seperation: self.agent.tasks_seperation,
+                self.agent.write_requirements:self.agent.write_requirements,
+                END:END
+            }
+        )
         # entry point
-        architect_flow.set_entry_point(self.agent.name)
+        architect_flow.set_entry_point(self.agent.architect)
 
         return architect_flow.compile()
 

@@ -48,6 +48,9 @@ class ArchitectState(TypedDict):
         messages (list[tuple[str, str]]): A chronological list of tuples representing the 
         conversation history between the system, user, and AI. Each tuple contains a role 
         identifier (e.g., 'AI', 'tool', 'user', 'system') and the corresponding message.
+
+        is_requirements_written_to_local (bool): A flag indicating if the requirements have been
+        written to the local system.
     """
 
     user_request: Annotated[
@@ -106,4 +109,3 @@ class ArchitectState(TypedDict):
         "system, user, and AI. Each tuple contains a role identifier (e.g., 'AI', 'tool', "
         "'user', 'system') and the corresponding message."
     ]
-

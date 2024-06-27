@@ -16,7 +16,10 @@ from langchain_core.prompts import ChatPromptTemplate
 
 from langchain.output_parsers import PydanticOutputParser
 
-from pydantic import BaseModel
+
+from models.architect import TasksList
+from models.architect import QueryResult
+from models.architect import RequirementsDoc
 
 class ArchitectPrompts:
     """
@@ -29,18 +32,23 @@ class ArchitectPrompts:
     """
 
     INITIAL_TEMPLATE: str ="""
-    As a Development Lead, you are entrusted with the implementation of the given project. 
-    Conduct a thorough analysis of the user request and construct a comprehensive document 
-    in markdown format necessary for project execution.
+    As a Development Lead, you are responsible for implementing the assigned project. Your 
+    duties include conducting a comprehensive analysis of the user request and creating a detailed 
+    document necessary for the completion of the project.
     
-    You should also be proficient in decomposing them into autonomous tasks that can be 
-    delegated to other team members.
+    You should be skilled in breaking down the project into independent tasks that can be assigned to 
+    team members. Each task should be self-contained and provide sufficient detail for the team member 
+    who will undertake it.
 
     Mandate the utilization of microservice architecture, adhere to the best practice methods 
     for project folder structure, 12-factor application standards, domain-driven microservice 
     application design, clean-code development architecture standards, and code commenting 
     standards throughout the project.
     
+    In addition, you should enforce programming language-specific standards. These standards vary depending 
+    on the language used, but they generally include conventions for naming, commenting, indentation, and 
+    organization of code.
+
     Enforce these user-requested standards as well:
     {user_requested_standards}
 
@@ -48,10 +56,41 @@ class ArchitectPrompts:
     OpenAPI specification file for the project in YAML format, dependency package manager files, 
     Dockerfile, .dockerignore, and a .gitignore file.
 
+    I want you to adhere to all the requriements mentioned above, I always want the document to include
+    tasks, standards, project folder strucrure to be present. The document should be structured in a well
+    formated markdown format.
+
+    Output format instructions:
     {format_instructions}
 
     User Request:
     {user_request}
+    """
+
+    REQUIREMENTS_ERROR_TEMPLATE: str = """
+    It seems like the previous output was missing some fields. Here's the previous output for your 
+    reference:
+
+    Previous Output:
+    {previous_output}
+
+    Please ensure that the following fields are included in the output:
+
+    Missing Fields:
+    {missing_fields}
+
+    Here's the context you might need:
+
+    User Requested Standards:
+    {user_requested_standards}
+
+    Format Instructions:
+    {format_instructions}
+
+    User Request:
+    {user_request}
+
+    Please revise the output and make sure it adheres to the user's request and includes all the necessary fields.
     """
 
     ADDITIONAL_INFO_TEMPLATE: str = """
@@ -64,9 +103,6 @@ class ArchitectPrompts:
 
     {format_instructions}
 
-    Chat History:
-    {chat_history}
-
     Previously Prepared Requirements Documents:
     {requirements_document}
 
@@ -77,7 +113,45 @@ class ArchitectPrompts:
     {question}
     """
 
-    def requirements_generation_prompt(self, pydantic_model: BaseModel) -> ChatPromptTemplate: 
+    TASK_SEPARATION_TEMPLATE: str = """
+    You have previously generated a well-formatted requirements document in markdown 
+    format. Here is the generated requirements document:
+
+    {requirements_document}
+
+    The tasks suggested by you are as follows:
+    {tasks}
+
+    Below is an example of how the tasks should be formatted from the source:
+
+    [
+        "**Project Setup**
+            - Initialize the project structure.
+            - Set up version control with Git.
+            - Create `.gitignore` and `.dockerignore` files.",
+
+        "**Database Configuration**
+            - Set up MySQL database.
+            - Create database connection module.", 
+
+        "**API Endpoints**
+            - Create FastAPI application.
+            - Implement CRUD operations for User resource.",
+        .
+        .
+        .
+        .
+        "Task N"
+    ]
+
+    Your task is to convert the tasks from this markdown document into a list or an array. 
+    Each task should be copied exactly as it appears in the markdown document and transformed 
+    into an item in the list or array. No modifications should be made to the statements.
+
+    {format_instructions}
+    """
+
+    def requirements_generation_prompt(self) -> ChatPromptTemplate: 
         """
         This method generates a prompt for the initial project requirements based on the 
         provided Pydantic model.
@@ -92,11 +166,22 @@ class ArchitectPrompts:
         return ChatPromptTemplate.from_template(
             template=self.INITIAL_TEMPLATE,
             partial_variables = {
-                "format_instructions": PydanticOutputParser(pydantic_object=pydantic_model)
+                "format_instructions": PydanticOutputParser(pydantic_object=RequirementsDoc).get_format_instructions()
             }
         )
 
-    def additional_info_prompt(self, pydantic_model: BaseModel) -> ChatPromptTemplate:
+    def requirements_generation_error_prompt(self) -> ChatPromptTemplate:
+        """
+        """
+
+        return ChatPromptTemplate.from_template(
+            template=self.REQUIREMENTS_ERROR_TEMPLATE,
+            partial_variables = {
+                "format_instructions": PydanticOutputParser(pydantic_object=RequirementsDoc).get_format_instructions()
+            }
+        )
+    
+    def additional_info_prompt(self) -> ChatPromptTemplate:
         """
         This method generates a prompt for providing additional information during 
         project implementation based on the provided Pydantic model.
@@ -110,7 +195,18 @@ class ArchitectPrompts:
                 
         return ChatPromptTemplate.from_template(
             template=self.ADDITIONAL_INFO_TEMPLATE,
-            partial_varibales = {
-                "format_instructions": PydanticOutputParser(pydantic_object=pydantic_model)
+            partial_variables = {
+                "format_instructions": PydanticOutputParser(pydantic_object=QueryResult).get_format_instructions()
+            }
+        )
+
+    def task_seperation_prompt(self) -> ChatPromptTemplate:
+        """
+        """
+
+        return ChatPromptTemplate.from_template(
+            template=self.TASK_SEPARATION_TEMPLATE,
+            partial_variables = {
+                "format_instructions": PydanticOutputParser(pydantic_object=TasksList).get_format_instructions()
             }
         )
