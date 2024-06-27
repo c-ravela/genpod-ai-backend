@@ -1,9 +1,9 @@
 from langchain_core.output_parsers import StrOutputParser
 from langchain_core.output_parsers import JsonOutputParser
-from langchain.vectorstores import Chroma
+from langchain_community.vectorstores import Chroma
 from langchain_openai import OpenAIEmbeddings
-from rag_workflow.rag_state import RAGState
-from rag_workflow.rag_prompts import RAGPrompts
+from agents.rag_workflow.rag_state import RAGState
+from agents.rag_workflow.rag_prompts import RAGPrompts
 
 class RAGAgent():
     def __init__(self, llm, collection_name, persist_directory=None):
@@ -34,6 +34,8 @@ class RAGAgent():
             | StrOutputParser()
         )
 
+        self.state = {}
+        
     def retrieve(self, state: RAGState):
         """
         Retrieve documents
@@ -182,3 +184,7 @@ class RAGAgent():
         else:
             print("---DECISION: GENERATION IS NOT GROUNDED IN DOCUMENTS, RE-TRY---")
             return "not supported"
+    
+    def update_state(self, state: RAGState):
+        self.state = {**state}
+        return {**state}

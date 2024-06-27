@@ -7,4 +7,3 @@ into detailed documentation for team members.
 * Determines the optimal folder structure for the project.
 * Generates a comprehensive list of tasks necessary for project completion.
 """
-
