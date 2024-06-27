@@ -156,9 +156,6 @@ class ArchitectPrompts:
         This method generates a prompt for the initial project requirements based on the 
         provided Pydantic model.
         
-        Args:
-            pydantic_model (BaseModel): The Pydantic model containing the project requirements.
-
         Returns:
             ChatPromptTemplate: The generated prompt.
         """
@@ -172,6 +169,11 @@ class ArchitectPrompts:
 
     def requirements_generation_error_prompt(self) -> ChatPromptTemplate:
         """
+        This method generates a prompt for handling errors during the project 
+        requirements generation.
+        
+        Returns:
+            ChatPromptTemplate: The generated error prompt.
         """
 
         return ChatPromptTemplate.from_template(
@@ -186,9 +188,6 @@ class ArchitectPrompts:
         This method generates a prompt for providing additional information during 
         project implementation based on the provided Pydantic model.
         
-        Args:
-            pydantic_model (BaseModel): The Pydantic model containing the additional information.
-
         Returns:
             ChatPromptTemplate: The generated prompt.
         """
@@ -202,6 +201,10 @@ class ArchitectPrompts:
 
     def task_seperation_prompt(self) -> ChatPromptTemplate:
         """
+        This method generates a prompt for separating tasks from a markdown document into a list or an array.
+        
+        Returns:
+            ChatPromptTemplate: The generated prompt.
         """
 
         return ChatPromptTemplate.from_template(
