@@ -13,6 +13,9 @@ from typing_extensions import ClassVar
 from pydantic import Field
 from pydantic import BaseModel
 
+from models.constants import Status
+from models.models import Task
+
 class RequirementsDoc(BaseModel):
     """
     A data model representing the output of the Architect agent in the form
@@ -35,11 +38,12 @@ class RequirementsDoc(BaseModel):
         required=True
     )
 
-    tasks: list[str] = Field(
-        description="The list of tasks derived from the detailed requirements, "
-        "each providing sufficient context with detailed information crucial for "
-        "the task completion process", 
-        required=True
+    tasks: str = Field(
+        description="This field represents a list of tasks necessary for the successful "
+        "completion of a project. Each task is self-contained, providing comprehensive "
+        "details to ensure clarity for the assignee. Tasks should be formatted in valid "
+        "markdown for readability and structure.", 
+        required=True,
     )
 
     project_folder_structure: str = Field(
@@ -49,6 +53,17 @@ class RequirementsDoc(BaseModel):
    
     description: ClassVar[str] = "Schema representing the documents to be "
     "generated based on the project requirements."
+
+class TasksList(BaseModel):
+    """
+    """
+    
+    tasks: str = Field(
+        description="The list of tasks in the form of string derived from the detailed requirements, "
+        "each providing sufficient context with detailed information crucial for "
+        "the task completion process", 
+        required=True,
+    )
 
 class QueryResult(BaseModel):
     """
