@@ -18,12 +18,12 @@ from models.models import Task
 
 class RequirementsDoc(BaseModel):
     """
-    A data model representing the output of the Architect agent in the form
-    of a Requirements Document.
+    A data model representing the output of the llm in the form of a 
+    Requirements Document.
 
     This model includes various fields that capture the essential details of 
     the project requirements, such as the project name, a well-documented 
-    requirements document, a list of tasks derived from the requirements, and
+    requirements document, a set of tasks derived from the requirements, and
     the project folder structure to follow.
     """
 
@@ -56,6 +56,9 @@ class RequirementsDoc(BaseModel):
 
 class TasksList(BaseModel):
     """
+    The TasksList class is a Pydantic model that represents a list of tasks for a project. 
+    Each task in the list provides sufficient context and detailed information crucial for 
+    the task completion process.
     """
     
     tasks: str = Field(
@@ -64,6 +67,8 @@ class TasksList(BaseModel):
         "the task completion process", 
         required=True,
     )
+
+    description: ClassVar[str] = "Schema representing a list of tasks derived from the project requirements."
 
 class QueryResult(BaseModel):
     """
@@ -79,3 +84,5 @@ class QueryResult(BaseModel):
     response_text: str = Field(
         description="The response provided to the user's question"
     )
+
+    description: ClassVar[str] = "Schema representing the result of a query or question."

@@ -1,4 +1,8 @@
 .env
+.venv
 
-**/.ipynb_checkpoints  
+**/.ipynb_checkpoints
 vector_collections/
+**/__pycache__
+
+output

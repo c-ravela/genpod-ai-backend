@@ -8,6 +8,6 @@ WORKDIR /opt/genpod
 COPY . .
 
 # update and install necessary packages
-RUN apt-get update && apt-get install -y make less && pip install -r requirements.txt
+RUN apt-get update && apt-get install -y make less sqlite3 && pip install -r requirements.txt
 
 CMD ["sleep", "infinity"]
