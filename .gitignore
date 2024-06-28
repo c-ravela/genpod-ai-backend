@@ -6,3 +6,8 @@ vector_collections/
 **/__pycache__
 
 output
+.vscode/
+**.svg
+agents/__init__.py
+output.txt
+scratch.py
