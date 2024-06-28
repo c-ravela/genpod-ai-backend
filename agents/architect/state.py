@@ -9,7 +9,7 @@ from typing_extensions import TypedDict
 from typing_extensions import Annotated
 
 from models.models import Task
-from models.constants import Status
+from models.constants import PStatus
 
 class ArchitectState(TypedDict): 
     """
@@ -42,7 +42,7 @@ class ArchitectState(TypedDict):
         current_task (Task): The Task object currently in focus, representing the active task 
         that team members are working on.
 
-        project_state (Status): An enumerated value reflecting the project's current lifecycle 
+        project_status (PStatus): An enumerated value reflecting the project's current lifecycle 
         stage, providing real-time tracking of project progress.
 
         messages (list[tuple[str, str]]): A chronological list of tuples representing the 
@@ -52,6 +52,8 @@ class ArchitectState(TypedDict):
         generated_project_path (str): The absolute path in the file system where the project 
         is being generated. This path is used to store all the project-related files and 
         directories.
+
+        query_answered (bool): A boolean flag indicating whether the task has been answered
     """
 
     user_request: Annotated[
@@ -98,8 +100,8 @@ class ArchitectState(TypedDict):
         "members are working on."
     ]
 
-    project_state: Annotated[
-        Status,
+    project_status: Annotated[
+        PStatus,
         "An enumerated value reflecting the project's current lifecycle stage, providing "
         "real-time tracking of project progress."
     ]
@@ -115,4 +117,9 @@ class ArchitectState(TypedDict):
         str,
         "The absolute path in the file system where the project is being generated. "
         "This path is used to store all the project-related files and directories."
+    ]
+
+    query_answered = Annotated[
+        bool,
+        "A boolean flag indicating whether the task has been answered",
     ]
