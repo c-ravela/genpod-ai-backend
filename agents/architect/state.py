@@ -9,7 +9,7 @@ from typing_extensions import TypedDict
 from typing_extensions import Annotated
 
 from models.models import Task
-from models.constants import Status
+from models.constants import PStatus
 
 class ArchitectState(TypedDict): 
     """
@@ -42,7 +42,7 @@ class ArchitectState(TypedDict):
         current_task (Task): The Task object currently in focus, representing the active task 
         that team members are working on.
 
-        project_state (Status): An enumerated value reflecting the project's current lifecycle 
+        project_status (PStatus): An enumerated value reflecting the project's current lifecycle 
         stage, providing real-time tracking of project progress.
 
         messages (list[tuple[str, str]]): A chronological list of tuples representing the 
@@ -100,8 +100,8 @@ class ArchitectState(TypedDict):
         "members are working on."
     ]
 
-    project_state: Annotated[
-        Status,
+    project_status: Annotated[
+        PStatus,
         "An enumerated value reflecting the project's current lifecycle stage, providing "
         "real-time tracking of project progress."
     ]

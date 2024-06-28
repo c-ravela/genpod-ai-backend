@@ -11,6 +11,7 @@ from langchain_core.runnables.base import RunnableSequence
 
 from prompts.architect import ArchitectPrompts
 
+from models.constants import PStatus
 from models.constants import Status
 from models.constants import ChatRoles
 
@@ -152,7 +153,7 @@ class ArchitectAgent:
         for ti in ts_list:
             tasks_list.append(Task(
                 description=ti,
-                task_status=Status.NEW
+                task_status=Status.NEW.value
             ))   
 
         return tasks_list
@@ -197,7 +198,7 @@ class ArchitectAgent:
         self.state = state
         self.last_visited_node = self.requirements_and_additional_context
 
-        if self.state['project_state'] == Status.NEW:
+        if self.state['project_status'] == PStatus.INITIAL.value:
             if not self.hasError:
                 llm_response = self.requirements_genetation_chain.invoke({
                     "user_request": self.state['user_request'],
@@ -222,7 +223,7 @@ class ArchitectAgent:
                 self.expected_keys = []
             
             self.expected_keys = [item for item in RequirementsDoc.__annotations__ if item != "description"]
-        elif self.state['current_task'].task_status == Status.AWAITING:
+        elif self.state['current_task'].task_status == Status.AWAITING.value:
             llm_response = self.additional_information_chain.invoke({
                 "current_task": self.state['current_task'].description,
                 "requirements_overview": self.state["requirements_overview"],
@@ -254,7 +255,7 @@ class ArchitectAgent:
                     f"ERROR: Output was not structured properly. Expected keys: {self.expected_keys}, "
                     f"Missing Keys: {self.missing_keys}."        
                 ))
-            elif self.state['project_state'] == Status.NEW:
+            elif self.state['project_status'] == PStatus.INITIAL.value:
 
                 self.state["project_name"] = llm_response['parsed']['project_name']
                 self.state["requirements_overview"] = llm_response['parsed']['well_documented']
@@ -268,7 +269,7 @@ class ArchitectAgent:
                     "with the next steps as per the requirements documents.",
                 ))
 
-            elif self.state['current_task'].task_status == Status.AWAITING:
+            elif self.state['current_task'].task_status == Status.AWAITING.value:
                 
                 if llm_response['parsed']['is_answer_found']:
                     self.state["query_answered"] = True
