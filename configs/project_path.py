@@ -1,33 +1,39 @@
 """
-This module manages the Project generation path.
+This module is responsible for managing the path generation for projects. 
+It provides functionalities to set up a unique project path by creating a new 
+directory with a timestamp. This ensures that each project has its own 
+dedicated directory, preventing any overlap or overwriting of data.
+
+The main function in this module is `set_project_path`, which sets the path 
+for a new project and creates a new directory at that path with the current 
+timestamp.
 """
-from datetime import datetime
+
+from utils.fs import create_directory_with_timestamp
 
 import os
 
-project_path = os.getenv("PROJECT_PATH", os.path.join(os.getcwd(), "output", "project"))
-
-def create_path_with_timestamp() -> str:
+def set_project_path(project_path: str=os.path.join(os.getcwd(), "output", "project")) -> str:
     """
-    Creates a new directory with the current timestamp appended to the project path.
-    The directory is created only if it does not already exist.
+    Sets the path for a new project and creates a new directory at that path 
+    with the current timestamp. If the path already exists, no new directory 
+    is created.
+
+    Args:
+        project_path (str, optional): The base path where the new project 
+                                       directory will be created. Defaults to 
+                                       the 'output/project' directory in the 
+                                       current working directory.
 
     Returns:
-        str: The path to the newly created directory.
+        str: The path of the newly created project directory. If a directory 
+             with the same timestamp already exists, the path of the existing 
+             directory is returned.
+
+    Example:
+        If the function is called on June 27, 2024 at 22:22:43.027072, the 
+        returned path will be '<cwd>/output/project/2024-06-27 22:22:43.027072'.
+
     """
-    
-    timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S.%f")
 
-    project_path_timestamp = os.path.join(project_path, timestamp)
-    if not os.path.exists(project_path_timestamp):
-        os.makedirs(project_path_timestamp)
-
-    return project_path_timestamp
-
-"""
-Define the path to the project creation
-Example of how path looks
-
-/opt/output/2024-06-27 22:22:43.027072
-"""
-GENERATED_PROJECT_PATH = create_path_with_timestamp()
+    return create_directory_with_timestamp(project_path)
