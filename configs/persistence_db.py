@@ -7,7 +7,7 @@ Database: genpod.db
 
 import os
 
-db_dir = os.path.join(os.getcwd(), "output")
+db_dir = os.path.join(os.getcwd(), "output", "database")
 
 if not os.path.exists(db_dir):
     os.makedirs(db_dir)
