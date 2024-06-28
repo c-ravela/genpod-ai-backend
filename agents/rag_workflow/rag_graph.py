@@ -30,7 +30,15 @@ class RAGWorkFlow():
                 "generate": "generate",
             },
         )
-        self.rag_workflow.add_edge("transform_query", "retrieve")
+        # self.rag_workflow.add_edge("transform_query", "retrieve")
+        self.rag_workflow.add_conditional_edges(
+            "transform_query",
+            lambda x: x["next"],
+            {
+                "retrieve": "retrieve",
+                "update_state": "update_state",
+            },
+        )
         self.rag_workflow.add_conditional_edges(
             "generate",
             self.agent.grade_generation_v_documents_and_question,

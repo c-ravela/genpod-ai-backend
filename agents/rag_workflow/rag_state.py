@@ -10,9 +10,12 @@ class RAGState(TypedDict):
         question: question
         generation: LLM generation
         documents: list of documents
+        iteration_count: max number of times transform query can happen
     """
 
     question: str
     generation: str
     documents: List[str]
     iteration_count: int
+    next: str
+    query_answered: bool

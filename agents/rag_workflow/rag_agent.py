@@ -66,6 +66,7 @@ class RAGAgent():
         print("---GENERATE---")
         question = state["question"]
         documents = state["documents"]
+        state['query_answered'] = True
 
         # RAG generation
         generation = self.rag_generation_chain.invoke({"context": documents, "question": question})
@@ -111,14 +112,19 @@ class RAGAgent():
         Returns:
             state (dict): Updates question key with a re-phrased question
         """
+        if state['iteration_count'] <= 0:
+            state['generation'] = "I don't have any additional information about the question."
+            state['query_answered'] = False
+            return {**state, "next":"update_state"}
 
         print("---TRANSFORM QUERY---")
         question = state["question"]
         documents = state["documents"]
+        state["iteration_count"] -= 1
 
         # Re-write question
         better_question = self.question_rewriter.invoke({"question": question})
-        return {**state, "documents": documents, "question": better_question}
+        return {**state, "documents": documents, "question": better_question, "next":"retrieve"}
 
     def decide_to_generate(self, state: RAGState):
         """
