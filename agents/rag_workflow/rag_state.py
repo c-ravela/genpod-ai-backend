@@ -15,3 +15,4 @@ class RAGState(TypedDict):
     question: str
     generation: str
     documents: List[str]
+    iteration_count: int
