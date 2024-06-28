@@ -8,8 +8,10 @@ THREAD_IDS = {
 }
 
 # Currently only use this value for collection_name if you have embeded and saved vector into the db with a differnet name then you can use it here.
-VECTOR_DB_COLLECTIONS = {'MISMO-version-3.6-docs':"C:/Users/vkumar/Desktop/genpod-ai-backend/vector_collections"}
+VECTOR_DB_COLLECTIONS = {'MISMO-version-3.6-docs':"path/to/your/vector_collections"}
 
 MEMBERS = ['RAG','Architect','Planner']
+
+RAG_TRY_LIMIT = 1
 
 # VECTOR_DB_PERSISTENCE_LOCATION = "C:/Users/vkumar/Desktop/genpod-ai-backend/vector_collections"
