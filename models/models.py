@@ -6,6 +6,7 @@ capturing a specific set of information required for the project. These models
 are used to structure the data in a consistent and organized manner, enhancing 
 the readability and maintainability of the code.
 """
+from typing_extensions import ClassVar
 
 from pydantic import Field, BaseModel
 from models.constants import Status
@@ -26,6 +27,11 @@ class Task(BaseModel):
         description="The current status indicating the progress of the task",
         default= Status.NONE,
         required=True
+    )
+
+    query_answered: bool = Field(
+        description="A boolean flag indicating whether the task has been answered",
+        default=False
     )
 
     additional_info: str = Field(
