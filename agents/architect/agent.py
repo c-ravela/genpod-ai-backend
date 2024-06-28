@@ -260,6 +260,7 @@ class ArchitectAgent:
                 self.state["requirements_overview"] = llm_response['parsed']['well_documented']
                 self.state["project_folder_strucutre"] = llm_response['parsed']['project_folder_structure']
                 self.tasks = llm_response['parsed']['tasks']
+                self.state["query_answered"] = False
 
                 self.add_message((
                     ChatRoles.AI.value,
@@ -270,7 +271,7 @@ class ArchitectAgent:
             elif self.state['current_task'].task_status == Status.AWAITING:
                 
                 if llm_response['parsed']['is_answer_found']:
-                    self.state["current_task"].query_answered = True
+                    self.state["query_answered"] = True
                     self.state["current_task"].additional_info = llm_response['parsed']['response_text']
 
                     self.add_message((
@@ -279,7 +280,7 @@ class ArchitectAgent:
                         "with task completion."
                     ))
                 else:
-                    self.state["current_task"].query_answered = False
+                    self.state["query_answered"] = False
                     self.add_message((
                         ChatRoles.AI.value,
                         "Unfortunately, I couldn't provide the additional information requested. "

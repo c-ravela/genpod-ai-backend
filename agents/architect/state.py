@@ -52,6 +52,8 @@ class ArchitectState(TypedDict):
         generated_project_path (str): The absolute path in the file system where the project 
         is being generated. This path is used to store all the project-related files and 
         directories.
+
+        query_answered (bool): A boolean flag indicating whether the task has been answered
     """
 
     user_request: Annotated[
@@ -115,4 +117,9 @@ class ArchitectState(TypedDict):
         str,
         "The absolute path in the file system where the project is being generated. "
         "This path is used to store all the project-related files and directories."
+    ]
+
+    query_answered = Annotated[
+        bool,
+        "A boolean flag indicating whether the task has been answered",
     ]
