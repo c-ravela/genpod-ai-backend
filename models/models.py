@@ -29,11 +29,6 @@ class Task(BaseModel):
         required=True
     )
 
-    query_answered: bool = Field(
-        description="A boolean flag indicating whether the task has been answered",
-        default=False
-    )
-
     additional_info: str = Field(
         description="Additional info requested.",
         default=""

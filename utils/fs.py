@@ -1,5 +1,5 @@
 import os
-import datetime
+from datetime import datetime
 
 def create_directory_with_timestamp(parent_directory: str) -> str:
     """
@@ -17,7 +17,7 @@ def create_directory_with_timestamp(parent_directory: str) -> str:
              is returned.
     """
     
-    current_timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S.%f")
+    current_timestamp = datetime.now().strftime("%Y-%m-%d_%H-%M-%S-%f")
     new_directory_path = os.path.join(parent_directory, current_timestamp)
 
     if not os.path.exists(new_directory_path):
