@@ -158,17 +158,17 @@ class SupervisorAgent():
         if self.project_status == PStatus.NEW.value:
             if state['current_task'].task_status.value == Status.DONE.value:
                 self.project_status = PStatus.INITIAL.value
+                _description = self.prompts.architect_call_prompt.format()
+                _task_status = Status.NEW.value
+                _additional_info = state['rag_retrieval']
+                _question=''
+                state['current_task'] = Task(description=_description,task_status=_task_status,additional_info=_additional_info,question=_question)
             self.calling_agent = 'Supervisor'
             return {**state}
-        elif self.project_status == PStatus.INITIAL.value:
-            # Lets first create the new task for initial phase of the project
-            _description = self.prompts.architect_call_prompt
-            _task_status = Status.NEW.value
-            _additional_info = state['rag_retrieval']
-            _question=''
-            state['current_task'] = Task(description=_description,task_status=_task_status,additional_info=_additional_info,question=_question)
-            self.calling_agent = 'Supervisor'
-            return {**state}
+        # elif self.project_status == PStatus.INITIAL.value:
+        #     # Lets first create the new task for initial phase of the project
+            
+        #     return {**state}
         elif self.project_status == PStatus.EXECUTING.value and state['current_task'].task_status.value==Status.AWAITING.value:
             self.project_status = PStatus.MONITORING.value
             self.calling_agent = self.called_agent
