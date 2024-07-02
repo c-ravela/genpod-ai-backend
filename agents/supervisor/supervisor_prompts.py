@@ -50,6 +50,28 @@ class SupervisorPrompts():
     )
 
     init_rag_questionaire_prompt = PromptTemplate(
+        template="""Given the user prompt: "{user_prompt}", generate a comprehensive list of questions to query the knowledge base which is a vector DB.
+        These questions should cover various aspects of the project requirements, technical specifications, and industry standards. Focus on the following areas:
+            1. Industry standards and regulations:
+            - What specific standards or regulations are relevant to this project?
+            - How do these standards impact the design and implementation?
+
+            2. Project-specific requirements:
+            - What are the key components or features required for this project?
+            - Are there any specific data structures or formats that need to be considered?
+
+            3. Data management:
+            - What type of data storage is most suitable for this project?
+            - How should the data be structured for efficient retrieval and management?
+
+            Create a list response which containes one well-defined question for each category that will help extract detailed information from our knowledge base to assist in creating a comprehensive requirements document.
+            example output format: "['question1','question2','question3']"
+            Use this additional context if an error exists in output: {context}
+            """,
+            input_variables=["user_prompt", "context"]
+    )
+
+    ideal_init_rag_questionaire_prompt = PromptTemplate(
         template="""Given the user prompt: "{user_prompt}", generate a comprehensive list of questions to query the knowledge base which is a vector DB. 
         These questions should cover various aspects of the project requirements, technical specifications, and industry standards. Focus on the following areas:
             1. Industry standards and regulations:
