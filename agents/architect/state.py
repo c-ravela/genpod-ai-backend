@@ -26,6 +26,20 @@ class ArchitectState(TypedDict):
         requested to be implemented in the project, which could include coding standards, 
         design patterns, or industry-specific standards.
 
+        project_status (PStatus): An enumerated value reflecting the project's current lifecycle 
+        stage, providing real-time tracking of project progress.
+
+        generated_project_path (str): The absolute path in the file system where the project 
+        is being generated. This path is used to store all the project-related files and 
+        directories.
+
+        messages (list[tuple[str, str]]): A chronological list of tuples representing the 
+        conversation history between the system, user, and AI. Each tuple contains a role 
+        identifier (e.g., 'AI', 'tool', 'user', 'system') and the corresponding message.
+        
+        current_task (Task): The Task object currently in focus, representing the active task 
+        that team members are working on.
+
         project_name (str): The name of the project.
 
         project_folder_structure (str): The organized layout of directories and subdirectories 
@@ -39,29 +53,16 @@ class ArchitectState(TypedDict):
         necessary for the project's completion. These tasks are meant to be carried out by the 
         entire team collectively.
 
-        current_task (Task): The Task object currently in focus, representing the active task 
-        that team members are working on.
-
-        project_status (PStatus): An enumerated value reflecting the project's current lifecycle 
-        stage, providing real-time tracking of project progress.
-
-        messages (list[tuple[str, str]]): A chronological list of tuples representing the 
-        conversation history between the system, user, and AI. Each tuple contains a role 
-        identifier (e.g., 'AI', 'tool', 'user', 'system') and the corresponding message.
-
-        generated_project_path (str): The absolute path in the file system where the project 
-        is being generated. This path is used to store all the project-related files and 
-        directories.
-
         query_answered (bool): A boolean flag indicating whether the task has been answered
     """
-
+    # @in 
     user_request: Annotated[
         str,
         "The original set of requirements provided by the user, serving as the "
         "foundation for the project."
     ]
 
+    # @in
     user_requested_standards: Annotated[
         str,
         "The specific standards or protocols the user has requested to be implemented"
@@ -69,43 +70,21 @@ class ArchitectState(TypedDict):
         "industry-specific standards."
     ]
 
-    project_name: Annotated[
-        str, 
-        "The name of the project."
-    ]
-
-    project_folder_strucutre: Annotated[
-        str,
-        "The organized layout of directories and subdirectories that form the project's "
-        "file system, adhering to best practices for project structure."
-    ]
-
-    requirements_overview: Annotated[
-        str, 
-        "A comprehensive, well-structured document in markdown format that outlines "
-        "the project's requirements derived from the user's request. This serves as a "
-        "guide for the development process."
-    ]
-
-    tasks: Annotated[
-        list[Task],
-        "A list of Task objects, each encapsulating a distinct unit of work necessary "
-        "for the project's completion. These tasks are meant to be carried out by the "
-        "entire team collectively."
-    ]
-
-    current_task: Annotated[
-        Task,
-        "The Task object currently in focus, representing the active task that team "
-        "members are working on."
-    ]
-
+    # @in
     project_status: Annotated[
         PStatus,
         "An enumerated value reflecting the project's current lifecycle stage, providing "
         "real-time tracking of project progress."
     ]
 
+    # @in
+    generated_project_path: Annotated[
+        str,
+        "The absolute path in the file system where the project is being generated. "
+        "This path is used to store all the project-related files and directories."
+    ]
+    
+    # @inout
     messages: Annotated[
         list[tuple[str, str]], 
         "A chronological list of tuples representing the conversation history between the "
@@ -113,14 +92,44 @@ class ArchitectState(TypedDict):
         "'user', 'system') and the corresponding message."
     ]
 
-    generated_project_path: Annotated[
-        str,
-        "The absolute path in the file system where the project is being generated. "
-        "This path is used to store all the project-related files and directories."
+    # @inout
+    current_task: Annotated[
+        Task,
+        "The Task object currently in focus, representing the active task that team "
+        "members are working on."
     ]
 
+    # @out
+    project_name: Annotated[
+        str, 
+        "The name of the project."
+    ]
+
+    # @out
+    project_folder_strucutre: Annotated[
+        str,
+        "The organized layout of directories and subdirectories that form the project's "
+        "file system, adhering to best practices for project structure."
+    ]
+
+    # @out
+    requirements_overview: Annotated[
+        str, 
+        "A comprehensive, well-structured document in markdown format that outlines "
+        "the project's requirements derived from the user's request. This serves as a "
+        "guide for the development process."
+    ]
+
+    # @out
+    tasks: Annotated[
+        list[Task],
+        "A list of Task objects, each encapsulating a distinct unit of work necessary "
+        "for the project's completion. These tasks are meant to be carried out by the "
+        "entire team collectively."
+    ]
+
+    # @out
     query_answered: Annotated[
         bool,
         "A boolean flag indicating whether the task has been answered",
     ]
-    

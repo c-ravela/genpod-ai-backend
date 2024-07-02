@@ -308,7 +308,6 @@ class ArchitectAgent:
 
         print("----Architect: Writing requirements documents to local filesystem----")
 
-        self.last_visited_node = self.write_requirements
         self.update_state(state)
 
         if len(self.state['requirements_overview']) < 0:
@@ -320,13 +319,22 @@ class ArchitectAgent:
             generated_code = self.state['requirements_overview']
             file_path = os.path.join(self.state['generated_project_path'], "docs/requirements.md")
 
-            hasError, msg = FS.write_generated_code_to_file.invoke({"generated_code": generated_code, "file_path": file_path})
+            self.hasError, msg = FS.write_generated_code_to_file.invoke({"generated_code": generated_code, "file_path": file_path})
+            
+            if self.hasError:
+                self.error_message = msg
+                self.last_visited_node = self.requirements_and_additional_context
+            else:
+                self.hasError = False
+                self.error_message = ""
+                self.last_visited_node = self.write_requirements
+                self.areRequirementsSavedLocally = True
+
             self.add_message((
                 ChatRoles.USER.value,
                 msg
             ))
 
-            self.areRequirementsSavedLocally = True
 
         return {**self.state}
 
@@ -436,10 +444,10 @@ class ArchitectAgent:
 
         if self.hasError:
             return self.last_visited_node
-        elif not self.areTasksSeperated:
-            return self.tasks_seperation
         elif not self.areRequirementsSavedLocally:
             return self.write_requirements
+        elif not self.areTasksSeperated:
+            return self.tasks_seperation
         
         return self.state_update
     
