@@ -68,8 +68,10 @@ class SupervisorAgent():
                     print(f"Cache hit for query, will not response to: {req_query}")
                 else:
                     print(f"Cache miss for query: {req_query}")
+                    print(f'----------RAG Agent Called to Query----------\n{req_query}')
                     result = self.team_members['RAG'].rag_app.invoke({'question': req_query,'iteration_count':self.rag_try_limit}, {'configurable':{'thread_id':self.memberids['RAG']}})
                     self.rag_cache.add(req_query, result['generation'])
+                    print(f'----------RAG Agent Response----------\n{result['generation']}')
                     if result['query_answered'] is True:
                         final_response += f"Question: {req_query}\nAnswer: {result['generation']}"
             return final_response
@@ -179,8 +181,8 @@ class SupervisorAgent():
             state['messages'] += [message]
             print(f"----------Response from Architect Agent----------\n{architect_result['tasks']}")
             # Temporary validation this needs to be done by architect. Remove it once architect has implemented this.
-            if len(architect_result['tasks']) is not None:
-                architect_result['current_task'].task_status = Status.DONE
+            # if len(architect_result['tasks']) is not None:
+            #     architect_result['current_task'].task_status = Status.DONE
             if architect_result['current_task'].task_status.value == Status.DONE.value:
                 self.project_status = PStatus.EXECUTING.value
                 state['current_task'] = architect_result['current_task']
@@ -193,8 +195,12 @@ class SupervisorAgent():
             else:
                 #  TODO: if task_status=='AWAITING', that means Current task could not be completed by architect call supervisor to deal with the same task
                 # self.project_status = PStatus.MONITORING.value
-                pass
-
+                state['current_task'] = architect_result['current_task']
+                state['agents_status'] = 'Architect Awaiting'
+                self.responses['Architect'].append(("Returned from Architect with a question:", architect_result['current_task'].question))
+                self.called_agent = 'Architect'
+                return {**state}
+            
         elif self.project_status == PStatus.MONITORING.value:
             # Need to query Architect to get additional information for another agent which will be present in called agent and that will never be updated when returning
             print("----------Querying Architect----------")
@@ -244,13 +250,16 @@ class SupervisorAgent():
                 _additional_info = state['rag_retrieval']
                 _question=''
                 # Assign new task as the current task
-                state['current_task'] = Task(description=_description,task_status=_task_status,additional_info=_additional_info,question=_question)
+                state['current_task'] = Task(description=_description,task_status=_task_status,additional_info=_additional_info,question=_question)            
             self.calling_agent = 'Supervisor'
             return {**state}
-        # elif self.project_status == PStatus.INITIAL.value:
-        #     # Lets first create the new task for initial phase of the project
-            
-        #     return {**state}
+        elif self.project_status == PStatus.INITIAL.value:
+            # If Architect has any queries during project Initial Stage which is common then we only want to call rag and send that response to architect
+            if state['current_task'].task_status.value == Status.AWAITING.value and "RAG_Response" not in state['current_task'].additional_info:
+                self.calling_agent = self.called_agent
+            else:
+                self.calling_agent = 'Supervisor'
+            return {**state}
         elif self.project_status == PStatus.EXECUTING.value and state['current_task'].task_status.value==Status.AWAITING.value:
             self.project_status = PStatus.MONITORING.value
             self.calling_agent = self.called_agent
@@ -334,8 +343,11 @@ class SupervisorAgent():
             # self.project_status = PStatus.INITIAL.value
             return 'call_rag'
         elif self.project_status == PStatus.INITIAL.value:
+            if self.calling_agent=='Supervisor':
+                return 'call_architect'
             # self.calling_agent = 'Supervisor'
-            return 'call_architect'
+            else:
+                return 'call_rag'
         elif self.project_status==PStatus.MONITORING.value and "RAG_Response" not in state['current_task'].additional_info:
             return 'call_rag'
         elif self.project_status==PStatus.MONITORING.value and 'Architect_Response' not in state['current_task'].additional_info:
