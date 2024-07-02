@@ -19,7 +19,7 @@ class PlannerAgent():
         self.backlog_plan = PlannerPrompts.backlog_planner_prompt | self.llm
         
         # detailed requirements generator chain
-        self.detailed_requirements = PlannerPrompts.detailed_requirements_prompt | self.llm | JsonOutputParser()
+        self.detailed_requirements = PlannerPrompts.detailed_requirements_prompt | self.llm
 
         # State to maintain when responding back to supervisor
         self.state = {}
@@ -35,7 +35,7 @@ class PlannerAgent():
         # self.current_task = {x:config['configurable'][x] for x in ['description','task_status','additional_info','question']}
         # self.current_task = state.new_task
         # if config['configurable']['task_status'] == Status.NEW.value:
-        if self.current_task.task_status.value == Status.NEW.value:
+        if state['current_task'].task_status.value == Status.NEW.value:
             return "backlog_planner"
         else:
             return "requirements_developer"
@@ -43,7 +43,7 @@ class PlannerAgent():
     def backlog_planner(self, state: PlannerState):
         while(True):
             try:
-                generated_backlogs = self.backlog_plan.invoke({"deliverable":self.current_task.description, "context":self.current_task.additional_info, "feedback":self.error_messages})
+                generated_backlogs = self.backlog_plan.invoke({"deliverable":state['current_task'].description, "context":state['current_task'].additional_info, "feedback":self.error_messages})
                 backlogs_list = ast.literal_eval(generated_backlogs.content)
                 # backlogs_list = self.parse_backlog_tasks(generated_backlogs.content)
                 # Validate the response using Pydantic
@@ -53,7 +53,7 @@ class PlannerAgent():
                 self.error_messages = []
 
                 # Update the state with the validated backlogs
-                state['deliverable'] = self.current_task.description
+                state['deliverable'] = state['current_task'].description
                 state['backlogs'] = validated_backlogs.backlogs
 
                 # Extend the deliverable_backlog_map with the new backlogs
@@ -73,17 +73,17 @@ class PlannerAgent():
                     return {**state}
 
     def requirements_developer(self, state: PlannerState):
-        for backlog in state['deliverable_backlog_map'][self.current_task.description]:
+        for backlog in state['deliverable_backlog_map'][state['current_task'].description]:
             while(True):
-                response = self.detailed_requirements.invoke({"backlog":backlog, "deliverable":state['deliverable'], "context":self.current_task.additional_info, "feedback":self.error_messages})
                 try:
-                    # parsed_response = json.loads(response)
-                    if "question" in response.keys():
-                        self.current_task.task_status = Status.AWAITING.value
-                        self.current_task.question = response['question']
+                    response = self.detailed_requirements.invoke({"backlog":backlog, "deliverable":state['deliverable'], "context":state['current_task'].additional_info, "feedback":self.error_messages})
+                    parsed_response = json.loads(response.content)
+                    if "question" in parsed_response.keys():
+                        state['current_task'].task_status = Status.AWAITING
+                        state['current_task'].question = parsed_response['question']
                         return {**state}
-                    elif "description" in response.keys():
-                        self.backlog_requirements[backlog] = response
+                    elif "description" in parsed_response.keys():
+                        self.backlog_requirements[backlog] = parsed_response
                         self.error_count = 0
                         self.error_messages = []
                         break
@@ -98,16 +98,21 @@ class PlannerAgent():
                         print("Max retries reached. Halting")
                         self.error_count = 0
                         return {**state}
-        self.current_task.task_status = Status.INPROGRESS.value
+        """Uncomment the below line to call coder on each workpackage created for the deliverable. Currently coder is not implemented yet so we will try to build workpackages for eacg deliverable using the Done mode."""
+        # state['current_task'].task_status = Status.INPROGRESS
+        state['current_task'].task_status = Status.DONE
         return {**state}
 
     def generate_response(self, state: PlannerState):
-        if self.current_task.task_status == Status.INPROGRESS.value:
-            response = Task(description="All Backlogs for the deliverable is successfully generated proceed further", task_status=Status.INPROGRESS.value, additional_info='',question='')
-        elif self.current_task.task_status == Status.AWAITING.value:
-            response = self.current_task
+        if state['current_task'].task_status.value == Status.DONE.value:
+            # ----when calling Coder----
+            # response = Task(description="All Backlogs for the deliverable is successfully generated proceed further", task_status=Status.INPROGRESS.value, additional_info='',question='')
+            # ----When recursively calling planner on each deliverable----
+            response = Task(description="All Backlogs for the deliverable is successfully generated proceed further", task_status=Status.DONE.value, additional_info=state['current_task'].additional_info,question='')
+        elif state['current_task'].task_status.value == Status.AWAITING.value:
+            response = state['current_task']
         else:
-            response = Task(description=self.current_task.description, task_status=Status.ABANDONED.value, additional_info=self.current_task.additional_info, question=self.current_task.question)
+            response = Task(description=state['current_task'].description, task_status=Status.ABANDONED.value, additional_info=state['current_task'].additional_info, question=state['current_task'].question)
 
         if state['response'] is None:
             state["response"] = response
