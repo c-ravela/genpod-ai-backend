@@ -48,3 +48,53 @@ class SupervisorPrompts():
     additional_info_req_prompt = PromptTemplate(
         template="""A fellow agent is stuck with something and is requesting additional info on the question"""
     )
+
+    init_rag_questionaire_prompt = PromptTemplate(
+        template="""Given the user prompt: "{user_prompt}", generate a comprehensive list of questions to query the knowledge base which is a vector DB. 
+        These questions should cover various aspects of the project requirements, technical specifications, and industry standards. Focus on the following areas:
+            1. Industry standards and regulations:
+            - What specific standards or regulations are relevant to this project?
+            - How do these standards impact the design and implementation?
+
+            2. Project-specific requirements:
+            - What are the key components or features required for this project?
+            - Are there any specific data structures or formats that need to be considered?
+
+            3. Technical architecture:
+            - What is the recommended architecture for this type of project?
+            - Are there any specific design patterns or best practices to follow?
+
+            4. API design (if applicable):
+            - What are the best practices for designing the API for this service?
+            - How should the API endpoints be structured?
+
+            5. Implementation details:
+            - What are the recommended frameworks or libraries for this project?
+            - Are there any specific features of the chosen technology that align well with the project requirements?
+
+            6. Data management:
+            - What type of data storage is most suitable for this project?
+            - How should the data be structured for efficient retrieval and management?
+
+            7. Security and compliance:
+            - What security measures should be implemented for this project?
+            - Are there any specific compliance requirements to consider?
+
+            8. Performance and scalability:
+            - What are the expected performance metrics for this service?
+            - How can we ensure scalability of the system?
+
+            9. Testing and validation:
+            - What types of tests should be implemented for this project?
+            - How can we validate that the service meets all requirements and standards?
+
+            10. Documentation and specifications:
+                - What should be included in the project documentation?
+                - Are there any standard tools or formats recommended for documentation in this domain?
+
+            Create a list response which containes one well-defined question for each category that will help extract detailed information from our knowledge base to assist in creating a comprehensive requirements document.
+            example output format: "['question1','question2','question3']"
+            Use this additional context if an error exists in output: {context}
+            """,
+            input_variables=["user_prompt", "context"]
+    )
