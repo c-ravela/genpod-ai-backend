@@ -77,7 +77,19 @@ class PlannerAgent():
             while(True):
                 try:
                     response = self.detailed_requirements.invoke({"backlog":backlog, "deliverable":state['deliverable'], "context":state['current_task'].additional_info, "feedback":self.error_messages})
-                    parsed_response = json.loads(response.content)
+
+                    # Let's clean the response to remove json prefix that llm sometimes appends to the actual text
+                    # Strip whitespace from the beginning and end
+                    cleaned_response = response.content.strip()
+                    
+                    # Check if the text starts with ```json and ends with ```
+                    if cleaned_response.startswith('```json') and cleaned_response.endswith('```'):
+                        # Remove the ```json prefix and ``` suffix
+                        cleaned_json = cleaned_response.removeprefix('```json').removesuffix('```').strip()
+                    else:
+                        # If not enclosed in code blocks, use the text as is
+                        cleaned_json = cleaned_response
+                    parsed_response = json.loads(cleaned_json)
                     if "question" in parsed_response.keys():
                         state['current_task'].task_status = Status.AWAITING
                         state['current_task'].question = parsed_response['question']
@@ -90,7 +102,7 @@ class PlannerAgent():
                 except Exception as e:
                     print(f"Error parsing response for backlog: {backlog}, {e}")
                     self.error_count += 1
-                    error_message = f"Error in generated detailed requirements format: {str(e)}"
+                    error_message = f"Error in generated detailed requirements format: {str(e)}, I'm using python json.loads() to convert json to dictionary so take that into consideration."
                     print(error_message)
                     self.error_messages.append(error_message)
                     
