@@ -26,7 +26,8 @@ class SupervisorState(TypedDict):
     current_task: Task
     agents_status: str
     messages: List[Tuple[str, str]]
-    rag_query_answer = bool
+    rag_query_answer : bool
+    requirements_doc : str
 
 def add_message(state: SupervisorState, message: tuple[str, str]) -> SupervisorState:
     """
