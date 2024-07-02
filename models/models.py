@@ -39,3 +39,9 @@ class Task(BaseModel):
         " to proceed with task execution.",
         default=""
     )
+
+    remarks: str = Field(
+        description="A field for notes on the task's status. If the task is "
+        "abandoned, state the reason here.",
+        default=""
+    )
