@@ -96,7 +96,7 @@ class ArchitectGraph:
 
         return architect_flow.compile(checkpointer=self.memory)
 
-    def get_current_state(self) -> dict:
+    def get_current_state(self) -> ArchitectState:
         """
         returns the current state of the graph.
         """
