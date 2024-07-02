@@ -25,7 +25,6 @@ from agents.architect.state import ArchitectState
 
 from tools.fs import FS
 
-import pprint as pp
 import os
 import ast
 
@@ -283,6 +282,8 @@ class ArchitectAgent:
                     ))
                 else:
                     self.state["query_answered"] = False
+                    self.state["current_task"].additional_info = f"{self.state["current_task"].additional_info}, \nArchitect_Response:\nI don't have any additional information about the question."
+
                     self.add_message((
                         ChatRoles.AI.value,
                         "Unfortunately, I couldn't provide the additional information requested. "
