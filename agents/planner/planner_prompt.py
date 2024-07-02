@@ -28,7 +28,7 @@ class PlannerPrompts():
         Feedback: {feedback}
 
         Instructions:
-        - If you have enough information, provide the detailed technical requirements as a JSON object with the following structure. Avoid adding generic comments within the JSON Object and use appropriate json structure to add comments about any object:
+        - If you have enough information, provide the detailed technical requirements as a JSON object with the following structure. Avoid adding generic comments within the JSON Object and use strict json format to add comments about any object:
         {{
             "description": "Detailed description of the task",
             "name": "Name of the service or component",
