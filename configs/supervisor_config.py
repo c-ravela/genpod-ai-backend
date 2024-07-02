@@ -14,4 +14,10 @@ MEMBERS = ['RAG','Architect','Planner']
 
 RAG_TRY_LIMIT = 1
 
-# VECTOR_DB_PERSISTENCE_LOCATION = "C:/Users/vkumar/Desktop/genpod-ai-backend/vector_collections"
+# Map between called agent and node to call by supervisor
+calling_map = {
+    'RAG':'call_rag',
+    'Architect':'call_architect',
+    'Planner':'call_planner',
+    'Coder':'call_coder'
+}
