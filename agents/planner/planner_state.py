@@ -18,3 +18,4 @@ class PlannerState(TypedDict):
     generation: List[str]
     response: List[Task]
     deliverable_backlog_map: Dict[str, List[str]]
+    current_task: Task
