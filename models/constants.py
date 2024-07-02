@@ -31,13 +31,13 @@ class ChatRoles(Enum):
     SYSTEM: str = "system"
 
     def __str__(self):
-        """
-        Returns the string representation of the Enum member.
+      """
+      Returns the string representation of the Enum member.
 
-        Returns:
-            str: The value of the Enum member.
-        """
-        return self.value
+      Returns:
+          str: The value of the Enum member.
+      """
+      return self.value
 
 class Status(Enum):
     """
@@ -67,13 +67,13 @@ class Status(Enum):
     DONE: str = "DONE"
 
     def __str__(self):
-        """
-        Returns the string representation of the Enum member.
+      """
+      Returns the string representation of the Enum member.
 
-        Returns:
-            str: The value of the Enum member.
-        """
-        return self.value
+      Returns:
+          str: The value of the Enum member.
+      """
+      return self.value
 
 
 class PStatus(Enum):
@@ -102,10 +102,10 @@ class PStatus(Enum):
     HALTED: str = "HALTED"
 
     def __str__(self):
-        """
-        Returns the string representation of the Enum member.
+      """
+      Returns the string representation of the Enum member.
 
-        Returns:
-            str: The value of the Enum member.
-        """
-        return self.value
+      Returns:
+          str: The value of the Enum member.
+      """
+      return self.value

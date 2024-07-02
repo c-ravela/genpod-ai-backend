@@ -31,7 +31,7 @@ class ArchitectGraph:
         and defines the state graph.
         """
         
-        self.state: ArchitectState = {}
+        self.state: ArchitectState = ArchitectState()
         self.agent = ArchitectAgent(llm)
         self.memory: SqliteSaver = SqliteSaver.from_conn_string(PERSISTANCE_DB_PATH)
         self.app: CompiledGraph = self.define_graph()
@@ -53,6 +53,7 @@ class ArchitectGraph:
         architect_flow.add_node(self.agent.requirements_and_additional_context, self.agent.requirements_and_additional_context_node)
         architect_flow.add_node(self.agent.write_requirements, self.agent.write_requirements_to_local_node)
         architect_flow.add_node(self.agent.tasks_seperation, self.agent.tasks_seperation_node)
+        architect_flow.add_node(self.agent.state_update, self.agent.update_state)
 
         # edges
         architect_flow.add_conditional_edges(
@@ -62,7 +63,7 @@ class ArchitectGraph:
                 self.agent.requirements_and_additional_context: self.agent.requirements_and_additional_context,
                 self.agent.tasks_seperation: self.agent.tasks_seperation,
                 self.agent.write_requirements:self.agent.write_requirements,
-                END:END
+                self.agent.state_update: self.agent.state_update
             }
         )
 
@@ -73,7 +74,7 @@ class ArchitectGraph:
                 self.agent.requirements_and_additional_context: self.agent.requirements_and_additional_context,
                 self.agent.tasks_seperation: self.agent.tasks_seperation,
                 self.agent.write_requirements:self.agent.write_requirements,
-                END:END
+                self.agent.state_update: self.agent.state_update
             }
         )
 
@@ -84,26 +85,20 @@ class ArchitectGraph:
                 self.agent.requirements_and_additional_context: self.agent.requirements_and_additional_context,
                 self.agent.tasks_seperation: self.agent.tasks_seperation,
                 self.agent.write_requirements:self.agent.write_requirements,
-                END:END
+                self.agent.state_update: self.agent.state_update
             }
         )
+
+        architect_flow.add_edge(self.agent.state_update, END)
+
         # entry point
         architect_flow.set_entry_point(self.agent.requirements_and_additional_context)
 
         return architect_flow.compile(checkpointer=self.memory)
 
-    def update_state(self, state: any) -> any:
+    def get_current_state(self) -> dict:
         """
-        The method takes in a state, updates the current state of the object with the 
-        provided state, and then returns the updated state.
-
-        Args:
-            state (any): The state to update the current state of the object with.
-
-        Returns:
-            any: The updated state of the object.
+        returns the current state of the graph.
         """
         
-        self.state.update(state)
-
-        return {**self.state}
+        return self.agent.state

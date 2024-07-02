@@ -119,7 +119,8 @@ class ArchitectState(TypedDict):
         "This path is used to store all the project-related files and directories."
     ]
 
-    query_answered = Annotated[
+    query_answered: Annotated[
         bool,
         "A boolean flag indicating whether the task has been answered",
     ]
+    
