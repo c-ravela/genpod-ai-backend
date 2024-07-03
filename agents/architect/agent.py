@@ -64,6 +64,7 @@ class ArchitectAgent:
     state: ArchitectState = ArchitectState()
     prompts: ArchitectPrompts = ArchitectPrompts()
 
+    # chains
     requirements_genetation_chain: RunnableSequence
     additional_information_chain: RunnableSequence
     task_seperation_chain: RunnableSequence
@@ -157,14 +158,52 @@ class ArchitectAgent:
 
         Args:
             message (tuple[str, str]): The message to be added.
-
-        Returns:
-            ArchitectState: The updated state with the new message added to the 
-            messages field.
         """
 
         self.state['messages'] += [message]
 
+    def router(self, state: ArchitectState) -> str:
+        """
+        This method determines the next step based on the current state of the Architect agent.
+
+        It checks the current state and returns the name of the next agent to be invoked. If 
+        there is an error, it returns the last visited node. If the tasks are not separated, 
+        it returns the tasks_seperation agent. If the requirements are not saved locally, 
+        it returns the write_requirements agent. If none of these conditions are met, it 
+        signifies the end of the process and returns "__end__".
+
+        Args:
+            state (ArchitectState): The current state of the architect.
+
+        Returns:
+            str: The name of the next agent to be invoked or "__end__" if the process is complete.
+        """
+
+        if self.hasError:
+            return self.last_visited_node
+        elif not self.areRequirementsSavedLocally:
+            return self.write_requirements
+        elif not self.areTasksSeperated:
+            return self.tasks_seperation
+        
+        return self.state_update
+    
+    def update_state(self, state: ArchitectState) -> ArchitectState:
+        """
+        The method takes in a state, updates the current state of the object with the 
+        provided state, and then returns the updated state.
+
+        Args:
+            state (any): The state to update the current state of the object with.
+
+        Returns:
+            any: The updated state of the object.
+        """
+        
+        self.state = {**state}
+
+        return {**self.state}
+    
     def requirements_and_additional_context_node(self, state: ArchitectState) -> ArchitectState:
         """
         This method processes the current state of the Architect agent and updates it based on the user input.
@@ -190,7 +229,6 @@ class ArchitectAgent:
 
         self.update_state(state)
         self.last_visited_node = self.requirements_and_additional_context
-        self.expected_keys = []
 
         if self.state['project_status'] == PStatus.INITIAL.value:
             self.add_message((
@@ -424,46 +462,3 @@ class ArchitectAgent:
                     ))
 
         return {**self.state}
-
-    def router(self, state: ArchitectState) -> str:
-        """
-        This method determines the next step based on the current state of the Architect agent.
-
-        It checks the current state and returns the name of the next agent to be invoked. If 
-        there is an error, it returns the last visited node. If the tasks are not separated, 
-        it returns the tasks_seperation agent. If the requirements are not saved locally, 
-        it returns the write_requirements agent. If none of these conditions are met, it 
-        signifies the end of the process and returns "__end__".
-
-        Args:
-            state (ArchitectState): The current state of the architect.
-
-        Returns:
-            str: The name of the next agent to be invoked or "__end__" if the process is complete.
-        """
-
-        if self.hasError:
-            return self.last_visited_node
-        elif not self.areRequirementsSavedLocally:
-            return self.write_requirements
-        elif not self.areTasksSeperated:
-            return self.tasks_seperation
-        
-        return self.state_update
-    
-    def update_state(self, state: ArchitectState) -> ArchitectState:
-        """
-        The method takes in a state, updates the current state of the object with the 
-        provided state, and then returns the updated state.
-
-        Args:
-            state (any): The state to update the current state of the object with.
-
-        Returns:
-            any: The updated state of the object.
-        """
-        
-        self.state = {**state}
-
-        return {**self.state}
-    

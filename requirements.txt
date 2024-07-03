@@ -32,3 +32,4 @@ unstructured[pdf]
 unstructured[xlsx]
 unstructured[docx]
 notebook
+shlex

@@ -1,81 +1,83 @@
 """
 """
 
-from langchain_core.prompts import ChatPromptTemplate
-from langchain_core.prompts import MessagesPlaceholder
+from langchain_core.prompts import PromptTemplate
 
 from langchain.output_parsers import PydanticOutputParser
 
-from models.constants import ChatRoles
-
-from pydantic import BaseModel
-
-coder_prompt = ChatPromptTemplate.from_messages(
-    [
-        (
-            ChatRoles.SYSTEM.value,
-            """<instructions>
-            You are an expert programmer collaborating with the Architect in your team to complete an end to end Coding Project.
-            You are good at writing well documented, optimized, secure and productionizable code.
-            Here are the standards that you need to follow explicitly for this project:
-            1. You do not assume anything and asks Architect for additional context and clarification if requirements are not clear.
-            2. Must follow Project Folder Structure decided by Architect.
-            3. Must Write the files to the local filesystem.
-            4. Follow microservices development standards like 12-factor application standards, domain-driven microservice architecture and clean-code development architecture standards.
-
-            Structure your answer: 
-            1) Multiple steps may be needed to complete this task that needs access to some external tools `{coder_tools}`, if so add these steps and mark the project_status as InComplete and call_next to call_tool.
-            2) Depending on the project structure where should the code be written to, 
-            3) Fully complete, well documented code, with all the naming standards to follow, that is needed to complete the task., 
-            Invoke the CoderModel tool to structure the output correctly.
-            </instructions>"""
-        ),
-        MessagesPlaceholder(variable_name="coder_tools"),
-        MessagesPlaceholder(variable_name="messages"),
-    ]
-)
+from models.coder import CoderModel
 
 class CoderPrompts:
 
     CODE_GENERATION_TEMPLATE: str ="""
-    You are an expert programmer collaborating with a team to complete an end to end 
-    project requeseted by an user.
+    As an expert programmer, you are collaborating with a team to complete an end-to-end project 
+    requested by a user. Your strengths lie in writing well-documented, optimized, secure, and 
+    production-ready code. 
 
-    you are good at writting well documented, optimized, secure and productionizable code.
-    You should add code comments, docstrings where ever its required.
+    Project Name: '{project_name}'
 
-    Here are the standards that you need to follow explicitly for this project:
-    1. You do not assume anything and asks team member for additional context and clarification 
-    if requirements are not clear.
-    2. Must follow Project Folder Structure decided by Architect.
-    3. Must Write the files to the local filesystem.
-    4. Follow microservices development standards like 12-factor application standards, 
-    domain-driven microservice architecture and clean-code development architecture standards.
+    Project Path: '{project_path}'
 
+    From document provided below you will find facts about the project and set of guidelines to be 
+    followed while developing the project. Please adhere to the following guidelines specified by 
+    your team lead:
+    "{requirements_document}"
+
+    The project requires certain files and directories. The required folder structure for the 
+    project is as follows at path:
+    "{folder_structure}"
+
+    If you need clarification on any aspect of the task, do not make assumptions. Instead, 
+    conclude that additional information is needed. Generate the output accordingly, and the 
+    required information will be provided to you. Additional information is only available 
+    upon request:
+    "{additional_information}"
+
+    If the provided additional information is insufficient and you are unable to complete the 
+    task, you may conclude that the task cannot be finished.
+
+    Error messages will only be present if there is an issue with your previous response. 
+    "{error_message}"
+
+    The instructions for formatting are as follows:
+    {format_instructions}
+
+    Format the files to be created as a list of strings. For example:
+    "[file_path1, file_path2, file_path3, ..., file_pathN]"
+
+    You have access to the following tools:
+    {tools}.
+
+    To complete each task, you should select at least one tool. The tools should be executed in 
+    the order they are listed.
+
+    Now, here is your task to complete.
+    {task}.
     """
-
-    TOOL_SELECTION_TEMPLATE: str = """
     
-    """
-    
-    def code_generation_prompt(self, pydantic_model: BaseModel) -> ChatPromptTemplate:
+    def code_generation_prompt(self) -> PromptTemplate:
         """
         """
 
-        return ChatPromptTemplate.from_template(
+        return PromptTemplate(
             template=self.CODE_GENERATION_TEMPLATE,
-            partial_variables = {
-                "format_instructions": PydanticOutputParser(pydantic_object=pydantic_model)
+            input_variables=[
+                "project_name", "requirements_document", "project_path", 
+                "folder_structure", "additional_information", "error_message",
+                "tools", "task"
+            ],
+            partial_variables= {
+                "format_instructions": PydanticOutputParser(pydantic_object=CoderModel).get_format_instructions()
             }
         )
     
-    def tool_selection_prompt(self, pydantic_model: BaseModel) -> ChatPromptTemplate:
-        """
-        """
+    # def tool_selection_prompt(self, pydantic_model: BaseModel) -> ChatPromptTemplate:
+    #     """
+    #     """
 
-        return ChatPromptTemplate.from_template(
-            template=self.TOOL_SELECTION_TEMPLATE,
-            partial_variables = {
-                "format_instructions": PydanticOutputParser(pydantic_object=pydantic_model)
-            }
-        )
+    #     return ChatPromptTemplate.from_template(
+    #         template=self.TOOL_SELECTION_TEMPLATE,
+    #         partial_variables = {
+    #             "format_instructions": PydanticOutputParser(pydantic_object=pydantic_model)
+    #         }
+    #     )

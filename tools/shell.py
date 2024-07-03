@@ -30,13 +30,13 @@ class Shell:
             "The absolute path to the repository where the command will be executed."
         ]
     ) -> tuple[bool, str]:
-        f"""
+        """
         Executes a command on the local machine. This function is only allowed to use the 
         following commands:
-        '{CODER_COMMANDS}'
+        'mkdir, docker, python, python3, pip, virtualenv, mv, pytest, touch, cat, ls'
 
         The use of these symbols to concatenate or pipe commands is not permitted:
-        '{SHELL_COMMANDS_JOIN_SYMBOLS}'
+        '&&, ||, |, ;'
 
         Args:
             command (str): The command and its arguments to be run on the shell.
