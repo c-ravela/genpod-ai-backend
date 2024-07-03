@@ -6,7 +6,7 @@ from langchain.tools import tool
 
 from typing import Annotated
 
-import os
+import os, codecs
 
 class CodeFileWriter:
     """
@@ -46,9 +46,14 @@ class CodeFileWriter:
             # Ensure the directory exists before writing the file
             os.makedirs(os.path.dirname(file_path), exist_ok=True)
             
-            with open(file_path, 'w') as file:
-                file.write(generated_code)
-            
+            try:
+                with codecs.open(file_path, 'w', encoding='utf-8') as file:
+                    file.write(generated_code)
+            except UnicodeEncodeError:
+                # If UTF-8 fails, try with 'utf-8-sig' (UTF-8 with BOM)
+                with codecs.open(file_path, 'w', encoding='utf-8-sig') as file:
+                    file.write(generated_code)
+                    
             return (False, f"Success! The generated code was written to the following location: '{file_path}'.")
         except BaseException as e:
             return (True, f"An error occurred while attempting to write the generated code to the file. Here's what went wrong: '{repr(e)}'.")
