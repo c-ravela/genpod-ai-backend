@@ -94,7 +94,8 @@ class ArchitectAgent:
         self.requirements_genetation_chain = (
             {
                 "user_request": lambda x: x["user_request"],
-                "user_requested_standards": lambda x: x["user_requested_standards"],
+                "task_description": lambda x: x["task_description"],
+                "additional_information": lambda x: x["additional_information"],
                 "error_message": lambda x: x["error_message"]
             }
             | self.prompts.requirements_generation_prompt()
@@ -197,11 +198,12 @@ class ArchitectAgent:
                 ChatRoles.USER.value,
                 "Started working on preparing the requirements and tasks for team members"
             ))
-            print("----Architect: Working of requiements documents----")
+            print("----Architect: Working on requiements documents----")
             print("ReqDoc: ", self.error_message)
             llm_response = self.requirements_genetation_chain.invoke({
-                "user_request": f"{self.state['user_request']}\n {self.state['current_task'].description}",
-                "user_requested_standards": f"{self.state["user_requested_standards"]} \n {self.state['current_task'].additional_info}",
+                "user_request": f"{self.state['user_request']}\n",
+                "task_description": f"{self.state['current_task'].description}",
+                "additional_information": f"{self.state['current_task'].additional_info}",
                 "error_message": self.error_message
             })
 
