@@ -31,14 +31,17 @@ class ArchitectPrompts:
     microservice architecture, project folder structure, and clean-code development.
     """
 
-    INITIAL_TEMPLATE: str ="""
-    As a Development Lead, you are responsible for implementing the assigned project. Your 
-    duties include conducting a comprehensive analysis of the user request and creating a detailed 
+    INITIAL_TEMPLATE: str ="""Given the user request, supervisor expectation, and additional information about the project
+    user request:"{user_request}"\n
+    supervisor_expects: "{task_description}"\n
+    additional_information: "{additional_information}"\n
+    
+    As a Solution Architect, you are responsible for implementing this assigned task. Your 
+    duties include conducting a comprehensive analysis of the user request and the additional information to create a detailed 
     document necessary for the completion of the project.
     
-    You should be skilled in breaking down the project into a deliverables that can be assigned to 
-    team members. Each task should be self-contained and provide sufficient detail for the team member 
-    who will undertake it.
+    It is paramount that you break down the project into "descriptive technical deliverables" that other team_members can work on. 
+    Each task should be self-contained and provide sufficient "technical details" for the team members who will undertake it.
 
     Mandate the utilization of microservice architecture, adhere to the best practice methods 
     for project folder structure, 12-factor application standards, domain-driven microservice 
@@ -48,9 +51,6 @@ class ArchitectPrompts:
     In addition, you should enforce programming language-specific standards. These standards vary depending 
     on the language used, but they generally include conventions for naming, commenting, indentation, and 
     organization of code.
-
-    Enforce these user-requested standards as well:
-    "{user_requested_standards}"
 
     The final project should encompass all the source files, configuration files, unit test files, 
     OpenAPI specification file for the project in YAML format, dependency package manager files, 
@@ -77,6 +77,9 @@ class ArchitectPrompts:
     ## Microservice Design
     .
     .
+    ## Tasks
+    .
+    .
     ## Standards
     ### 12-Factor Application Standards
     .
@@ -93,9 +96,6 @@ class ArchitectPrompts:
     ### User Requested Standards
     .
     .
-    ## Tasks
-    .
-    .
     ## License
     .
     .
@@ -106,13 +106,10 @@ class ArchitectPrompts:
 
     Output format instructions:
     "{format_instructions}"
-
-    User Request:
-    "{user_request}"
     """
 
     ADDITIONAL_INFO_TEMPLATE: str = """
-    As a Development Lead, you are responsible for implementing a given project. You have 
+    As a Solution Architect, you are responsible for implementing a given project. You have 
     previously prepared the requirements documents, tasks, and other necessary details for 
     your team members to complete the project.
 
