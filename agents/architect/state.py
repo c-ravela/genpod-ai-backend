@@ -9,7 +9,6 @@ from typing_extensions import TypedDict
 from typing_extensions import Annotated
 
 from models.models import Task
-from models.constants import PStatus
 
 class ArchitectState(TypedDict): 
     """
@@ -26,7 +25,7 @@ class ArchitectState(TypedDict):
         requested to be implemented in the project, which could include coding standards, 
         design patterns, or industry-specific standards.
 
-        project_status (PStatus): An enumerated value reflecting the project's current lifecycle 
+        project_status (str): An enumerated value reflecting the project's current lifecycle 
         stage, providing real-time tracking of project progress.
 
         generated_project_path (str): The absolute path in the file system where the project 
@@ -72,7 +71,7 @@ class ArchitectState(TypedDict):
 
     # @in
     project_status: Annotated[
-        PStatus,
+        str,
         "An enumerated value reflecting the project's current lifecycle stage, providing "
         "real-time tracking of project progress."
     ]

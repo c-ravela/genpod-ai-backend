@@ -32,7 +32,7 @@ class ArchitectGraph:
         """
         
         self.state: ArchitectState = ArchitectState()
-        self.agent = ArchitectAgent(llm)
+        self.agent: ArchitectAgent = ArchitectAgent(llm)
         self.memory: SqliteSaver = SqliteSaver.from_conn_string(PERSISTANCE_DB_PATH)
         self.app: CompiledGraph = self.define_graph()
 
