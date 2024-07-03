@@ -12,6 +12,7 @@ import ast
 from agents.supervisor.supervisor_prompts import SupervisorPrompts
 from agents.supervisor.supervisor_models import QueryList
 from pydantic import ValidationError
+from langchain_openai import ChatOpenAI
 
 class SupervisorAgent():
     def __init__(self, llm, collections, members, memberids, user_input, rag_try_limit, project_path):
@@ -46,6 +47,7 @@ class SupervisorAgent():
         self.prompts = SupervisorPrompts()
         self.project_status = None
         self.project_init_questionaire = SupervisorPrompts.init_rag_questionaire_prompt | self.llm
+        self.evaluation_chain = SupervisorPrompts.follow_up_questions | self.llm
 
     def build_rag_cache(self, query: str):
         # I need to build a rag_cache during kick_off with answers to questions about requirements.
@@ -60,20 +62,58 @@ class SupervisorAgent():
             except (ValidationError, ValueError, SyntaxError) as e:
                 context += str(e)
                 count = count-1
-        if len(validated_requirements_queries.req_queries) is not None:
+        # if len(validated_requirements_queries.req_queries) is not None:
+        #     final_response = ''
+        #     for req_query in validated_requirements_queries.req_queries:
+        #         result = self.rag_cache.get(req_query)
+        #         if result is not None:
+        #             print(f"Cache hit for query, will not response to: {req_query}")
+        #         else:
+        #             print(f"Cache miss for query: {req_query}")
+        #             print(f'----------RAG Agent Called to Query----------\n{req_query}')
+        #             result = self.team_members['RAG'].rag_app.invoke({'question': req_query,'iteration_count':self.rag_try_limit}, {'configurable':{'thread_id':self.memberids['RAG']}})
+        #             self.rag_cache.add(req_query, result['generation'])
+        #             print(f'----------RAG Agent Response----------\n{result['generation']}')
+        #             if result['query_answered'] is True:
+        #                 final_response += f"Question: {req_query}\nAnswer: {result['generation']}"
+        #     return final_response
+        if validated_requirements_queries.req_queries:
             final_response = ''
             for req_query in validated_requirements_queries.req_queries:
                 result = self.rag_cache.get(req_query)
                 if result is not None:
-                    print(f"Cache hit for query, will not response to: {req_query}")
+                    print(f"Cache hit for query: {req_query}")
+                    rag_response = result
                 else:
                     print(f"Cache miss for query: {req_query}")
                     print(f'----------RAG Agent Called to Query----------\n{req_query}')
-                    result = self.team_members['RAG'].rag_app.invoke({'question': req_query,'iteration_count':self.rag_try_limit}, {'configurable':{'thread_id':self.memberids['RAG']}})
-                    self.rag_cache.add(req_query, result['generation'])
-                    print(f'----------RAG Agent Response----------\n{result['generation']}')
+                    result = self.team_members['RAG'].rag_app.invoke({'question': req_query, 'iteration_count': self.rag_try_limit}, {'configurable': {'thread_id': self.memberids['RAG']}})
+                    rag_response = result['generation']
+                    self.rag_cache.add(req_query, rag_response)
+                    print(f'----------RAG Agent Response----------\n{rag_response}')
+                
                     if result['query_answered'] is True:
-                        final_response += f"Question: {req_query}\nAnswer: {result['generation']}"
+                # Evaluate the RAG response
+                        evaluation_result = self.evaluation_chain.invoke({
+                            'user_query':req_query,
+                            'initial_rag_response':rag_response}
+                        )
+                        
+                        if evaluation_result.content.startswith("COMPLETE"):
+                            final_response += f"Question: {req_query}\nAnswer: {rag_response}\n\n"
+                        elif evaluation_result.content.startswith("INCOMPLETE"):
+                            follow_up_query = evaluation_result.content.split("Follow-up Query:")[1].strip()
+                            print(f"\n----------Follow-up query needed----------\n{follow_up_query}")
+                            
+                            # Ask the follow-up query to the RAG agent
+                            follow_up_result = self.team_members['RAG'].rag_app.invoke({'question': follow_up_query, 'iteration_count': self.rag_try_limit}, {'configurable': {'thread_id': self.memberids['RAG']}})
+                            follow_up_response = follow_up_result['generation']
+                            self.rag_cache.add(follow_up_query, follow_up_response)
+                            
+                            final_response += f"Question: {req_query}\nInitial Answer: {rag_response}\nFollow-up Question: {follow_up_query}\nFollow-up Answer: {follow_up_response}\n\n"
+                        else:
+                            print("Unexpected evaluation result format.")
+                            final_response += f"Question: {req_query}\nAnswer: {rag_response}\n\n"
             return final_response
         else:
             return 'Failed to initialize project'
@@ -81,16 +121,16 @@ class SupervisorAgent():
     def instantiate_team_members(self, state: SupervisorState):
         for member,_ in self.team_members.items():
             if member=='Architect':
-                self.team_members[member] = ArchitectGraph(self.llm)
+                self.team_members[member] = ArchitectGraph(ChatOpenAI(model="gpt-4o-2024-05-13", temperature=0.3, max_retries=5, streaming=True, seed=4000, top_p=0.4))
             elif member=='RAG':
                 # We can to implement a scenario where we are able to use appropriate collection_name from the list of collections based on the user_input
                 # This will probably mechanism should probably go inside ragworkflow implementation. For now lets keep it simple
-                self.team_members[member] = RAGWorkFlow(self.llm,
+                self.team_members[member] = RAGWorkFlow(ChatOpenAI(model="gpt-4o-2024-05-13", temperature=0, max_retries=5, streaming=True, seed=4000, top_p=0.3),
                                                         collection_name=list(self.collections.keys())[0],
                                                         thread_id=self.memberids[member],
                                                         persist_directory=self.collections[list(self.collections.keys())[0]])
             elif member=='Planner':
-                self.team_members[member] = PlannerWorkFlow(self.llm,
+                self.team_members[member] = PlannerWorkFlow(ChatOpenAI(model="gpt-4o-2024-05-13", temperature=0.3, max_retries=5, streaming=True, seed=4000, top_p=0.6),
                                                             thread_id=self.memberids[member])
             else:
                 # TODO: Implement other team members' graph instantiation here.

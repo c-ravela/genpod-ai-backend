@@ -16,7 +16,7 @@ if __name__=="__main__":
     PROJECT_INPUT = "I want to develop a Title Requests Micro-service adhering to MISMO v3.6 standards to handle get_title service using GET REST API Call in .NET?"
     # PROJECT_INPUT = "How to make money?"
     PROJECT_PATH = "/"
-    LLM = ChatOpenAI(model="gpt-4o-2024-05-13", temperature=0, max_retries=5, streaming=True, seed=4000)
+    LLM = ChatOpenAI(model="gpt-4o-2024-05-13", temperature=0.2, max_retries=5, streaming=True, seed=4000, top_p=0.8)
     SUPERVISOR_THREAD_ID = "999"
     PROJECT_PATH = '/'
     SUPERVISOR = SupervisorWorkflow(LLM, VECTOR_DB_COLLECTIONS, SUPERVISOR_THREAD_ID, MEMBERS, THREAD_IDS, PROJECT_INPUT, RAG_TRY_LIMIT, PROJECT_PATH)
