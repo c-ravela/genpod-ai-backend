@@ -2,7 +2,7 @@ from langchain.tools import tool
 
 from typing import Annotated
 
-import os
+import os, codecs
 
 class FS:
 
@@ -19,14 +19,16 @@ class FS:
             file_path (str): The path where the generated code should be written.
         """
         try:
-
-            # Ensure the directory exists before writing the file
             os.makedirs(os.path.dirname(file_path), exist_ok=True)
             
-            with open(file_path, 'w') as file:
-                file.write(generated_code)
+            try:
+                with codecs.open(file_path, 'w', encoding='utf-8') as file:
+                    file.write(generated_code)
+            except UnicodeEncodeError:
+                # If UTF-8 fails, try with 'utf-8-sig' (UTF-8 with BOM)
+                with codecs.open(file_path, 'w', encoding='utf-8-sig') as file:
+                    file.write(generated_code)
             
             return (False, f"Successfully wrote the generated code to: {file_path}")
         except BaseException as e:
             return (True, f"Failed to write generated code. Error: {repr(e)}")
-        
