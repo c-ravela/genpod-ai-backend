@@ -23,7 +23,7 @@ from models.architect import RequirementsDoc
 
 from agents.architect.state import ArchitectState
 
-from tools.fs import FS
+from tools.code import CodeFileWriter
 
 import os
 import ast
@@ -88,7 +88,7 @@ class ArchitectAgent:
         self.previous_output = ""
 
         self.llm = llm
-        self.tools = ToolExecutor([FS.write_generated_code_to_file])
+        self.tools = ToolExecutor([CodeFileWriter.write_generated_code_to_file])
 
         # This chain is used initially when the project requirements need to be generated
         self.requirements_genetation_chain = (
@@ -319,7 +319,7 @@ class ArchitectAgent:
             generated_code = self.state['requirements_overview']
             file_path = os.path.join(self.state['generated_project_path'], "docs/requirements.md")
 
-            self.hasError, msg = FS.write_generated_code_to_file.invoke({"generated_code": generated_code, "file_path": file_path})
+            self.hasError, msg = CodeFileWriter.write_generated_code_to_file.invoke({"generated_code": generated_code, "file_path": file_path})
             
             if self.hasError:
                 self.error_message = msg
