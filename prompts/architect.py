@@ -180,19 +180,17 @@ class ArchitectPrompts:
             As a Solution Architect, provide a comprehensive project overview. Include:
             1. A brief description of the project's purpose and goals
             2. The main features or functionalities to be implemented
-            3. Any constraints or limitations
-            4. Key stakeholders and their roles
-            5. Expected timeline or major milestones
+            3. What schema definition models are needed to implement this service.
 
             Format your response in markdown, starting with a "## Project Overview" heading.""",
-        input_variables=['user_request','task_description','additional_information'],
+        input_variables=['user_request','task_description','additional_information']
     )
 
     ARCHITECTURE_PROMPT = PromptTemplate(
         template="""Based on the project overview, describe the high-level architecture for this microservice-based project. Include:
             Project Overview: "{project_overview}"
             1. A diagram or detailed description of the microservice architecture
-            2. Key components and their interactions
+            2. Key components, data models and their interactions
             3. Data flow between services
             4. External integrations or APIs
             5. Scalability and reliability considerations
@@ -225,8 +223,12 @@ class ArchitectPrompts:
 
     MICROSERVICE_DESIGN_PROMPT = PromptTemplate(
         template="""
-            Based on the following architecture:
+            Based on the following project overview and architecture:
 
+            Project Overview:
+            {project_overview}
+            
+            Architecture:
             {architecture}
 
             For each microservice identified, provide:
@@ -253,12 +255,10 @@ class ArchitectPrompts:
             Microservice Design:
             {microservice_design}
 
-            Break down the project into detailed, self-contained tasks that team members can work on. For each task, provide:
-            1. Task name
+            Break down the project into detailed, self-contained deliverables that team members can work on. Key is to not miss any technical specification for each deliverable, provide:
+            1. Deliverable name
             2. Detailed description of what needs to be done
             3. Technical requirements or specifications
-            4. Dependencies on other tasks
-            5. Estimated complexity or effort
 
             Format your response in markdown, starting with a "## Tasks" heading, with each task as a subheading.""",
         input_variables=["project_overview", "architecture", "microservice_design"],
@@ -294,9 +294,9 @@ class ArchitectPrompts:
             {folder_structure}
 
             Provide specific implementation details for:
-            1. Required source files
-            2. Configuration files
-            3. Unit test approach and files
+            1. list of required source files
+            2. list of Configuration files
+            3. list of Unit test approach and files
             4. OpenAPI specification (provide a sample structure in YAML)
             5. Dependency management (specify package manager and provide a sample file)
             6. Dockerfile contents
