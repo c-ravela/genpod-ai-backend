@@ -12,7 +12,7 @@ inputs and how to structure its outputs. They are essential for ensuring that
 the Architect agent can effectively assist users in implementing their projects.
 """
 
-from langchain_core.prompts import ChatPromptTemplate
+from langchain_core.prompts import ChatPromptTemplate, PromptTemplate
 
 from langchain.output_parsers import PydanticOutputParser
 
@@ -171,6 +171,151 @@ class ArchitectPrompts:
 
     "{format_instructions}"
     """
+
+    PROJECT_OVERVIEW_PROMPT = PromptTemplate(
+        template=""" Given the user request: "{user_request}"
+            Supervisor expectations: "{task_description}"
+            Additional information: "{additional_information}"
+
+            As a Solution Architect, provide a comprehensive project overview. Include:
+            1. A brief description of the project's purpose and goals
+            2. The main features or functionalities to be implemented
+            3. Any constraints or limitations
+            4. Key stakeholders and their roles
+            5. Expected timeline or major milestones
+
+            Format your response in markdown, starting with a "## Project Overview" heading.""",
+        input_variables=['user_request','task_description','additional_information'],
+    )
+
+    ARCHITECTURE_PROMPT = PromptTemplate(
+        template="""Based on the project overview, describe the high-level architecture for this microservice-based project. Include:
+            Project Overview: "{project_overview}"
+            1. A diagram or detailed description of the microservice architecture
+            2. Key components and their interactions
+            3. Data flow between services
+            4. External integrations or APIs
+            5. Scalability and reliability considerations
+
+            Format your response in markdown, starting with a "## Architecture" heading.""",
+        input_variables=['project_overview'],
+    )
+
+    FOLDER_STRUCTURE_PROMPT = PromptTemplate(
+        template="""
+        Given the project overview and architecture:
+
+        Project Overview:
+        {project_overview}
+
+        Architecture:
+        {architecture}
+
+        Propose a detailed folder structure for this microservice project, adhering to best practices. Include:
+        1. Root-level directories
+        2. Service-specific directories
+        3. Common or shared directories
+        4. Test directories
+        5. Configuration file locations
+        6. Explanation of the purpose for each major directory
+
+        Format your response in markdown, starting with a "## Folder Structure" heading.""",
+        input_variables=["project_overview", "architecture"],
+    )
+
+    MICROSERVICE_DESIGN_PROMPT = PromptTemplate(
+        template="""
+            Based on the following architecture:
+
+            {architecture}
+
+            For each microservice identified, provide:
+            1. Service name and primary responsibility
+            2. Key endpoints or functions
+            3. Data models or schemas
+            4. Internal components or modules
+            5. Dependencies on other services or external systems
+
+            Format your response in markdown, starting with a "## Microservice Design" heading, with subheadings for each service.""",
+        input_variables=["architecture"],
+    )
+
+    TASKS_BREAKDOWN_PROMPT = PromptTemplate(
+        template="""
+            Given the project overview, architecture, and microservice design:
+
+            Project Overview:
+            {project_overview}
+
+            Architecture:
+            {architecture}
+
+            Microservice Design:
+            {microservice_design}
+
+            Break down the project into detailed, self-contained tasks that team members can work on. For each task, provide:
+            1. Task name
+            2. Detailed description of what needs to be done
+            3. Technical requirements or specifications
+            4. Dependencies on other tasks
+            5. Estimated complexity or effort
+
+            Format your response in markdown, starting with a "## Tasks" heading, with each task as a subheading.""",
+        input_variables=["project_overview", "architecture", "microservice_design"],
+    )
+
+    STANDARDS_PROMPT = PromptTemplate(
+        template="""
+            Considering the user request: "{user_request}"
+            And the supervisor expectations: "{task_description}"
+
+            Outline the standards to be followed in this project, including:
+            1. 12-Factor Application Standards: Explain how each factor applies to this project
+            2. Clean Code Standards: Specific practices for maintaining clean, readable code
+            3. Code Commenting Standards: Guidelines for effective code documentation
+            4. Programming Language Specific Standards: Conventions for the chosen language(s)
+            5. User Requested Standards: Any additional standards specified by the user or supervisor
+
+            Format your response in markdown, starting with a "## Standards" heading, with subheadings for each category.""",
+        input_variables=["user_request", "task_description"],
+    )
+
+    IMPLEMENTATION_DETAILS_PROMPT = PromptTemplate(
+        template="""
+            Based on the following project details:
+
+            Architecture:
+            {architecture}
+
+            Microservice Design:
+            {microservice_design}
+
+            Folder Structure:
+            {folder_structure}
+
+            Provide specific implementation details for:
+            1. Required source files
+            2. Configuration files
+            3. Unit test approach and files
+            4. OpenAPI specification (provide a sample structure in YAML)
+            5. Dependency management (specify package manager and provide a sample file)
+            6. Dockerfile contents
+            7. Contents for .dockerignore and .gitignore files
+
+            Format your response in markdown, starting with a "## Implementation Details" heading, with subheadings for each category.""",
+        input_variables=["architecture", "microservice_design", "folder_structure"],
+    )
+
+    LICENSE_DETAILS_PROMPT = PromptTemplate(
+        template="""
+            Considering the user request: "{user_request}"
+            And the License Text: "{license_text}"
+
+            Specify the license to be used for this project.
+
+            Format your response in markdown, starting with a "## License and Legal Considerations" heading.""",
+        input_variables=["user_request", "license_text"],
+    )
 
     def requirements_generation_prompt(self) -> ChatPromptTemplate: 
         """
