@@ -239,7 +239,7 @@ class ArchitectPrompts:
             5. Dependencies on other services or external systems
 
             Format your response in markdown, starting with a "## Microservice Design" heading, with subheadings for each service.""",
-        input_variables=["architecture"],
+        input_variables=["project_overview","architecture"],
     )
 
     TASKS_BREAKDOWN_PROMPT = PromptTemplate(
