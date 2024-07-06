@@ -50,30 +50,40 @@ class ArchitectGraph:
         architect_flow = StateGraph(ArchitectState)
 
         # node
-        architect_flow.add_node(self.agent.requirements_and_additional_context, self.agent.requirements_and_additional_context_node)
+        architect_flow.add_node(self.agent.entry, self.agent.entry_node)
+        architect_flow.add_node(self.agent.requirements, self.agent.requirements_node)
+        architect_flow.add_node(self.agent.additional_info, self.agent.additional_information_node)
         architect_flow.add_node(self.agent.write_requirements, self.agent.write_requirements_to_local_node)
         architect_flow.add_node(self.agent.tasks_seperation, self.agent.tasks_seperation_node)
         architect_flow.add_node(self.agent.state_update, self.agent.update_state)
 
         # edges
         architect_flow.add_conditional_edges(
-            self.agent.requirements_and_additional_context,
+            self.agent.entry,
             self.agent.router, 
             {
-                self.agent.requirements_and_additional_context: self.agent.requirements_and_additional_context,
+                self.agent.requirements: self.agent.requirements,
+                self.agent.additional_info: self.agent.additional_info,
+                self.agent.state_update: self.agent.state_update,
+            }
+        )
+        
+        architect_flow.add_conditional_edges(
+            self.agent.requirements,
+            self.agent.router,
+            {
+                self.agent.requirements: self.agent.requirements,
+                self.agent.write_requirements: self.agent.write_requirements,
                 self.agent.tasks_seperation: self.agent.tasks_seperation,
-                self.agent.write_requirements:self.agent.write_requirements,
                 self.agent.state_update: self.agent.state_update
             }
         )
 
         architect_flow.add_conditional_edges(
-            self.agent.tasks_seperation,
-            self.agent.router, 
-            {
-                self.agent.requirements_and_additional_context: self.agent.requirements_and_additional_context,
-                self.agent.tasks_seperation: self.agent.tasks_seperation,
-                self.agent.write_requirements:self.agent.write_requirements,
+            self.agent.additional_info,
+            self.agent.router,
+            {   
+                self.agent.additional_info: self.agent.additional_info,
                 self.agent.state_update: self.agent.state_update
             }
         )
@@ -82,9 +92,17 @@ class ArchitectGraph:
             self.agent.write_requirements,
             self.agent.router, 
             {
-                self.agent.requirements_and_additional_context: self.agent.requirements_and_additional_context,
                 self.agent.tasks_seperation: self.agent.tasks_seperation,
-                self.agent.write_requirements:self.agent.write_requirements,
+                self.agent.requirements:self.agent.requirements,
+                self.agent.state_update: self.agent.state_update
+            }
+        )
+
+        architect_flow.add_conditional_edges(
+            self.agent.tasks_seperation,
+            self.agent.router, 
+            {
+                self.agent.tasks_seperation: self.agent.tasks_seperation,
                 self.agent.state_update: self.agent.state_update
             }
         )
@@ -92,7 +110,7 @@ class ArchitectGraph:
         architect_flow.add_edge(self.agent.state_update, END)
 
         # entry point
-        architect_flow.set_entry_point(self.agent.requirements_and_additional_context)
+        architect_flow.set_entry_point(self.agent.entry)
 
         return architect_flow.compile(checkpointer=self.memory)
 

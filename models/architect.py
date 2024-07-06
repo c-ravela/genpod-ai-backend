@@ -16,43 +16,36 @@ from pydantic import BaseModel
 from models.constants import Status
 from models.models import Task
 
-class RequirementsDoc(BaseModel):
+class TaskOutput(BaseModel):
     """
-    A data model representing the output of the llm in the form of a 
-    Requirements Document.
-
-    This model includes various fields that capture the essential details of 
-    the project requirements, such as the project name, a well-documented 
-    requirements document, a set of tasks derived from the requirements, and
-    the project folder structure to follow.
+    This class represents the output of a task. It includes fields to indicate 
+    whether additional information is needed to complete the task, the question 
+    to ask for additional information, and the content of the requested information.
     """
-
-    project_name: str = Field(
-        description="The name of the project assigned by the user", 
+    
+    is_add_info_needed: bool = Field(
+        description="Indicates whether additional information is needed to complete a task.",
         required=True
     )
 
-    well_documented: str = Field(
-        description="A comprehensive requirements document constructed from"
-        " the user's input in a markdown format.", 
-        required=True
+    question_for_additional_info: str = Field(
+        description="The question to ask when additional information is needed."
     )
 
-    tasks: str = Field(
-        description="This field represents a list of tasks necessary for the successful "
-        "completion of a project. Each task is self-contained, providing comprehensive "
-        "details to ensure clarity for the assignee. Tasks should be formatted in valid "
-        "markdown for readability and structure.", 
-        required=True,
+    content: str = Field(
+        description="The content of the requested information."
     )
 
-    project_folder_structure: str = Field(
-        description="The folder structure to be adhered to for the project", 
-        required=True
-    )
-   
-    description: ClassVar[str] = "Schema representing the documents to be "
-    "generated based on the project requirements."
+class RequirementsOverview:
+
+    project_details: str
+    architecture: str
+    folder_structure: str
+    microservice_design: str
+    task_description: str
+    standards: str
+    implementation_details: str
+    license_details: str
 
 class TasksList(BaseModel):
     """
@@ -61,8 +54,8 @@ class TasksList(BaseModel):
     the task completion process.
     """
     
-    tasks: str = Field(
-        description="The list of tasks in the form of string derived from the detailed requirements, "
+    tasks: list[str] = Field(
+        description="The list of tasks derived from the detailed requirements, "
         "each providing sufficient context with detailed information crucial for "
         "the task completion process", 
         required=True,

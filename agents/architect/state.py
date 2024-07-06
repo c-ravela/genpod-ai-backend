@@ -8,6 +8,7 @@ state.
 from typing_extensions import TypedDict
 from typing_extensions import Annotated
 
+from models.architect import RequirementsOverview
 from models.models import Task
 
 class ArchitectState(TypedDict): 
@@ -83,6 +84,12 @@ class ArchitectState(TypedDict):
         "This path is used to store all the project-related files and directories."
     ]
     
+    # @in
+    license_text: Annotated[
+        str,
+        "User provided license text"
+    ]
+
     # @inout
     messages: Annotated[
         list[tuple[str, str]], 
@@ -113,7 +120,7 @@ class ArchitectState(TypedDict):
 
     # @out
     requirements_overview: Annotated[
-        str, 
+        RequirementsOverview, 
         "A comprehensive, well-structured document in markdown format that outlines "
         "the project's requirements derived from the user's request. This serves as a "
         "guide for the development process."
