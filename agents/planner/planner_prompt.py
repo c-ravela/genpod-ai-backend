@@ -57,9 +57,9 @@ class PlannerPrompts():
             "LICENSE_TEXT": "Text of the license"
         }}
 
-        - If you need more information, respond with a JSON object containing a single comprehensive question:
+        - If you need more information, respond with a JSON object containing a single detailed question that can be used to retrieve additional information from RAG or can be asked to the Architect of the project:
         {{
-            "question": "A single, comprehensive question that covers all the information you need to proceed with the technical requirements"
+            "question": "A single, detailed question that covers all the information you need to proceed with the technical requirements"
         }}
 
         Remember:

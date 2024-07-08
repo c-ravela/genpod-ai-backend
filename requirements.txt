@@ -33,3 +33,4 @@ unstructured[xlsx]
 unstructured[docx]
 notebook
 shlex
+python-json-logger==2.0.7

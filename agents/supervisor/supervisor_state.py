@@ -28,6 +28,7 @@ class SupervisorState(TypedDict):
     messages: List[Tuple[str, str]]
     rag_query_answer : bool
     requirements_doc : str
+    human_feedback: List[Tuple[str, str]]
 
 def add_message(state: SupervisorState, message: tuple[str, str]) -> SupervisorState:
     """
