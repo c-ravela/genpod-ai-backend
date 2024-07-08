@@ -8,7 +8,7 @@ from agents.planner.planner_models import BacklogList
 from pydantic import ValidationError
 import json
 from typing import List
-
+from pprint import pprint
 
 class PlannerAgent():
     def __init__(self, llm):
@@ -43,6 +43,7 @@ class PlannerAgent():
     def backlog_planner(self, state: PlannerState):
         while(True):
             try:
+                print(f"----Working on building backlogs for the deliverable----\n{state['current_task'].description}")
                 generated_backlogs = self.backlog_plan.invoke({"deliverable":state['current_task'].description, "context":state['current_task'].additional_info, "feedback":self.error_messages})
                 backlogs_list = ast.literal_eval(generated_backlogs.content)
                 # backlogs_list = self.parse_backlog_tasks(generated_backlogs.content)
@@ -76,6 +77,7 @@ class PlannerAgent():
         for backlog in state['deliverable_backlog_map'][state['current_task'].description]:
             while(True):
                 try:
+                    print(f"----Now Working on Generating detailed requirements for the backlog----\n{backlog}")
                     response = self.detailed_requirements.invoke({"backlog":backlog, "deliverable":state['deliverable'], "context":state['current_task'].additional_info, "feedback":self.error_messages})
 
                     # Let's clean the response to remove json prefix that llm sometimes appends to the actual text
@@ -91,10 +93,13 @@ class PlannerAgent():
                         cleaned_json = cleaned_response
                     parsed_response = json.loads(cleaned_json)
                     if "question" in parsed_response.keys():
+                        print(f"----Awaiting for additional information on----\n{parsed_response['question']}")
                         state['current_task'].task_status = Status.AWAITING
                         state['current_task'].question = parsed_response['question']
                         return {**state}
                     elif "description" in parsed_response.keys():
+                        print("----Generated Detailed requirements in JSON format for the backlog----\n")
+                        pprint(parsed_response)
                         self.backlog_requirements[backlog] = parsed_response
                         self.error_count = 0
                         self.error_messages = []
@@ -127,7 +132,7 @@ class PlannerAgent():
             response = Task(description=state['current_task'].description, task_status=Status.ABANDONED.value, additional_info=state['current_task'].additional_info, question=state['current_task'].question)
 
         if state['response'] is None:
-            state["response"] = response
+            state["response"] = [response]
         else:
             state["response"].append(response)
         return {**state}
