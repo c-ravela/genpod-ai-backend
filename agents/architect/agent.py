@@ -9,6 +9,8 @@ from langgraph.prebuilt import ToolExecutor
 
 from langchain_core.runnables.base import RunnableSequence
 
+from langchain_core.output_parsers import JsonOutputParser
+
 from prompts.architect import ArchitectPrompts
 
 from models.constants import PStatus
@@ -17,16 +19,16 @@ from models.constants import ChatRoles
 
 from models.models import Task
 
-from models.architect import TasksList
+from models.architect import RequirementsOverview, TaskOutput, TasksList
 from models.architect import QueryResult
-from models.architect import RequirementsDoc
 
 from agents.architect.state import ArchitectState
 
 from tools.code import CodeFileWriter
 
+from typing_extensions import Literal
+
 import os
-import ast
 
 class ArchitectAgent:
     """
@@ -36,27 +38,30 @@ class ArchitectAgent:
     agent, processes user inputs, and generates appropriate responses. It uses 
     a chain of tools to parse the user input and generate a structured output.
     """
+    agent_name: str = "Solution Architect"
 
     # names of the graph node
-    requirements_and_additional_context: str = "requirements_and_additional_context"
+    entry: str = "entry"
+    requirements: str = "requirements"
+    additional_info: str = "additional_info"
     write_requirements: str = "write_requirements"
     tasks_seperation: str = "tasks_seperation"
     state_update: str = "state_update"
 
     # local state of this class which is not exposed
     # to the graph state
-    hasError: bool
-    areTasksSeperated: bool
-    areRequirementsSavedLocally: bool
+    mode: Literal["gather_info", "generation"] # gather_info: when additional information need, generation: need to generate requirements document
+    generation_phase: int # at step which current generation is
 
-    tasks: str
+    has_error: bool
+    are_tasks_seperated: bool
+    is_additional_info_provided: bool
+    are_requirements_generated: bool
+    are_requirements_saved_to_local: bool
+    requested_for_additional_info: bool
+
     last_visited_node: str
-
-    missing_keys: list[str]
-    expected_keys: list[str]
-
     error_message: str
-    previous_output: any
 
     # tools used by this agent
     tools: ToolExecutor
@@ -65,7 +70,15 @@ class ArchitectAgent:
     prompts: ArchitectPrompts = ArchitectPrompts()
 
     # chains
-    requirements_genetation_chain: RunnableSequence
+    project_overview_chain: RunnableSequence
+    architecture_chain: RunnableSequence
+    folder_structure_chain: RunnableSequence
+    microservice_design_chain: RunnableSequence
+    tasks_breakdown_chain: RunnableSequence
+    standards_chain: RunnableSequence
+    implementation_details_chain: RunnableSequence
+    license_legal_chain: RunnableSequence
+
     additional_information_chain: RunnableSequence
     task_seperation_chain: RunnableSequence
 
@@ -75,77 +88,129 @@ class ArchitectAgent:
         (llm) and sets up the architect chain.
         """
 
-        self.hasError = False
-        self.areTasksSeperated = False
-        self.areRequirementsSavedLocally = False
-        
-        self.tasks = ""
-        self.last_visited_node = self.requirements_and_additional_context # entry point node
+        self.has_error = False
+        self.are_tasks_seperated = False
+        self.is_additional_info_provided = False
+        self.are_requirements_saved_to_local = False
+        self.requested_for_additional_info = False
+        self.are_requirements_generated = False
 
-        self.missing_keys = []
-        self.expected_keys = []
+        self.mode = ""
+        self.generation_phase = 0
+        self.last_visited_node = self.entry # entry point node
 
         self.error_message = ""
-        self.previous_output = ""
 
         self.llm = llm
         self.tools = ToolExecutor([CodeFileWriter.write_generated_code_to_file])
 
-        # This chain is used initially when the project requirements need to be generated
-        self.requirements_genetation_chain = (
-            {
-                "user_request": lambda x: x["user_request"],
-                "task_description": lambda x: x["task_description"],
-                "additional_information": lambda x: x["additional_information"],
-                "error_message": lambda x: x["error_message"]
-            }
-            | self.prompts.requirements_generation_prompt()
-            | self.llm.with_structured_output(RequirementsDoc, include_raw=True)
+        self.project_overview_chain = ( 
+            self.prompts.project_overview_prompt
+            | self.llm
+            | JsonOutputParser()
         )
-        
+
+        self.architecture_chain = (
+            self.prompts.architecture_prompt
+            | self.llm
+            | JsonOutputParser()
+        )
+
+        self.folder_structure_chain = (
+            self.prompts.folder_structure_prompt
+            | self.llm
+            | JsonOutputParser()
+        )
+
+        self.microservice_design_chain = (
+            self.prompts.microservice_design_prompt
+            | self.llm
+            | JsonOutputParser()
+        )
+
+        self.tasks_breakdown_chain = (
+            self.prompts.tasks_breakdown_prompt
+            | self.llm
+            | JsonOutputParser()
+        )
+
+        self.standards_chain = (
+            self.prompts.standards_prompt
+            | self.llm
+            | JsonOutputParser()
+        )
+
+        self.implementation_details_chain = (
+            self.prompts.implementation_details_prompt
+            | self.llm
+            | JsonOutputParser()
+        )
+
+        self.license_legal_chain = (
+            self.prompts.license_details_prompt
+            | self.llm
+            | JsonOutputParser()
+        )
+
         # This chain is used when team member requests for additional information to complete 
         # the task
         self.additional_information_chain = (
-            {
-                "requirements_document": lambda x: x["requirements_overview"],
-                "current_task": lambda x: x["current_task"],
-                "question": lambda x: x["question"],
-                "error_message": lambda x: x["error_message"]
-            }
-            | self.prompts.additional_info_prompt()
-            | self.llm.with_structured_output(QueryResult, include_raw=True)
+            self.prompts.additional_info_prompt
+            | self.llm
+            | JsonOutputParser()
         )
 
         # This chain is used when we need to create a list of tasks from the markdown formatted
         # tasks
         self.task_seperation_chain = (
-            {
-                "requirements_document": lambda x: x["requirements_document"],
-                "tasks": lambda x : x["tasks"],
-                "error_message": lambda x: x["error_message"]
-            }
-            | self.prompts.task_seperation_prompt()
-            | self.llm.with_structured_output(TasksList, include_raw=True)
+            self.prompts.tasks_seperation_prompt
+            | self.llm
+            | JsonOutputParser()
         )
 
-    def create_tasks(self, tasks: str) -> list[Task]:
+    def create_requirements_document(self) -> str:
+        """
+        """
+        
+        print(f"----{self.agent_name}: Creating requirements document----")
+
+        return f"""
+# Project Requirements Document
+
+{self.state['requirements_overview']['project_details']}
+
+{self.state['requirements_overview']['architecture']}
+
+{self.state['requirements_overview']['folder_structure']}
+
+{self.state['requirements_overview']['microservice_design']}
+
+{self.state['requirements_overview']['task_description']}
+
+{self.state['requirements_overview']['standards']}
+
+{self.state['requirements_overview']['implementation_details']}
+
+{self.state['requirements_overview']['license_details']}
+        """
+    
+    def create_tasks(self, tasks: list) -> list[Task]:
         """
         This method is used to create a list of Task objects from a string representation of a list.
 
         Args:
-            tasks (str): A string representation of a list where each element is a description of a 
-            task.
+            tasks (list): A list where each element is a description of a task.
 
         Returns:
             list[Task]: A list of Task objects with the description set from the input and the status 
             set as NEW.
         """
 
-        print("----Architect: Creating List of Tasks----")
-        ts_list = ast.literal_eval(tasks)
+        print(f"----{self.agent_name}: Creating List of Tasks----")
+        # ts_list = ast.literal_eval(tasks)
         tasks_list: list[Task] = []
 
-        for ti in ts_list:
+        for ti in tasks:
             tasks_list.append(Task(
                 description=ti,
                 task_status=Status.NEW
@@ -162,6 +227,55 @@ class ArchitectAgent:
         """
 
         self.state['messages'] += [message]
+
+    def request_additional_info(self, response: TaskOutput) -> None:
+        """
+        """
+
+        self.requested_for_additional_info = True
+        self.state['current_task'].question = response['question_for_additional_info']
+        self.state['current_task'].task_status = Status.AWAITING
+    
+    def update_requirements_overview(self, key: str, phase: str, response: TaskOutput) -> None:
+        """
+        """
+
+        if not response['is_add_info_needed']:
+            self.add_message((
+                ChatRoles.USER.value,
+                f"{self.agent_name}: {phase} prepared."
+            ))
+            self.state['requirements_overview'][key] = response['content']
+
+            # update to next phase
+            self.generation_phase += 1
+        else:
+            self.add_message((
+                ChatRoles.USER.value,
+                f"{self.agent_name}: {phase} has requested for additional information."
+            ))
+            self.request_additional_info(response)
+
+    def requirements_overview(self, response: TaskOutput) -> None:
+        """
+        """
+        
+        if self.generation_phase == 0: # Project Overview
+            self.update_requirements_overview("project_details", "Project Overview", response)
+        elif self.generation_phase == 1: # Architecture
+            self.update_requirements_overview("architecture", "Architecture", response)
+        elif self.generation_phase == 2: # Folder Structure
+            self.update_requirements_overview("folder_structure", "Folder Structure", response)
+        elif self.generation_phase == 3: # Microservice Design
+            self.update_requirements_overview("microservice_design", "Microservice Design", response)
+        elif self.generation_phase == 4: # Tasks Breakdown
+            self.update_requirements_overview("task_description", "Tasks Breakdown", response)
+        elif self.generation_phase == 5: # Standards
+            self.update_requirements_overview("standards", "Standards", response)
+        elif self.generation_phase == 6: # Implementation Details
+            self.update_requirements_overview("implementation_details", "Implementation Details", response)
+        elif self.generation_phase == 7: # License Details
+            self.update_requirements_overview("license_details", "License Details", response)
 
     def router(self, state: ArchitectState) -> str:
         """
@@ -180,12 +294,20 @@ class ArchitectAgent:
             str: The name of the next agent to be invoked or "__end__" if the process is complete.
         """
 
-        if self.hasError:
+        print(f"----{self.agent_name}: Routing Graph----")
+
+        if self.has_error:
             return self.last_visited_node
-        elif not self.areRequirementsSavedLocally:
-            return self.write_requirements
-        elif not self.areTasksSeperated:
-            return self.tasks_seperation
+        elif self.mode == "generation":
+            if not self.are_requirements_generated:
+                return self.requirements
+            elif not self.are_requirements_saved_to_local:
+                return self.write_requirements
+            elif not self.are_tasks_seperated:
+                return self.tasks_seperation
+        elif self.mode == "gather_info":
+            if not self.is_additional_info_provided:
+                return self.additional_info
         
         return self.state_update
     
@@ -205,138 +327,199 @@ class ArchitectAgent:
 
         return {**self.state}
     
-    def requirements_and_additional_context_node(self, state: ArchitectState) -> ArchitectState:
+    def entry_node(self, state: ArchitectState) -> ArchitectState:
         """
-        This method processes the current state of the Architect agent and updates it based on the user input.
-        
-        It handles two main states: 'NEW' and 'AWAITING'. 
-
-        In the 'NEW' state, it invokes the requirements generation chain if there are no errors, or the requirements generation error chain if there are errors. 
-        It then updates the state with the response from the invoked chain.
-
-        In the 'AWAITING' state, it invokes the additional information chain and updates the state with the response from the invoked chain.
-
-        If there are any parsing errors in the response from the invoked chain, it sets the error flag and stores the error message. 
-        If the output is not structured properly, it sets the error flag and stores the missing keys.
-
-        Finally, it returns the updated state.
-
-        Parameters:
-            state (ArchitectState): The current state of the Architect agent.
-
-        Returns:
-            ArchitectState: The updated state of the Architect agent.
         """
+        print(f"----{self.agent_name}: Entry Point Triggered----")
 
         self.update_state(state)
-        self.last_visited_node = self.requirements_and_additional_context
+        self.last_visited_node = self.entry
 
         if self.state['project_status'] == PStatus.INITIAL.value:
-            self.add_message((
-                ChatRoles.USER.value,
-                "Started working on preparing the requirements and tasks for team members"
-            ))
-            print("----Architect: Working on requiements documents----")
-            print("ReqDoc: ", self.error_message)
-            llm_response = self.requirements_genetation_chain.invoke({
-                "user_request": f"{self.state['user_request']}\n",
-                "task_description": f"{self.state['current_task'].description}",
-                "additional_information": f"{self.state['current_task'].additional_info}",
-                "error_message": self.error_message
-            })
+            self.mode = "generation"
+        elif self.state["current_task"].task_status.value == Status.AWAITING.value:
+            self.mode = "gather_info"
 
-            self.expected_keys = [item for item in RequirementsDoc.__annotations__ if item != "description"]
-        elif self.state['current_task'].task_status.value == Status.AWAITING.value:
-            print("----Architect: Working on gathering additional information----")
-            print("Additional: ", self.error_message)
-
-            self.add_message((
-                ChatRoles.USER.value,
-                "Started working on gathering the additional information for team member."
-            ))
-            llm_response = self.additional_information_chain.invoke({
-                "current_task": self.state['current_task'].description,
-                "requirements_overview": self.state["requirements_overview"],
-                "question": self.state['current_task'].question,
-                "error_message": self.error_message
-            })
-
-            self.expected_keys = [item for item in QueryResult.__annotations__ if item != "description"]
-
-        if self.hasError:
-            self.hasError = False
-            self.previous_output = ""
-            self.missing_keys = []
-            self.error_message = ""
-
-        if ('parsing_error' in llm_response) and llm_response['parsing_error']:
-            self.hasError = True
-            self.previous_output = llm_response
-
-            self.error_message = f"ERROR: parsing your output! Be sure to invoke the tool. Output: {self.previous_output}.\n Parse error: {llm_response['parsing_error']}."
-            
-            self.add_message((
-                ChatRoles.USER.value,
-                self.error_message
-            ))
-        else:
-            for key in self.expected_keys:
-                if key not in llm_response['parsed']:
-                    self.missing_keys.append(key)
-
-            if len(self.missing_keys) > 0:
-                self.hasError = True
-                self.previous_output = llm_response
-
-                self.error_message = f"ERROR: Output was not structured properly. Expected keys: {self.expected_keys}, " f"Missing Keys: {self.missing_keys}."        
-
-                self.add_message((
-                    ChatRoles.USER.value,
-                    self.error_message
-                ))
-            elif self.state['project_status'] == PStatus.INITIAL.value:
-
-                self.state["current_task"].task_status = Status.DONE
-                self.state["project_name"] = llm_response['parsed']['project_name']
-                self.state["requirements_overview"] = llm_response['parsed']['well_documented']
-                self.state["project_folder_strucutre"] = llm_response['parsed']['project_folder_structure']
-                self.tasks = llm_response['parsed']['tasks']
-                self.state["query_answered"] = False
-
-                self.add_message((
-                    ChatRoles.AI.value,
-                    "The project implementation has been successfully initiated. Please proceed "
-                    "with the next steps as per the requirements documents.",
-                ))
-
-            elif self.state['current_task'].task_status.value == Status.AWAITING.value:
-                
-                if llm_response['parsed']['is_answer_found']:
-                    self.state["query_answered"] = True
-                    self.state["current_task"].additional_info = f"{self.state["current_task"].additional_info}, \nArchitect_Response:\n{llm_response['parsed']['response_text']}"
-
-                    self.add_message((
-                        ChatRoles.AI.value,
-                        "Additional information has been successfully provided. You may now proceed "
-                        "with task completion."
-                    ))
-                else:
-                    self.state["query_answered"] = False
-                    self.state["current_task"].additional_info = f"{self.state["current_task"].additional_info}, \nArchitect_Response:\nI don't have any additional information about the question."
-
-                    self.add_message((
-                        ChatRoles.AI.value,
-                        "Unfortunately, I couldn't provide the additional information requested. "
-                        "Please assess if you can complete the task with the existing details, or "
-                        "consider abandoning the task if necessary."
-                    ))
-        
         return {**self.state}
-    
+
+    def requirements_node(self, state: ArchitectState) -> ArchitectState:
+        """
+        """
+        print(f"----{self.agent_name}: Generating Requirements----")
+
+        state['requirements_overview'] = {}
+        self.generation_phase = 0
+        self.update_state(state)
+        self.last_visited_node = self.requirements
+
+        self.add_message((
+            ChatRoles.USER.value,
+            f"{self.agent_name}: Started working on preparing the requirements overview."
+        ))
+
+        #0. Project Overview
+        self.add_message((
+            ChatRoles.USER.value,
+            f"{self.agent_name}: Working on Project Overview."
+        ))
+        response: TaskOutput = self.project_overview_chain.invoke({
+            "user_request": f"{self.state['user_request']}\n",
+            "task_description": f"{self.state['current_task'].description}",
+            "additional_information": f"{self.state['current_task'].additional_info}"
+        })
+
+        self.requirements_overview(response)
+ 
+        # 1. Architecture
+        self.add_message((
+            ChatRoles.USER.value,
+            f"{self.agent_name}: Working on Architecture."
+        ))
+
+        response: TaskOutput = self.architecture_chain.invoke({
+            "project_overview": f"{self.state['requirements_overview']['project_details']}\n",
+        })
+
+        self.requirements_overview(response)
+
+        # 2. Folder Structure
+        self.add_message((
+            ChatRoles.USER.value,
+            f"{self.agent_name}: Working on Folder Structure."
+        ))
+
+        response: TaskOutput = self.folder_structure_chain.invoke({
+            "project_overview": f"{self.state['requirements_overview']['project_details']}\n",
+            "architecture": f"{self.state['requirements_overview']['architecture']}\n",
+        })
+
+        self.requirements_overview(response)
+
+        # 3. Micro service Design
+        self.add_message((
+            ChatRoles.USER.value,
+            f"{self.agent_name}: Working on Microservice Design."
+        ))
+
+        response: TaskOutput = self.microservice_design_chain.invoke({
+            "project_overview": f"{self.state['requirements_overview']['project_details']}\n",
+            "architecture": f"{self.state['requirements_overview']['architecture']}\n",
+        })
+
+        self.requirements_overview(response)
+
+        # 4. Tasks Breakdown
+        self.add_message((
+            ChatRoles.USER.value,
+            f"{self.agent_name}: Working on Tasks Breakdown."
+        ))
+
+        response: TaskOutput = self.tasks_breakdown_chain.invoke({
+            "project_overview": f"{self.state['requirements_overview']['project_details']}\n",
+            "architecture": f"{self.state['requirements_overview']['architecture']}\n",
+            "microservice_design": f"{self.state['requirements_overview']['microservice_design']}\n",
+        })
+
+        self.requirements_overview(response)
+
+        # 5. Standards
+        self.add_message((
+            ChatRoles.USER.value,
+            f"{self.agent_name}: Working on Standards."
+        ))
+
+        response: TaskOutput = self.standards_chain.invoke({
+            "user_request": f"{self.state['user_request']}\n",
+            "task_description": f"{self.state['requirements_overview']['task_description']}\n",
+        })
+
+        self.requirements_overview(response)
+
+        # 6. Implementation Details
+        self.add_message((
+            ChatRoles.USER.value,
+            f"{self.agent_name}: Working on Implementation Details."
+        ))
+
+        response: TaskOutput = self.implementation_details_chain.invoke({
+           "architecture": f"{self.state['requirements_overview']['architecture']}\n",
+           "microservice_design": f"{self.state['requirements_overview']['microservice_design']}\n",
+           "folder_structure": f"{self.state['requirements_overview']['folder_structure']}\n",
+        })
+
+        self.requirements_overview(response)
+
+        # 7. License Details
+        self.add_message((
+            ChatRoles.USER.value,
+            f"{self.agent_name}: Working on License Details."
+        ))
+
+        response: TaskOutput = self.license_legal_chain.invoke({
+            "user_request": f"{self.state['user_request']}\n",
+            "license_text": f"{self.state['license_text']}\n",
+        })
+
+        self.requirements_overview(response)
+
+        self.are_requirements_generated = True
+        self.are_tasks_seperated = True
+
+        return {**self.state}
+
+    def additional_information_node(self, state: ArchitectState) -> ArchitectState:
+        """
+        """
+        
+        print(f"----{self.agent_name}: Working on gathering additional information----")
+
+        self.update_state(state)
+        self.last_visited_node = self.additional_info
+
+        self.add_message((
+            ChatRoles.USER.value,
+            f"{self.agent_name}: Started working on gathering the additional information."
+        ))
+
+        llm_response: QueryResult = self.additional_information_chain.invoke({
+            "requirements_document": self.create_requirements_document(),
+            "question": self.state['current_task'].question,
+            "error_message": self.error_message
+        })
+
+        self.has_error = False
+        self.error_message = ""
+        
+        try:
+            required_keys = ["is_answer_found", "response_text"]
+            missing_keys = [key for key in required_keys if key not in llm_response]
+
+            if missing_keys:
+                raise KeyError(f"Missing keys: {missing_keys} in the response. Try Again!")
+
+            self.state["query_answered"] = llm_response['is_answer_found']
+            
+            response_text = llm_response['response_text'] if self.state["query_answered"] else "I don't have any additional information about the question."
+            self.state["current_task"].additional_info = f"{self.state['current_task'].additional_info}, \nArchitect_Response:\n{response_text}"
+
+            message_text = "Additional information has been successfully provided." if self.state["query_answered"] else "Unfortunately, I couldn't provide the additional information requested."
+
+            self.add_message((
+                ChatRoles.USER.value,
+                message_text
+            ))
+
+            self.is_additional_info_provided = True
+        except Exception as e:
+            self.has_error = True
+            self.error_message = f"An error occurred while processing the request: {str(e)}"
+
+        return {**self.state}
+
     def write_requirements_to_local_node(self, state: ArchitectState) -> ArchitectState:
         """
         This method is used to write the requirements overview to a local file. It updates 
-        the state of the architect and sets the `areRequirementsSavedLocally` flag to True if 
+        the state of the architect and sets the `are_requirements_saved_to_local` flag to True if 
         the requirements are successfully written.
 
         Args:
@@ -346,29 +529,34 @@ class ArchitectAgent:
             ArchitectState: The updated state of the architect.
         """
 
-        print("----Architect: Writing requirements documents to local filesystem----")
+        print(f"----{self.agent_name}: Writing requirements documents to local filesystem----")
 
         self.update_state(state)
 
-        if len(self.state['requirements_overview']) < 0:
+        document = self.create_requirements_document()
+        if len(document) < 0:
+            self.has_error = True
+            self.error_message = "ERROR: Found requirements document to be empty. Could not write it to file system."
+            self.last_visited_node = self.requirements
+            
             self.add_message((
                 ChatRoles.USER.value,
-                "ERROR: Found requirements document to be empty. Could not write it to file system."
+                self.error_message,
             ))
         else:
-            generated_code = self.state['requirements_overview']
+            generated_code = document
             file_path = os.path.join(self.state['generated_project_path'], "docs/requirements.md")
 
-            self.hasError, msg = CodeFileWriter.write_generated_code_to_file.invoke({"generated_code": generated_code, "file_path": file_path})
+            self.has_error, msg = CodeFileWriter.write_generated_code_to_file.invoke({"generated_code": generated_code, "file_path": file_path})
             
-            if self.hasError:
-                self.error_message = msg
-                self.last_visited_node = self.requirements_and_additional_context
-            else:
-                self.hasError = False
-                self.error_message = ""
-                self.last_visited_node = self.write_requirements
-                self.areRequirementsSavedLocally = True
+            # if self.has_error:
+            #     self.error_message = msg
+            #     self.last_visited_node = self.requirements_and_additional_context
+            # else:
+            self.has_error = False
+            self.error_message = ""
+            self.last_visited_node = self.write_requirements
+            self.are_requirements_saved_to_local = True
 
             self.add_message((
                 ChatRoles.USER.value,
@@ -390,77 +578,61 @@ class ArchitectAgent:
             ArchitectState: The updated state of the architect.
         """
 
-        print("----Architect: Working on tasks seperation----")
+        print(f"----{self.agent_name}: Working on Tasks Seperation----")
 
         self.last_visited_node = self.tasks_seperation
         self.update_state(state)
 
-        print("Tasks: ", self.error_message)
         task_seperation_solution = self.task_seperation_chain.invoke({
-            "requirements_document": self.state['requirements_overview'],
-            "tasks": self.tasks,
+            "tasks": self.state['tasks'],
             "error_message": self.error_message
         })
         
-        self.hasError = False
-        self.previous_output = ""
-        self.missing_keys = []
-        self.expected_keys = [item for item in TasksList.__annotations__ if item != "description"]
+        self.has_error = False
         self.error_message = ""
-        
-        if ('parsing_error' in task_seperation_solution) and task_seperation_solution['parsing_error']:
-            self.hasError = True
-            self.previous_output = task_seperation_solution
-            self.error_message = f"ERROR: parsing your output! Be sure to invoke the tool. Output: {self.previous_output}."
-            f" \n Parse error: {task_seperation_solution['parsing_error']}"
+
+        try:
+            tasks = task_seperation_solution['tasks']
+
+            if not isinstance(tasks, list):
+                raise TypeError(f"Expected 'tasks' to be of type list but received {type(tasks).__name__}.")
+          
+            if not tasks:
+                raise ValueError("The 'tasks' list in the received in previous response is empty.")
+            
+            self.state['tasks'] = self.create_tasks(tasks)
+
+            self.are_tasks_seperated = True
+            self.add_message((
+                ChatRoles.USER.value,
+               "The tasks list has been successfully generated. You may now continue with your work on these tasks."
+            ))
+
+        except ValueError as ve:
+            self.has_error = True
+            self.error_message = f"ValueError occurred: {ve}"
 
             self.add_message((
                 ChatRoles.USER.value,
                 self.error_message
             ))
-        else:
-            for key in self.expected_keys:
-                if key not in task_seperation_solution['parsed']:
-                    self.missing_keys.append(key)
 
-            if len(self.missing_keys) > 0:
-                self.hasError = True
-                self.previous_output = task_seperation_solution
+        except TypeError as te:
+            self.has_error = True
+            self.error_message = f"TypeError occurred: {te}"
 
-                self.error_message = f"ERROR: Output was not structured properly. Expected keys: {self.expected_keys}, "
-                f"Missing Keys: {self.missing_keys}."        
+            self.add_message((
+                ChatRoles.USER.value,
+                self.error_message
+            ))
+            
+        except Exception as e:
+            self.has_error = True
+            self.error_message = f"An unexpected error occurred: {e}"
 
-                self.add_message((
-                    ChatRoles.USER.value,
-                    self.error_message
-                ))   
-            else:
-                self.hasError = False
-                self.missing_keys = []
-                self.expected_keys = []
-                self.previous_output = ""
-                self.error_message = ""
-
-                try:
-                    self.state['tasks'] = self.create_tasks(task_seperation_solution['parsed']['tasks'])
-
-                    if len(self.state['tasks']) < 1:
-                        raise ValueError(f"'tasks' list is empty.")
-                    
-                    self.add_message((
-                        ChatRoles.USER.value,
-                        "Tasks list has been created. Please proceed working on it."
-                    ))
-
-                    self.areTasksSeperated = True
-                except Exception as e:
-
-                    self.hasError = True
-                    self.error_message = f"ERROR: PARSER ERROR or VALUE ERROR has encountered! 'tasks' is not a list or received an empty list. Got exception {e}"
-
-                    self.add_message((
-                        ChatRoles.USER.value,
-                        self.error_message
-                    ))
+            self.add_message((
+                ChatRoles.USER.value,
+                self.error_message
+            ))           
 
         return {**self.state}

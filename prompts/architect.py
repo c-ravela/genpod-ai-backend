@@ -19,7 +19,7 @@ from langchain.output_parsers import PydanticOutputParser
 
 from models.architect import TasksList
 from models.architect import QueryResult
-from models.architect import RequirementsDoc
+from models.architect import TaskOutput
 
 class ArchitectPrompts:
     """
@@ -31,148 +31,75 @@ class ArchitectPrompts:
     microservice architecture, project folder structure, and clean-code development.
     """
 
-    INITIAL_TEMPLATE: str ="""Given the user request, supervisor expectation, and additional information about the project
-    user request:"{user_request}"\n
-    supervisor_expects: "{task_description}"\n
-    additional_information: "{additional_information}"\n
-    
-    As a Solution Architect, you are responsible for implementing this assigned task. Your 
-    duties include conducting a comprehensive analysis of the user request and the additional information to create a detailed 
-    document necessary for the completion of the project.
-    
-    It is paramount that you break down the project into "descriptive technical deliverables" that other team_members can work on. 
-    Each task should be self-contained and provide sufficient "technical details" for the team members who will undertake it.
+    additional_info_prompt: PromptTemplate = PromptTemplate(
+        template="""
+        As a Solution Architect, you have previously prepared comprehensive requirements documents 
+        for your team members to work on the project.
 
-    Mandate the utilization of microservice architecture, adhere to the best practice methods 
-    for project folder structure, 12-factor application standards, domain-driven microservice 
-    application design, clean-code development architecture standards, and code commenting 
-    standards throughout the project.
-    
-    In addition, you should enforce programming language-specific standards. These standards vary depending 
-    on the language used, but they generally include conventions for naming, commenting, indentation, and 
-    organization of code.
+        We would appreciate your response to the following question:
+        '{question}'
 
-    The final project should encompass all the source files, configuration files, unit test files, 
-    OpenAPI specification file for the project in YAML format, dependency package manager files, 
-    Dockerfile, .dockerignore, and a .gitignore file.
+        For your reference, here are the Requirements Documents you previously prepared:
+        '{requirements_document}'
 
-    I want you to adhere to all the requriements mentioned above. The document should be structured in a well
-    formated markdown format. Follow the below example while generating the requirements document.
-    "
-    # Requirements Document
-    . <description>
-    .
-    ## Table of Contents
-    . <content>
-    .
-    ## Project OVerview
-    . <description>
-    .
-    ## Architecture
-    . <description>
-    .
-    ## Folder Structure
-    .
-    .
-    ## Microservice Design
-    .
-    .
-    ## Tasks
-    .
-    .
-    ## Standards
-    ### 12-Factor Application Standards
-    .
-    .
-    ### Clean Code Standards
-    .
-    .
-    ### Code Commenting Standards
-    .
-    . 
-    ### Programming Language Specific Standards
-    .
-    .
-    ### User Requested Standards
-    .
-    .
-    ## License
-    .
-    .
-    "
+        Please note, an error message will only be provided if there was an issue with your previous output:
+        {error_message}
 
-    Error messages will only be present if there is an issue with your previous response. 
-    "{error_message}"
+        output format instructions:
+        '{format_instructions}'
+        """,
+        input_variables=['question', 'requirements_document', 'error_message'],
+        partial_variables={
+            "format_instructions": PydanticOutputParser(pydantic_object=QueryResult).get_format_instructions()
+        }
+    )
 
-    Output format instructions:
-    "{format_instructions}"
-    """
+    tasks_seperation_prompt: PromptTemplate = PromptTemplate(
+        template="""
+            You have previously generated a well-formatted requirements document in markdown 
+            format. As a part of it you also prepared deliverables for the project:
 
-    ADDITIONAL_INFO_TEMPLATE: str = """
-    As a Solution Architect, you are responsible for implementing a given project. You have 
-    previously prepared the requirements documents, tasks, and other necessary details for 
-    your team members to complete the project.
+            '{tasks}'
 
-    A team member has reached out to you requesting additional information to complete their 
-    task. Please assist them.
+            Below is an example of how the deliverables should be formatted from the source:
 
-    Error messages will only be present if there is an issue with your previous response. 
-    "{error_message}"
+            [
+                "**Project Setup**
+                    - Initialize the project structure.
+                    - Set up version control with Git.
+                    - Create `.gitignore` and `.dockerignore` files.",
 
-    "{format_instructions}"
+                "**Database Configuration**
+                    - Set up MySQL database.
+                    - Create database connection module.", 
 
-    Previously Prepared Requirements Documents:
-    "{requirements_document}"
+                "**API Endpoints**
+                    - Create FastAPI application.
+                    - Implement CRUD operations for User resource.",
+                .
+                .
+                .
+                .
+                "Task N"
+            ]
 
-    Current Task Team is Working On:
-    {current_task}
+            Your task is to convert the deliverables from this markdown document into a list or an array. 
+            Each task should be copied exactly as it appears in the markdown document and transformed 
+            into an item in the list or array. No modifications should be made to the statements.
 
-    Question:
-    {question}
-    """
+            Error messages will only be present if there is an issue with your previous response. 
+            '{error_message}'
 
-    TASK_SEPARATION_TEMPLATE: str = """
-    You have previously generated a well-formatted requirements document in markdown 
-    format. Here is the generated requirements document:
+            output format instructions:
+            '{format_instructions}'
+        """,
+        input_variables=['tasks', 'error_message'],
+        partial_variables={
+            "format_instructions": PydanticOutputParser(pydantic_object=TasksList).get_format_instructions()
+        }
+    )
 
-    {requirements_document}
-
-    The tasks suggested by you are as follows:
-    {tasks}
-
-    Below is an example of how the tasks should be formatted from the source:
-
-    [
-        "**Project Setup**
-            - Initialize the project structure.
-            - Set up version control with Git.
-            - Create `.gitignore` and `.dockerignore` files.",
-
-        "**Database Configuration**
-            - Set up MySQL database.
-            - Create database connection module.", 
-
-        "**API Endpoints**
-            - Create FastAPI application.
-            - Implement CRUD operations for User resource.",
-        .
-        .
-        .
-        .
-        "Task N"
-    ]
-
-    Your task is to convert the tasks from this markdown document into a list or an array. 
-    Each task should be copied exactly as it appears in the markdown document and transformed 
-    into an item in the list or array. No modifications should be made to the statements.
-
-    Error messages will only be present if there is an issue with your previous response. 
-    "{error_message}"
-
-    "{format_instructions}"
-    """
-
-    PROJECT_OVERVIEW_PROMPT = PromptTemplate(
+    project_overview_prompt: PromptTemplate = PromptTemplate(
         template=""" Given the user request: "{user_request}"
             Supervisor expectations: "{task_description}"
             Additional information: "{additional_information}"
@@ -182,24 +109,39 @@ class ArchitectPrompts:
             2. The main features or functionalities to be implemented
             3. What schema definition models are needed to implement this service.
 
-            Format your response in markdown, starting with a "## Project Overview" heading.""",
-        input_variables=['user_request','task_description','additional_information']
+            Format your response in markdown, starting with a "## Project Overview" heading.
+            
+            output format instructions:
+            {format_instructions}
+        """,
+        input_variables=['user_request','task_description','additional_information'],
+        partial_variables = {
+                "format_instructions": PydanticOutputParser(pydantic_object=TaskOutput).get_format_instructions()
+        }
     )
 
-    ARCHITECTURE_PROMPT = PromptTemplate(
+    architecture_prompt: PromptTemplate = PromptTemplate(
         template="""Based on the project overview, describe the high-level architecture for this microservice-based project. Include:
             Project Overview: "{project_overview}"
+
             1. A diagram or detailed description of the microservice architecture
             2. Key components, data models and their interactions
             3. Data flow between services
             4. External integrations or APIs
             5. Scalability and reliability considerations
 
-            Format your response in markdown, starting with a "## Architecture" heading.""",
+            Format your response in markdown, starting with a "## Architecture" heading.
+                        
+            output format instructions:
+            {format_instructions}
+        """,
         input_variables=['project_overview'],
+        partial_variables = {
+            "format_instructions": PydanticOutputParser(pydantic_object=TaskOutput).get_format_instructions()
+        }
     )
 
-    FOLDER_STRUCTURE_PROMPT = PromptTemplate(
+    folder_structure_prompt: PromptTemplate = PromptTemplate(
         template="""
         Given the project overview and architecture:
 
@@ -217,11 +159,18 @@ class ArchitectPrompts:
         5. Configuration file locations
         6. Explanation of the purpose for each major directory
 
-        Format your response in markdown, starting with a "## Folder Structure" heading.""",
+        Format your response in markdown, starting with a "## Folder Structure" heading.
+                                
+        output format instructions:
+        {format_instructions}
+        """,
         input_variables=["project_overview", "architecture"],
+        partial_variables = {
+            "format_instructions": PydanticOutputParser(pydantic_object=TaskOutput).get_format_instructions()
+        }
     )
 
-    MICROSERVICE_DESIGN_PROMPT = PromptTemplate(
+    microservice_design_prompt: PromptTemplate = PromptTemplate(
         template="""
             Based on the following project overview and architecture:
 
@@ -238,11 +187,18 @@ class ArchitectPrompts:
             4. Internal components or modules
             5. Dependencies on other services or external systems
 
-            Format your response in markdown, starting with a "## Microservice Design" heading, with subheadings for each service.""",
+            Format your response in markdown, starting with a "## Microservice Design" heading, with subheadings for each service.
+                                            
+            output format instructions:
+            {format_instructions}
+            """,
         input_variables=["project_overview","architecture"],
+        partial_variables = {
+            "format_instructions": PydanticOutputParser(pydantic_object=TaskOutput).get_format_instructions()
+        }
     )
 
-    TASKS_BREAKDOWN_PROMPT = PromptTemplate(
+    tasks_breakdown_prompt: PromptTemplate = PromptTemplate(
         template="""
             Given the project overview, architecture, and microservice design:
 
@@ -260,11 +216,18 @@ class ArchitectPrompts:
             2. Detailed description of what needs to be done
             3. Technical requirements or specifications
 
-            Format your response in markdown, starting with a "## Tasks" heading, with each task as a subheading.""",
+            Format your response in markdown, starting with a "## Tasks" heading, with each task as a subheading.
+            
+            output format instructions:
+            {format_instructions}            
+            """,
         input_variables=["project_overview", "architecture", "microservice_design"],
+        partial_variables = {
+            "format_instructions": PydanticOutputParser(pydantic_object=TaskOutput).get_format_instructions()
+        }        
     )
 
-    STANDARDS_PROMPT = PromptTemplate(
+    standards_prompt: PromptTemplate = PromptTemplate(
         template="""
             Considering the user request: "{user_request}"
             And the supervisor expectations: "{task_description}"
@@ -276,11 +239,18 @@ class ArchitectPrompts:
             4. Programming Language Specific Standards: Conventions for the chosen language(s)
             5. User Requested Standards: Any additional standards specified by the user or supervisor
 
-            Format your response in markdown, starting with a "## Standards" heading, with subheadings for each category.""",
+            Format your response in markdown, starting with a "## Standards" heading, with subheadings for each category.
+            
+            output format instructions:
+            {format_instructions}
+            """,
         input_variables=["user_request", "task_description"],
+        partial_variables = {
+            "format_instructions": PydanticOutputParser(pydantic_object=TaskOutput).get_format_instructions()
+        }            
     )
 
-    IMPLEMENTATION_DETAILS_PROMPT = PromptTemplate(
+    implementation_details_prompt: PromptTemplate = PromptTemplate(
         template="""
             Based on the following project details:
 
@@ -302,64 +272,31 @@ class ArchitectPrompts:
             6. Dockerfile contents
             7. Contents for .dockerignore and .gitignore files
 
-            Format your response in markdown, starting with a "## Implementation Details" heading, with subheadings for each category.""",
+            Format your response in markdown, starting with a "## Implementation Details" heading, with subheadings for each category.
+            
+            output format instructions:
+            {format_instructions}
+            """,
         input_variables=["architecture", "microservice_design", "folder_structure"],
+        partial_variables = {
+            "format_instructions": PydanticOutputParser(pydantic_object=TaskOutput).get_format_instructions()
+        }            
     )
 
-    LICENSE_DETAILS_PROMPT = PromptTemplate(
+    license_details_prompt: PromptTemplate = PromptTemplate(
         template="""
             Considering the user request: "{user_request}"
             And the License Text: "{license_text}"
 
             Specify the license to be used for this project.
 
-            Format your response in markdown, starting with a "## License and Legal Considerations" heading.""",
+            Format your response in markdown, starting with a "## License and Legal Considerations" heading.
+            
+            output format instructions:
+            {format_instructions}
+            """,
         input_variables=["user_request", "license_text"],
+        partial_variables = {
+            "format_instructions": PydanticOutputParser(pydantic_object=TaskOutput).get_format_instructions()
+        }            
     )
-
-    def requirements_generation_prompt(self) -> ChatPromptTemplate: 
-        """
-        This method generates a prompt for the initial project requirements based on the 
-        provided Pydantic model.
-        
-        Returns:
-            ChatPromptTemplate: The generated prompt.
-        """
-
-        return ChatPromptTemplate.from_template(
-            template=self.INITIAL_TEMPLATE,
-            partial_variables = {
-                "format_instructions": PydanticOutputParser(pydantic_object=RequirementsDoc).get_format_instructions()
-            }
-        )
-    
-    def additional_info_prompt(self) -> ChatPromptTemplate:
-        """
-        This method generates a prompt for providing additional information during 
-        project implementation based on the provided Pydantic model.
-        
-        Returns:
-            ChatPromptTemplate: The generated prompt.
-        """
-                
-        return ChatPromptTemplate.from_template(
-            template=self.ADDITIONAL_INFO_TEMPLATE,
-            partial_variables = {
-                "format_instructions": PydanticOutputParser(pydantic_object=QueryResult).get_format_instructions()
-            }
-        )
-
-    def task_seperation_prompt(self) -> ChatPromptTemplate:
-        """
-        This method generates a prompt for separating tasks from a markdown document into a list or an array.
-        
-        Returns:
-            ChatPromptTemplate: The generated prompt.
-        """
-
-        return ChatPromptTemplate.from_template(
-            template=self.TASK_SEPARATION_TEMPLATE,
-            partial_variables = {
-                "format_instructions": PydanticOutputParser(pydantic_object=TasksList).get_format_instructions()
-            }
-        )
