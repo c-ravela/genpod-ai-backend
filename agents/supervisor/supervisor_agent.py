@@ -13,6 +13,7 @@ from agents.supervisor.supervisor_prompts import SupervisorPrompts
 from agents.supervisor.supervisor_models import QueryList
 from pydantic import ValidationError
 from langchain_openai import ChatOpenAI
+from pprint import pprint
 
 class SupervisorAgent():
     def __init__(self, llm, collections, members, memberids, user_input, rag_try_limit, project_path):
@@ -306,6 +307,7 @@ class SupervisorAgent():
             return {**state}
         elif self.project_status == PStatus.MONITORING.value:
             if "RAG_Response" in state['current_task'].additional_info and "Architect_Response" in state['current_task'].additional_info:
+                # state['current_task'].question = ''
                 self.project_status = PStatus.EXECUTING.value
             # else:
             #     self.project_status = PStatus.HALTED.value
@@ -329,7 +331,7 @@ class SupervisorAgent():
         print("----------Calling Planner----------")
         planner_result = self.team_members['Planner'].planner_app.invoke({'current_task':state['current_task']},{'configurable':{'thread_id':self.memberids['Planner']}})
         # planner_state = self.team_members['Planner'].planner_app.get_state()
-        state['current_task'] = planner_result['response']
+        state['current_task'] = planner_result['response'][-1]
         if state['current_task'].task_status.value == Status.DONE.value:
             print(f"----------Response from Planner Agent----------\n{planner_result['deliverable_backlog_map']}")
             state['agents_status'] = 'Planner completed'
@@ -347,8 +349,34 @@ class SupervisorAgent():
 
 
     def call_human(self, state: SupervisorState):
-        # TODO: Implement Human_in_the_loop
-        pass
+        # Display relevant information to the human
+        # pprint(f"----------Supervisor current state----------\n{state}")
+        # Prompt for input
+        if state['current_task'].question != '':
+            # Display the current task being performed to the user
+            pprint(f"----------Current Task that needs your assistance to proceed----------\n{state['current_task']}")
+
+            # Get human input
+            human_input = input(f"Please provide additional input for the question:\n{state['current_task'].question}")
+
+            # Append the human input to current_task additional_info
+            state['current_task'].additional_info += '\nHuman_Response:\n' + human_input
+
+            # Update the project status back to executing
+            self.project_status = PStatus.EXECUTING.value
+
+            # Add the human responses to the rag cache for future queries and maintain a copy in state too
+            human_feedback = (state['current_task'].question, f'Response from Human: {human_input}')
+            state['human_feedback'] += [human_feedback]
+            self.rag_cache.add(state['current_task'].question, human_input)
+
+        else:
+            print("----------Unable to handle Human Feedback currently so ending execution----------")
+            exit()
+
+        # Process the input and update the state
+        state.human_feedback = human_input
+        return state
 
     def update_state(self, state: SupervisorState):
         # TODO: Imple Update_state_mechanism
