@@ -12,12 +12,12 @@ inputs and how to structure its outputs. They are essential for ensuring that
 the Architect agent can effectively assist users in implementing their projects.
 """
 
-from langchain_core.prompts import ChatPromptTemplate, PromptTemplate
+from langchain_core.prompts import PromptTemplate
 
 from langchain.output_parsers import PydanticOutputParser
 
-
 from models.architect import TasksList
+from models.architect import ProjectDetails
 from models.architect import QueryResult
 from models.architect import TaskOutput
 
@@ -54,7 +54,7 @@ class ArchitectPrompts:
         }
     )
 
-    tasks_seperation_prompt: PromptTemplate = PromptTemplate(
+    tasks_separation_prompt: PromptTemplate = PromptTemplate(
         template="""
             You have previously generated a well-formatted requirements document in markdown 
             format. As a part of it you also prepared deliverables for the project:
@@ -299,4 +299,24 @@ class ArchitectPrompts:
         partial_variables = {
             "format_instructions": PydanticOutputParser(pydantic_object=TaskOutput).get_format_instructions()
         }            
+    )
+
+    project_details_prompt: PromptTemplate = PromptTemplate(
+        template="""
+        Given the user's request: "{user_request}"
+        And the provided project folder structure: "{folder_structure_document}"
+
+        Please suggest a project name that adheres to the naming standards and folder structure, 
+        which should be derived directly from the provided folder structure document.
+        
+        Error messages will only be present if there is an issue with your previous response. 
+        '{error_message}'
+
+        Output format instructions:
+        {format_instructions}
+        """,
+        input_variables=['user_request', 'folder_structure_document', 'error_message'],
+        partial_variables={
+            "format_instructions": PydanticOutputParser(pydantic_object=ProjectDetails).get_format_instructions()
+        }
     )

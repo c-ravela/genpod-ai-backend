@@ -13,7 +13,7 @@ from utils.fs import create_directory_with_timestamp
 
 import os
 
-def set_project_path(project_path: str=os.path.join(os.getcwd(), "output", "project")) -> str:
+def set_project_path(project_path: str=os.path.join(os.getcwd(), "output", "projects")) -> str:
     """
     Sets the path for a new project and creates a new directory at that path 
     with the current timestamp. If the path already exists, no new directory 
