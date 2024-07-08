@@ -33,6 +33,9 @@ class ArchitectState(TypedDict):
         is being generated. This path is used to store all the project-related files and 
         directories.
 
+        license_text (str): The text of the license provided by the user. This text outlines 
+        the terms and conditions under which the project can be used, modified, and distributed.
+
         messages (list[tuple[str, str]]): A chronological list of tuples representing the 
         conversation history between the system, user, and AI. Each tuple contains a role 
         identifier (e.g., 'AI', 'tool', 'user', 'system') and the corresponding message.
@@ -87,7 +90,8 @@ class ArchitectState(TypedDict):
     # @in
     license_text: Annotated[
         str,
-        "User provided license text"
+        "The text of the license provided by the user. This text outlines the terms and "
+        "conditions under which the project can be used, modified, and distributed."
     ]
 
     # @inout

@@ -5,7 +5,8 @@ managing the state of the Architect agent, processing user inputs, and
 generating appropriate responses.
 """
 
-from langgraph.prebuilt import ToolExecutor
+from langchain_openai import ChatOpenAI
+from langchain_community.chat_models import ChatOllama
 
 from langchain_core.runnables.base import RunnableSequence
 
@@ -19,13 +20,14 @@ from models.constants import ChatRoles
 
 from models.models import Task
 
-from models.architect import RequirementsOverview, TaskOutput, TasksList
+from models.architect import ProjectDetails, TaskOutput
 from models.architect import QueryResult
 
 from agents.architect.state import ArchitectState
 
 from tools.code import CodeFileWriter
 
+from typing_extensions import Union
 from typing_extensions import Literal
 
 import os
@@ -38,39 +40,40 @@ class ArchitectAgent:
     agent, processes user inputs, and generates appropriate responses. It uses 
     a chain of tools to parse the user input and generate a structured output.
     """
-    agent_name: str = "Solution Architect"
+    agent_name: str # The name of the agent
 
     # names of the graph node
-    entry: str = "entry"
-    requirements: str = "requirements"
-    additional_info: str = "additional_info"
-    write_requirements: str = "write_requirements"
-    tasks_seperation: str = "tasks_seperation"
-    state_update: str = "state_update"
+    entry_node_name: str # The entry point of the graph
+    requirements_node_name: str # Node for handling requirements generation
+    additional_info_node_name: str # Node for handling additional information request
+    write_requirements_node_name: str # Node for writing requirements to local file system
+    tasks_separation_node_name: str  # Node for converting the tasks from string to list
+    project_details_node_name: str # Node for gathering project details
+    update_state_node_name: str # Node for updating the state
 
     # local state of this class which is not exposed
     # to the graph state
-    mode: Literal["gather_info", "generation"] # gather_info: when additional information need, generation: need to generate requirements document
-    generation_phase: int # at step which current generation is
+    mode: Literal["information_gathering", "document_generation"] # information_gathering: when additional information is needed, document_generation: when a requirements document needs to be generated
+    generation_step: int # Represents the step at which the current document generation is
 
-    has_error: bool
-    are_tasks_seperated: bool
-    is_additional_info_provided: bool
-    are_requirements_generated: bool
-    are_requirements_saved_to_local: bool
-    requested_for_additional_info: bool
+    has_error_occured: bool # Indicates if an error occurred when completing a task
+    are_tasks_separated: bool # Indicates if tasks have been converted from a string to a list
+    is_additional_info_provided: bool # Indicates if additional information is provided when requested
+    is_requirements_document_generated: bool # Indicates if the requirements document has been generated
+    is_requirements_document_saved: bool # Indicates if the requirements document has been saved locally
+    is_additional_info_requested: bool # Indicates if this agent has requested for additional information
+    are_project_details_provided: bool # Indicates if project details have been provided
 
-    last_visited_node: str
-    error_message: str
+    last_visited_node: str # The last node that was visited in the graph
+    error_message: str # The error message, if an error occurred
 
-    # tools used by this agent
-    tools: ToolExecutor
+    state: ArchitectState # Architect agent graphs state
+    prompts: ArchitectPrompts # Architect agents the prompts
 
-    state: ArchitectState = ArchitectState()
-    prompts: ArchitectPrompts = ArchitectPrompts()
+    llm: Union[ChatOpenAI, ChatOllama] # This is the language learning model (llm) for the Architect agent. It can be either a ChatOpenAI model or a ChatOllama model
 
     # chains
-    project_overview_chain: RunnableSequence
+    project_overview_chain: RunnableSequence # This is for project comprehensive overview in markdown format
     architecture_chain: RunnableSequence
     folder_structure_chain: RunnableSequence
     microservice_design_chain: RunnableSequence
@@ -79,30 +82,48 @@ class ArchitectAgent:
     implementation_details_chain: RunnableSequence
     license_legal_chain: RunnableSequence
 
+    project_details_chain: RunnableSequence # This is for project_name and project folder structure
     additional_information_chain: RunnableSequence
     task_seperation_chain: RunnableSequence
 
-    def __init__(self, llm) -> None:
+    def __init__(self, llm: Union[ChatOpenAI, ChatOllama]) -> None:
         """
-        Initializes the ArchitectAgent with a given Language Learning Model
-        (llm) and sets up the architect chain.
+        This method initializes the ArchitectAgent with a given Language Learning Model (llm) 
+        and sets up the architect chain. The architect chain is a sequence of operations 
+        that the ArchitectAgent will perform to generate a solution architecture.
+
+        Args:
+            llm (Union[ChatOpenAI, ChatOllama]): The Language Learning Model to be used by the ArchitectAgent.
         """
 
-        self.has_error = False
-        self.are_tasks_seperated = False
-        self.is_additional_info_provided = False
-        self.are_requirements_saved_to_local = False
-        self.requested_for_additional_info = False
-        self.are_requirements_generated = False
+        self.agent_name = "Solution Architect"
+
+        self.entry_node_name = "entry"
+        self.requirements_node_name = "requirements"
+        self.additional_info_node_name = "additional_info"
+        self.write_requirements_node_name = "write_requirements"
+        self.tasks_separation_node_name = "tasks_seperation"
+        self.project_details_node_name = "project_details"
+        self.update_state_node_name = "state_update"
 
         self.mode = ""
-        self.generation_phase = 0
-        self.last_visited_node = self.entry # entry point node
+        self.generation_step = 0
 
+        self.has_error_occured = False
+        self.are_tasks_seperated = False
+        self.is_additional_info_provided = False
+        self.is_requirements_document_saved = False
+        self.is_additional_info_requested = False
+        self.is_requirements_document_generated = False
+        self.are_project_details_provided = False
+
+        self.last_visited_node = self.entry_node_name # entry point node
         self.error_message = ""
 
+        self.state = ArchitectState()
+        self.prompts = ArchitectPrompts()
+        
         self.llm = llm
-        self.tools = ToolExecutor([CodeFileWriter.write_generated_code_to_file])
 
         self.project_overview_chain = ( 
             self.prompts.project_overview_prompt
@@ -152,27 +173,43 @@ class ArchitectAgent:
             | JsonOutputParser()
         )
 
-        # This chain is used when team member requests for additional information to complete 
-        # the task
+        self.project_details_chain = (
+            self.prompts.project_details_prompt
+            | self.llm
+            | JsonOutputParser()
+        )
+
         self.additional_information_chain = (
             self.prompts.additional_info_prompt
             | self.llm
             | JsonOutputParser()
         )
 
-        # This chain is used when we need to create a list of tasks from the markdown formatted
-        # tasks
         self.task_seperation_chain = (
-            self.prompts.tasks_seperation_prompt
+            self.prompts.tasks_separation_prompt
             | self.llm
             | JsonOutputParser()
         )
 
-    def create_requirements_document(self) -> str:
+    def add_message(self, message: tuple[str, str]) -> None:
         """
+        Adds a single message to the messages field in the state.
+
+        Args:
+            message (tuple[str, str]): The message to be added.
+        """
+
+        self.state['messages'] += [message]
+
+    def generate_requirements_document(self) -> str:
+        """
+        This method generates a requirements document for the project.
+
+        Returns:
+            str: A string representing the requirements document.
         """
         
-        print(f"----{self.agent_name}: Creating requirements document----")
+        print(f"----{self.agent_name}: Generating requirements document----")
 
         return f"""
 # Project Requirements Document
@@ -194,51 +231,55 @@ class ArchitectAgent:
 {self.state['requirements_overview']['license_details']}
         """
     
-    def create_tasks(self, tasks: list) -> list[Task]:
+    def create_tasks_list(self, tasks_description: list) -> list[Task]:
         """
-        This method is used to create a list of Task objects from a string representation of a list.
-
+        This method creates a list of Task objects from a given list of task descriptions
+        
         Args:
-            tasks (list): A list where each element is a description of a task.
+            tasks_description (list): A list of strings where each string is a description of a task.
 
         Returns:
-            list[Task]: A list of Task objects with the description set from the input and the status 
-            set as NEW.
+            list[Task]: A list of Task objects. Each Task object has a 'description' attribute set 
+            from the input list and a 'status' attribute set as NEW.
         """
 
-        print(f"----{self.agent_name}: Creating List of Tasks----")
-        # ts_list = ast.literal_eval(tasks)
+        print(f"----{self.agent_name}: Initiating the process of Task List Creation----")
+
         tasks_list: list[Task] = []
 
-        for ti in tasks:
+        for description in tasks_description:
             tasks_list.append(Task(
-                description=ti,
+                description=description,
                 task_status=Status.NEW
             ))   
 
         return tasks_list
 
-    def add_message(self, message: tuple[str, str]) -> None:
+    def request_for_additional_info(self, response: TaskOutput) -> None:
         """
-        Adds a single message to the messages field in the state.
+        This method is used when additional information is needed to complete a task. It updates 
+        the status of the current task to AWAITING and sets the question for additional info.
 
         Args:
-            message (tuple[str, str]): The message to be added.
+            response (TaskOutput): The output of the task that requires additional information.
         """
 
-        self.state['messages'] += [message]
+        print(f"----{self.agent_name}: Initiating request for additional information----")
 
-    def request_additional_info(self, response: TaskOutput) -> None:
-        """
-        """
-
-        self.requested_for_additional_info = True
+        self.is_additional_info_requested = True
         self.state['current_task'].question = response['question_for_additional_info']
         self.state['current_task'].task_status = Status.AWAITING
     
     def update_requirements_overview(self, key: str, phase: str, response: TaskOutput) -> None:
         """
+        This method is used to update the requirements overview with the content generated by a task. 
+
+        Args:
+            key (str): The key in the requirements overview to be updated.
+            phase (str): The phase of the task.
+            response (TaskOutput): The output of the task.
         """
+        print(f"----{self.agent_name}: Modifying key: {key} in requirements overview----")
 
         if not response['is_add_info_needed']:
             self.add_message((
@@ -248,80 +289,88 @@ class ArchitectAgent:
             self.state['requirements_overview'][key] = response['content']
 
             # update to next phase
-            self.generation_phase += 1
+            self.generation_step += 1
         else:
             self.add_message((
                 ChatRoles.USER.value,
                 f"{self.agent_name}: {phase} has requested for additional information."
             ))
-            self.request_additional_info(response)
+            self.request_for_additional_info(response)
 
-    def requirements_overview(self, response: TaskOutput) -> None:
+    def handle_requirements_overview(self, response: TaskOutput) -> None:
         """
+        This method handles the generation of the requirements overview based on the current 
+        generation step. It determines which section of the requirements overview to update 
+        based on the generation step and calls the 'update_requirements_overview' method with 
+        the appropriate parameters.
+
+        Args:
+            response (TaskOutput): The output of the task. This contains the generated content 
+            for the current section of the requirements overview.
         """
         
-        if self.generation_phase == 0: # Project Overview
+        print(f"----{self.agent_name}: Progressing with requirements overview. Current Step: {self.generation_step}----")
+
+        if self.generation_step == 0: # Project Overview
             self.update_requirements_overview("project_details", "Project Overview", response)
-        elif self.generation_phase == 1: # Architecture
+        elif self.generation_step == 1: # Architecture
             self.update_requirements_overview("architecture", "Architecture", response)
-        elif self.generation_phase == 2: # Folder Structure
+        elif self.generation_step == 2: # Folder Structure
             self.update_requirements_overview("folder_structure", "Folder Structure", response)
-        elif self.generation_phase == 3: # Microservice Design
+        elif self.generation_step == 3: # Microservice Design
             self.update_requirements_overview("microservice_design", "Microservice Design", response)
-        elif self.generation_phase == 4: # Tasks Breakdown
+        elif self.generation_step == 4: # Tasks Breakdown
             self.update_requirements_overview("task_description", "Tasks Breakdown", response)
-        elif self.generation_phase == 5: # Standards
+        elif self.generation_step == 5: # Standards
             self.update_requirements_overview("standards", "Standards", response)
-        elif self.generation_phase == 6: # Implementation Details
+        elif self.generation_step == 6: # Implementation Details
             self.update_requirements_overview("implementation_details", "Implementation Details", response)
-        elif self.generation_phase == 7: # License Details
+        elif self.generation_step == 7: # License Details
             self.update_requirements_overview("license_details", "License Details", response)
 
     def router(self, state: ArchitectState) -> str:
         """
-        This method determines the next step based on the current state of the Architect agent.
-
-        It checks the current state and returns the name of the next agent to be invoked. If 
-        there is an error, it returns the last visited node. If the tasks are not separated, 
-        it returns the tasks_seperation agent. If the requirements are not saved locally, 
-        it returns the write_requirements agent. If none of these conditions are met, it 
-        signifies the end of the process and returns "__end__".
+        This method acts as a router, determining the next step in the process based on the 
+        current state of the Architect agent. It checks the current state and returns the name 
+        of the next agent to be invoked. 
 
         Args:
             state (ArchitectState): The current state of the architect.
 
         Returns:
-            str: The name of the next agent to be invoked or "__end__" if the process is complete.
+            str: The name of the next agent to be invoked.
         """
 
-        print(f"----{self.agent_name}: Routing Graph----")
+        print(f"----{self.agent_name}: Router in action: Determining the next node----")
 
-        if self.has_error:
+        if self.has_error_occured:
             return self.last_visited_node
-        elif self.mode == "generation":
-            if not self.are_requirements_generated:
-                return self.requirements
-            elif not self.are_requirements_saved_to_local:
-                return self.write_requirements
+        elif self.mode == "document_generation":
+            if not self.is_requirements_document_generated:
+                return self.requirements_node_name
+            elif not self.is_requirements_document_saved:
+                return self.write_requirements_node_name
             elif not self.are_tasks_seperated:
-                return self.tasks_seperation
-        elif self.mode == "gather_info":
+                return self.tasks_separation_node_name
+            elif not self.are_project_details_provided:
+                return self.project_details_node_name
+        elif self.mode == "information_gathering":
             if not self.is_additional_info_provided:
-                return self.additional_info
+                return self.additional_info_node_name
         
-        return self.state_update
+        return self.update_state_node_name
     
     def update_state(self, state: ArchitectState) -> ArchitectState:
         """
-        The method takes in a state, updates the current state of the object with the 
-        provided state, and then returns the updated state.
+        This method updates the current state of the Architect agent with the provided state. 
 
         Args:
-            state (any): The state to update the current state of the object with.
+            state (ArchitectState): The new state to update the current state of the agent with.
 
         Returns:
-            any: The updated state of the object.
+            ArchitectState: The updated state of the agent.
         """
+        print(f"----{self.agent_name}: Proceeding with state update----")
         
         self.state = {**state}
 
@@ -329,152 +378,360 @@ class ArchitectAgent:
     
     def entry_node(self, state: ArchitectState) -> ArchitectState:
         """
+        This method is the entry point of the Architect agent. It updates the current state 
+        with the provided state and sets the mode based on the project status and the status 
+        of the current task.
+
+        Args:
+            state (ArchitectState): The current state of the architect.
+
+        Returns:
+            ArchitectState: The updated state of the architect.
         """
-        print(f"----{self.agent_name}: Entry Point Triggered----")
+
+        print(f"----{self.agent_name}: Initiating Graph Entry Point----")
 
         self.update_state(state)
-        self.last_visited_node = self.entry
+        self.last_visited_node = self.entry_node_name
 
         if self.state['project_status'] == PStatus.INITIAL.value:
-            self.mode = "generation"
+            self.mode = "document_generation"
         elif self.state["current_task"].task_status.value == Status.AWAITING.value:
-            self.mode = "gather_info"
+            self.mode = "information_gathering"
 
         return {**self.state}
 
     def requirements_node(self, state: ArchitectState) -> ArchitectState:
         """
+        This method is responsible for generating the requirements overview. 
+
+        Args:
+            state (ArchitectState): The current state of the architect.
+
+        Returns:
+            ArchitectState: The updated state of the architect.
         """
-        print(f"----{self.agent_name}: Generating Requirements----")
+        print(f"----{self.agent_name}: Commencing generation of Requirements Document----")
 
-        state['requirements_overview'] = {}
-        self.generation_phase = 0
+        if not self.has_error_occured:
+            state['requirements_overview'] = {}
+            self.generation_step = 0
+            
         self.update_state(state)
-        self.last_visited_node = self.requirements
+        self.last_visited_node = self.requirements_node_name
+        self.is_additional_info_requested = False
 
         self.add_message((
             ChatRoles.USER.value,
-            f"{self.agent_name}: Started working on preparing the requirements overview."
+            f"{self.agent_name}: Initiating the process of preparing the requirements overview."
         ))
 
-        #0. Project Overview
-        self.add_message((
-            ChatRoles.USER.value,
-            f"{self.agent_name}: Working on Project Overview."
-        ))
-        response: TaskOutput = self.project_overview_chain.invoke({
-            "user_request": f"{self.state['user_request']}\n",
-            "task_description": f"{self.state['current_task'].description}",
-            "additional_information": f"{self.state['current_task'].additional_info}"
-        })
+        if self.generation_step == 0: #0. Project Overview
+            self.add_message((
+                ChatRoles.USER.value,
+                f"{self.agent_name}: Progressing with Step 0 - Project Overview."
+            ))
 
-        self.requirements_overview(response)
- 
-        # 1. Architecture
-        self.add_message((
-            ChatRoles.USER.value,
-            f"{self.agent_name}: Working on Architecture."
-        ))
+            response: TaskOutput = self.project_overview_chain.invoke({
+                "user_request": f"{self.state['user_request']}\n",
+                "task_description": f"{self.state['current_task'].description}",
+                "additional_information": f"{self.state['current_task'].additional_info}"
+            })
 
-        response: TaskOutput = self.architecture_chain.invoke({
-            "project_overview": f"{self.state['requirements_overview']['project_details']}\n",
-        })
+            self.handle_requirements_overview(response)
 
-        self.requirements_overview(response)
+        if self.generation_step == 1: # 1. Architecture
+            self.add_message((
+                ChatRoles.USER.value,
+                f"{self.agent_name}: Progressing with Step 1 - Architecture."
+            ))
 
-        # 2. Folder Structure
-        self.add_message((
-            ChatRoles.USER.value,
-            f"{self.agent_name}: Working on Folder Structure."
-        ))
+            response: TaskOutput = self.architecture_chain.invoke({
+                "project_overview": f"{self.state['requirements_overview']['project_details']}\n",
+            })
 
-        response: TaskOutput = self.folder_structure_chain.invoke({
-            "project_overview": f"{self.state['requirements_overview']['project_details']}\n",
-            "architecture": f"{self.state['requirements_overview']['architecture']}\n",
-        })
+            self.handle_requirements_overview(response)
 
-        self.requirements_overview(response)
+        if self.generation_step == 2: # 2. Folder Structure
+            self.add_message((
+                ChatRoles.USER.value,
+                f"{self.agent_name}: Progressing with Step 2 - Folder Structure."
+            ))
 
-        # 3. Micro service Design
-        self.add_message((
-            ChatRoles.USER.value,
-            f"{self.agent_name}: Working on Microservice Design."
-        ))
+            response: TaskOutput = self.folder_structure_chain.invoke({
+                "project_overview": f"{self.state['requirements_overview']['project_details']}\n",
+                "architecture": f"{self.state['requirements_overview']['architecture']}\n",
+            })
 
-        response: TaskOutput = self.microservice_design_chain.invoke({
-            "project_overview": f"{self.state['requirements_overview']['project_details']}\n",
-            "architecture": f"{self.state['requirements_overview']['architecture']}\n",
-        })
+            self.handle_requirements_overview(response)
 
-        self.requirements_overview(response)
+        if self.generation_step == 3: # 3. Micro service Design
+            self.add_message((
+                ChatRoles.USER.value,
+                f"{self.agent_name}: Progressing with Step 3 - Microservice Design."
+            ))
 
-        # 4. Tasks Breakdown
-        self.add_message((
-            ChatRoles.USER.value,
-            f"{self.agent_name}: Working on Tasks Breakdown."
-        ))
+            response: TaskOutput = self.microservice_design_chain.invoke({
+                "project_overview": f"{self.state['requirements_overview']['project_details']}\n",
+                "architecture": f"{self.state['requirements_overview']['architecture']}\n",
+            })
 
-        response: TaskOutput = self.tasks_breakdown_chain.invoke({
-            "project_overview": f"{self.state['requirements_overview']['project_details']}\n",
+            self.handle_requirements_overview(response)
+
+        if self.generation_step == 4: # 4. Tasks Breakdown
+            self.add_message((
+                ChatRoles.USER.value,
+                f"{self.agent_name}: Progressing with Step 4 - Tasks Breakdown."
+            ))
+
+            response: TaskOutput = self.tasks_breakdown_chain.invoke({
+                "project_overview": f"{self.state['requirements_overview']['project_details']}\n",
+                "architecture": f"{self.state['requirements_overview']['architecture']}\n",
+                "microservice_design": f"{self.state['requirements_overview']['microservice_design']}\n",
+            })
+
+            self.handle_requirements_overview(response)
+
+        if self.generation_step == 5: # 5. Standards
+            self.add_message((
+                ChatRoles.USER.value,
+                f"{self.agent_name}: Progressing with Step 5 - Standards."
+            ))
+
+            response: TaskOutput = self.standards_chain.invoke({
+                "user_request": f"{self.state['user_request']}\n",
+                "task_description": f"{self.state['requirements_overview']['task_description']}\n",
+            })
+
+            self.handle_requirements_overview(response)
+
+        if self.generation_step == 6: # 6. Implementation Details
+            self.add_message((
+                ChatRoles.USER.value,
+                f"{self.agent_name}: Progressing with Step 6 - Implementation Details."
+            ))
+
+            response: TaskOutput = self.implementation_details_chain.invoke({
             "architecture": f"{self.state['requirements_overview']['architecture']}\n",
             "microservice_design": f"{self.state['requirements_overview']['microservice_design']}\n",
-        })
+            "folder_structure": f"{self.state['requirements_overview']['folder_structure']}\n",
+            })
 
-        self.requirements_overview(response)
+            self.handle_requirements_overview(response)
 
-        # 5. Standards
-        self.add_message((
-            ChatRoles.USER.value,
-            f"{self.agent_name}: Working on Standards."
-        ))
+        if self.generation_step == 7: # 7. License Details
+            self.add_message((
+                ChatRoles.USER.value,
+                f"{self.agent_name}: Progressing with Step 7 - License Details."
+            ))
 
-        response: TaskOutput = self.standards_chain.invoke({
-            "user_request": f"{self.state['user_request']}\n",
-            "task_description": f"{self.state['requirements_overview']['task_description']}\n",
-        })
+            response: TaskOutput = self.license_legal_chain.invoke({
+                "user_request": f"{self.state['user_request']}\n",
+                "license_text": f"{self.state['license_text']}\n",
+            })
 
-        self.requirements_overview(response)
+            
+            self.handle_requirements_overview(response)
 
-        # 6. Implementation Details
-        self.add_message((
-            ChatRoles.USER.value,
-            f"{self.agent_name}: Working on Implementation Details."
-        ))
-
-        response: TaskOutput = self.implementation_details_chain.invoke({
-           "architecture": f"{self.state['requirements_overview']['architecture']}\n",
-           "microservice_design": f"{self.state['requirements_overview']['microservice_design']}\n",
-           "folder_structure": f"{self.state['requirements_overview']['folder_structure']}\n",
-        })
-
-        self.requirements_overview(response)
-
-        # 7. License Details
-        self.add_message((
-            ChatRoles.USER.value,
-            f"{self.agent_name}: Working on License Details."
-        ))
-
-        response: TaskOutput = self.license_legal_chain.invoke({
-            "user_request": f"{self.state['user_request']}\n",
-            "license_text": f"{self.state['license_text']}\n",
-        })
-
-        self.requirements_overview(response)
-
-        self.are_requirements_generated = True
-        self.are_tasks_seperated = True
+        self.is_requirements_document_generated = True
 
         return {**self.state}
 
+    def write_requirements_node(self, state: ArchitectState) -> ArchitectState:
+        """
+        This method is used to write the requirements overview to a local file. It updates 
+        the state of the architect and sets the `is_requirements_document_saved` flag to True if 
+        the requirements are successfully written.
+
+        Args:
+            state (ArchitectState): The current state of the architect.
+
+        Returns:
+            ArchitectState: The updated state of the architect.
+        """
+
+        print(f"----{self.agent_name}: Commencing the process of writing requirements documents to local filesystem----")
+
+        self.update_state(state)
+
+        document = self.generate_requirements_document()
+        if len(document) < 0:
+            self.has_error_occured = True
+            self.error_message = "ERROR: Found requirements document to be empty. Could not write it to file system."
+            self.last_visited_node = self.requirements_node_name
+            
+            self.add_message((
+                ChatRoles.USER.value,
+                self.error_message,
+            ))
+        else:
+            generated_code = document
+            file_path = os.path.join(self.state['generated_project_path'], "docs/requirements.md")
+
+            self.has_error_occured, msg = CodeFileWriter.write_generated_code_to_file.invoke({"generated_code": generated_code, "file_path": file_path})
+            
+            # if self.has_error_occured:
+            #     self.error_message = msg
+            #     self.last_visited_node = self.requirements_and_additional_context
+            # else:
+            self.has_error_occured = False
+            self.error_message = ""
+            self.last_visited_node = self.write_requirements_node_name
+            self.is_requirements_document_saved = True
+
+            self.add_message((
+                ChatRoles.USER.value,
+                msg
+            ))
+
+        return {**self.state}
+
+    def tasks_separation_node(self, state: ArchitectState) -> ArchitectState:
+        """
+        This method separates tasks from the requirements document and creates a list of tasks.
+        It updates the state of the architect with the separated tasks.
+
+        Args:
+            state (ArchitectState): The current state of the architect.
+
+        Returns:
+            ArchitectState: The updated state of the architect.
+        """
+
+        print(f"----{self.agent_name}: Initiating the process of Tasks Separation----")
+
+        self.last_visited_node = self.tasks_separation_node_name
+        self.update_state(state)
+
+        task_seperation_solution = self.task_seperation_chain.invoke({
+            "tasks": self.state['tasks'],
+            "error_message": self.error_message
+        })
+        
+        self.has_error_occured = False
+        self.error_message = ""
+
+        try:
+            tasks = task_seperation_solution['tasks']
+
+            if not isinstance(tasks, list):
+                raise TypeError(f"Expected 'tasks' to be of type list but received {type(tasks).__name__}.")
+          
+            if not tasks:
+                raise ValueError("The 'tasks' list in the received in previous response is empty.")
+            
+            self.state['tasks'] = self.create_tasks_list(tasks)
+
+            self.are_tasks_seperated = True
+            self.add_message((
+                ChatRoles.USER.value,
+               f"{self.agent_name}: Task list has been successfully created. You can now proceed with your tasks."
+            ))
+
+        except ValueError as ve:
+            self.has_error_occured = True
+            self.error_message = f"ValueError occurred: {ve}"
+
+            self.add_message((
+                ChatRoles.USER.value,
+                self.error_message
+            ))
+
+        except TypeError as te:
+            self.has_error_occured = True
+            self.error_message = f"TypeError occurred: {te}"
+
+            self.add_message((
+                ChatRoles.USER.value,
+                self.error_message
+            ))
+            
+        except Exception as e:
+            self.has_error_occured = True
+            self.error_message = f"An unexpected error occurred: {e}"
+
+            self.add_message((
+                ChatRoles.USER.value,
+                self.error_message
+            ))           
+
+        return {**self.state}
+
+    def project_details_node(self, state: ArchitectState) -> ArchitectState:
+        """
+        This method is used to gather project details. It updates the current state with the 
+        provided state and invokes the project_details_chain to get the project details.
+
+        Args:
+            state (ArchitectState): The current state of the architect.
+
+        Returns:
+            ArchitectState: The updated state of the architect.
+        """
+
+        print(f"----{self.agent_name}: Initiating the process of gathering project details----")
+
+        self.update_state(state)
+        self.last_visited_node = self.project_details_node_name
+
+        self.add_message((
+            ChatRoles.USER.value,
+            f"{self.agent_name}: Initiating the process of gathering project details."
+        ))
+
+        response: ProjectDetails = self.project_details_chain.invoke({
+            "user_request": f"{self.state['user_request']}\n",
+            "folder_structure_document": f"{self.state['requirements_overview']['folder_structure']}\n",
+            "error_message": f"{self.error_message}\n",
+        })
+
+        self.has_error_occured = False
+        self.error_message = ""
+
+        try:
+            required_keys = ["project_name", "project_folder_structure"]
+            missing_keys = [key for key in required_keys if key not in response]
+
+            if missing_keys:
+                raise KeyError(f"Missing keys: {missing_keys} in the response. Try Again!")
+
+            self.state['project_name'] = response['project_name']
+            self.state['project_folder_strucutre'] = response['project_folder_structure']
+          
+            self.add_message((
+                ChatRoles.USER.value,
+                f"{self.agent_name}: Project details have been successfully gathered!"
+            ))
+
+            self.are_project_details_provided = True
+        except Exception as e:
+            self.has_error_occured = True
+            self.error_message = f"An error occurred while processing the request: {str(e)}"
+
+            self.add_message((
+                ChatRoles.USER.value,
+                self.error_message
+            ))
+
+        return {**self.state}
+    
     def additional_information_node(self, state: ArchitectState) -> ArchitectState:
         """
+        This method is used to gather additional information if needed. It updates the current 
+        state with the provided state and invokes the additional_information_chain to get the 
+        additional information.
+
+        Args:
+            state (ArchitectState): The current state of the architect.
+
+        Returns:
+            ArchitectState: The updated state of the architect.
         """
         
         print(f"----{self.agent_name}: Working on gathering additional information----")
 
         self.update_state(state)
-        self.last_visited_node = self.additional_info
+        self.last_visited_node = self.additional_info_node_name
 
         self.add_message((
             ChatRoles.USER.value,
@@ -482,12 +739,12 @@ class ArchitectAgent:
         ))
 
         llm_response: QueryResult = self.additional_information_chain.invoke({
-            "requirements_document": self.create_requirements_document(),
+            "requirements_document": self.generate_requirements_document(),
             "question": self.state['current_task'].question,
             "error_message": self.error_message
         })
 
-        self.has_error = False
+        self.has_error_occured = False
         self.error_message = ""
         
         try:
@@ -511,128 +768,12 @@ class ArchitectAgent:
 
             self.is_additional_info_provided = True
         except Exception as e:
-            self.has_error = True
+            self.has_error_occured = True
             self.error_message = f"An error occurred while processing the request: {str(e)}"
 
-        return {**self.state}
-
-    def write_requirements_to_local_node(self, state: ArchitectState) -> ArchitectState:
-        """
-        This method is used to write the requirements overview to a local file. It updates 
-        the state of the architect and sets the `are_requirements_saved_to_local` flag to True if 
-        the requirements are successfully written.
-
-        Args:
-            state (ArchitectState): The current state of the architect.
-
-        Returns:
-            ArchitectState: The updated state of the architect.
-        """
-
-        print(f"----{self.agent_name}: Writing requirements documents to local filesystem----")
-
-        self.update_state(state)
-
-        document = self.create_requirements_document()
-        if len(document) < 0:
-            self.has_error = True
-            self.error_message = "ERROR: Found requirements document to be empty. Could not write it to file system."
-            self.last_visited_node = self.requirements
-            
-            self.add_message((
-                ChatRoles.USER.value,
-                self.error_message,
-            ))
-        else:
-            generated_code = document
-            file_path = os.path.join(self.state['generated_project_path'], "docs/requirements.md")
-
-            self.has_error, msg = CodeFileWriter.write_generated_code_to_file.invoke({"generated_code": generated_code, "file_path": file_path})
-            
-            # if self.has_error:
-            #     self.error_message = msg
-            #     self.last_visited_node = self.requirements_and_additional_context
-            # else:
-            self.has_error = False
-            self.error_message = ""
-            self.last_visited_node = self.write_requirements
-            self.are_requirements_saved_to_local = True
-
-            self.add_message((
-                ChatRoles.USER.value,
-                msg
-            ))
-
-
-        return {**self.state}
-
-    def tasks_seperation_node(self, state: ArchitectState) -> ArchitectState:
-        """
-        This method separates tasks from the requirements document and creates a list of tasks
-        and updates the state.
-
-        Args:
-            state (ArchitectState): The current state of the architect.
-
-        Returns:
-            ArchitectState: The updated state of the architect.
-        """
-
-        print(f"----{self.agent_name}: Working on Tasks Seperation----")
-
-        self.last_visited_node = self.tasks_seperation
-        self.update_state(state)
-
-        task_seperation_solution = self.task_seperation_chain.invoke({
-            "tasks": self.state['tasks'],
-            "error_message": self.error_message
-        })
-        
-        self.has_error = False
-        self.error_message = ""
-
-        try:
-            tasks = task_seperation_solution['tasks']
-
-            if not isinstance(tasks, list):
-                raise TypeError(f"Expected 'tasks' to be of type list but received {type(tasks).__name__}.")
-          
-            if not tasks:
-                raise ValueError("The 'tasks' list in the received in previous response is empty.")
-            
-            self.state['tasks'] = self.create_tasks(tasks)
-
-            self.are_tasks_seperated = True
-            self.add_message((
-                ChatRoles.USER.value,
-               "The tasks list has been successfully generated. You may now continue with your work on these tasks."
-            ))
-
-        except ValueError as ve:
-            self.has_error = True
-            self.error_message = f"ValueError occurred: {ve}"
-
             self.add_message((
                 ChatRoles.USER.value,
                 self.error_message
             ))
-
-        except TypeError as te:
-            self.has_error = True
-            self.error_message = f"TypeError occurred: {te}"
-
-            self.add_message((
-                ChatRoles.USER.value,
-                self.error_message
-            ))
-            
-        except Exception as e:
-            self.has_error = True
-            self.error_message = f"An unexpected error occurred: {e}"
-
-            self.add_message((
-                ChatRoles.USER.value,
-                self.error_message
-            ))           
 
         return {**self.state}

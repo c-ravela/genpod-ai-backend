@@ -2,10 +2,6 @@
 This module defines the data model for the output of the Architect agent in 
 the form of a Requirements Document.
 
-The Requirements Document captures the details of the project requirements, 
-such as the project name, a well-documented requirements document, a list of 
-tasks derived from the requirements, the project folder structure to follow. 
-Each of these details is represented as a field in the `RequirementsDoc` class.
 """
 
 from typing_extensions import ClassVar
@@ -15,6 +11,23 @@ from pydantic import BaseModel
 
 from models.constants import Status
 from models.models import Task
+
+class ProjectDetails(BaseModel):
+    """
+    This class encapsulates the essential details of a project. It includes fields 
+    to describe the project name and the project's folder structure. These details 
+    provide a high-level overview of the project and its organization.
+    """
+
+    project_name: str = Field(
+        description="The name of the project",
+        required=True
+    )
+
+    project_folder_structure: str = Field(
+        description="The folder structure to be adhered to for the project",
+        required=True
+    )
 
 class TaskOutput(BaseModel):
     """
@@ -37,15 +50,18 @@ class TaskOutput(BaseModel):
     )
 
 class RequirementsOverview:
+    """
+    This class encapsulates the various requirements of a project. 
+    """
 
-    project_details: str
-    architecture: str
-    folder_structure: str
-    microservice_design: str
-    task_description: str
-    standards: str
-    implementation_details: str
-    license_details: str
+    project_details: str # A brief description of the project
+    architecture: str # Details about the system's architecture
+    folder_structure: str # Description of the project's directory or folder structure
+    microservice_design: str # Design details of the microservices used in the project
+    task_description: str # Overview of the tasks involved in the project
+    standards: str # Coding standards and conventions followed in the project
+    implementation_details: str  # Detailed description of the implementation process
+    license_details: str # Information about the project's licensing
 
 class TasksList(BaseModel):
     """
