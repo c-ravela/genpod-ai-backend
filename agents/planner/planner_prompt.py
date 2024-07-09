@@ -11,10 +11,12 @@ class PlannerPrompts():
         Feedback: {feedback}
 
         Give a Deliverable and Additional context, you should return the output similar to the example_output below.
-        example_output: '['workpackage1','workpackage2','workpackage3']'
-        
+        example_output: ['workpackage1','workpackage2','workpackage3']
+
+        Provide the list of backlog tasks exactly as the example output format above for this deliverable.
+
         To complete the task accurately it is important to not assume anything and ask questions when any information is missing.
-        Provide the list of backlog of tasks for this deliverable""",
+        Provide the list of backlog of tasks for this deliverable that I can convert using ast.literal_eval(example_output)""",
         input_variables=["deliverable", "context", "feedback"]
     )
 
