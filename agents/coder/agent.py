@@ -16,8 +16,9 @@ from langchain_core.runnables.base import RunnableSequence
 from agents.coder.state import CoderState
 
 from models.constants import Status
-from models.constants import PStatus
 from models.constants import ChatRoles
+
+from models.coder import CodeGeneration
 
 from prompts.coder import CoderPrompts
 
@@ -41,6 +42,8 @@ class CoderAgent:
     # names of the graph node
     entry_node_name: str # The entry point of the graph
     code_generation_node_name: str 
+    run_commands_node_name: str
+    write_generated_code_node_name: str
     download_license_node_name: str 
     add_license_node_name: str 
     update_state_node_name: str 
@@ -55,6 +58,9 @@ class CoderAgent:
     # to the graph state
     hasError: bool
     is_code_generated: bool
+    has_command_execution_finished: bool
+    has_code_been_written_locally: bool
+    is_code_written_to_local: bool
     is_license_file_downloaded: bool
     is_license_text_added_to_files: bool
     hasPendingToolCalls: bool
@@ -64,6 +70,7 @@ class CoderAgent:
 
     state: CoderState
     prompts: CoderPrompts
+    current_code_generation: CodeGeneration
 
     llm: Union[ChatOpenAI, ChatOllama] # This is the language learning model (llm) for the Architect agent. It can be either a ChatOpenAI model or a ChatOllama model
 
@@ -78,6 +85,8 @@ class CoderAgent:
 
         self.entry_node_name = "entry"
         self.code_generation_node_name = "code_generation"
+        self.run_commands_node_name = "run_commands"
+        self.write_generated_code_node_name = "write_code"
         self.download_license_node_name = "download_license"
         self.add_license_node_name = "add_license_text"
         self.update_state_node_name = "state_update"
@@ -93,6 +102,8 @@ class CoderAgent:
 
         self.hasError = False
         self.is_code_generated = False
+        self.has_command_execution_finished = False
+        self.has_code_been_written_locally = False
         self.is_license_file_downloaded = False
         self.is_license_text_added_to_files = False
         self.hasPendingToolCalls = False
@@ -102,6 +113,8 @@ class CoderAgent:
         
         self.state = CoderState()
         self.prompts = CoderPrompts()
+
+        self.current_code_generation = {}
 
         self.llm = llm
 
@@ -122,6 +135,22 @@ class CoderAgent:
 
         self.state['messages'] += [message]
 
+    def router(self, state: CoderState) -> str:
+        """
+        """
+
+        if self.hasError:
+            return self.last_visited_node
+        elif self.mode == "code_generation":
+            if not self.is_code_generated:
+                return self.code_generation_node_name
+            elif not self.is_license_file_downloaded:
+                return self.download_license_node_name
+            elif not self.is_license_text_added_to_files:
+                return self.add_license_node_name
+        
+        return self.update_state_node_name
+    
     def update_state(self, state: CoderState) -> CoderState:
         """
         This method updates the current state of the Architect agent with the provided state. 
@@ -138,22 +167,6 @@ class CoderAgent:
 
         return {**self.state}
     
-    def router(self, state: CoderState) -> str:
-        """
-        """
-
-        if self.hasError:
-            return self.last_visited_node
-        elif self.mode == "code_generation":
-            if not self.is_code_generated:
-                return self.code_generation_node_name
-            elif not self.is_license_file_downloaded:
-                return self.download_license_node_name
-            elif not self.is_license_text_added_to_files:
-                return self.add_license_node_name
-        
-        return self.update_state_node_name
-
     def entry_node(self, state: CoderState) -> CoderState:
         """
         This method is the entry point of the Coder agent. It updates the current state 
@@ -175,8 +188,12 @@ class CoderAgent:
         if self.state['current_task'].task_status == Status.NEW:
             self.mode = "code_generation"
             self.is_code_generated = False
+            self.has_command_execution_finished = False
+            self.has_code_been_written_locally = False
             self.is_license_file_downloaded = False
             self.is_license_text_added_to_files = False
+
+            self.current_code_generation = {}
 
         return {**self.state}
     
@@ -197,28 +214,32 @@ class CoderAgent:
             f"Started working on the task: {task.description}."
         ))
 
-        llm_response = self.code_generation_chain.invoke({
-            "project_name": self.state['project_name'],
-            "project_path": self.state['generated_project_path'],
-            "requirements_document": self.state['requirements_overview'],
-            "folder_structure": self.state['project_folder_strucutre'],
-            "task": task.description,
-            "error_message": self.error_message,
-        })
-
-        self.hasError = False
-        self.error_message = ""
-
         try:
-            required_keys = ["files_to_create", "code", "infile_license_comments"]
+            llm_response = self.code_generation_chain.invoke({
+                "project_name": self.state['project_name'],
+                "project_path": self.state['generated_project_path'],
+                "requirements_document": self.state['requirements_overview'],
+                "folder_structure": self.state['project_folder_strucutre'],
+                "task": task.description,
+                "error_message": self.error_message,
+            })
+
+            self.hasError = False
+            self.error_message = ""
+
+            required_keys = ["files_to_create", "code", "infile_license_comments", "commands_to_execute"]
             missing_keys = [key for key in required_keys if key not in llm_response]
 
             if missing_keys:
                 raise KeyError(f"Missing keys: {missing_keys} in the response. Try Again!")
 
+            # TODO: Need to update these to the state such that it holds the past tasks following field details along current task with no duplicates.
+            # TODO: maintian class variable (local to class) to hold the current task's CodeGeneration object so that we are not gonna pass any extra
+            # details to the code generation prompt - look self.current_code_generation
             self.state["code"] = llm_response['code']
             self.state["files_created"] = llm_response['files_to_create']
             self.state['infile_license_comments'] = llm_response['infile_license_comments']
+            self.state['commands_to_execute'] = llm_response['commands_to_execute']
 
             self.add_message((
                 ChatRoles.USER.value,
@@ -236,13 +257,40 @@ class CoderAgent:
                 ChatRoles.USER.value,
                 f"{self.agent_name}: {self.error_message}"
             ))
-            
+        
+        pp.pp(llm_response)
         return {**self.state}
 
+    def run_commands_node(self, state: CoderState) -> CoderState:
+        """
+        """
+
+        # TODO: Add logic for command execution. use self.current_code_generation
+        # run one command at a time from the dictionary of commands to execute.
+        # Need to add error handling prompt for this node.
+        # When command execution fails llm need to re try with different commands
+        # look into - Shell.execute_command, whitelisted commands for llm to pick
+        self.has_command_execution_finished = True
+        
+        return {**self.state}
+    
+    def write_code_node(self, state: CoderState) -> CoderState:
+        """
+        """
+
+        # TODO: Add logic to write code to local. use self.current_code_generation.code
+        # just simply run wrire_generated_code_to_local tool to achieve this
+        # need to look for the case when code is empty.
+        # key and value of the code dict are the parameters for tool
+        self.has_code_been_written_locally = True
+
+        return {**self.state}
+    
     def download_license_node(self, state: CoderState) -> CoderState:
         """
         """
 
+        # TODO: from state pick the license url and user download_license tool to achieve this
         self.is_license_file_downloaded = True
 
         return {**self.state}
@@ -251,6 +299,10 @@ class CoderAgent:
         """
         """
 
+        # TODO: Need to work on a logic to achieve this
+        # use self.state['infile_license_text]
+        # and only loop to add to the filepaths that self.current_code_generation.code.keys() has
+        # or else there is chance for duplicating the license text to already written files.
         self.is_license_text_added_to_files = True
 
         return {**self.state}

@@ -83,3 +83,10 @@ class CoderState(TypedDict):
         dict[str, str],
         "A list of multiline license comments for each type of file."
     ]
+
+    commands_to_execute: Annotated[ 
+        dict[str, str],
+        """
+        This field represents a dictionary of commands intended to be executed on a Linux terminal. Each key-value pair in the dictionary corresponds to an absolute path (the key) and a specific command (the value) to be executed at that path.
+        """
+    ]

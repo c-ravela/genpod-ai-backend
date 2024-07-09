@@ -52,7 +52,7 @@ class CoderModel(BaseModel):
     )
 
     files_to_create: str = Field(
-        description="A list of absolute file paths that need to be created as part of the task", 
+        description="A list of absolute file paths that need to be created as part of the current task", 
         required=True
     )
 
@@ -85,7 +85,7 @@ class CodeGeneration(BaseModel):
 
     files_to_create: list[str] = Field(
         description="""
-        A list of absolute file paths that need to be created as part of the task
+        A list of absolute file paths that need to be created as part of the current task
         "
         [
             'absolute_file_path1', 
@@ -122,6 +122,20 @@ class CodeGeneration(BaseModel):
                 ".yml": "multiline comment",
             }
         "
+        """,
+        required=True
+    )
+
+    commands_to_execute: dict[str, str] = Field(
+        description="""
+        This field represents a dictionary of commands intended to be executed on a Linux terminal. Each key-value pair in the dictionary corresponds to an absolute path (the key) and a specific command (the value) to be executed at that path.
+
+        Please adhere to the following guidelines while populating this field:
+        - The key should be the absolute path where the command is to be run.
+        - Only commands from the approved list are allowed. The approved commands include 'mkdir', 'docker', 'python', 'python3', 'pip', 'virtualenv', 'mv', 'pytest', and 'touch', 'git'.
+        - For security reasons, the use of certain symbols is restricted. Specifically, the following symbols are not permitted: '&&', '||', '|', ';'.
+
+        Please ensure that the commands and their parameters are correctly formatted to prevent any execution errors.
         """,
         required=True
     )
