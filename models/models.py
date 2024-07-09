@@ -10,12 +10,17 @@ from typing_extensions import ClassVar
 
 from pydantic import Field, BaseModel
 from models.constants import Status
+from utils.task_utils import generate_task_id
 
 class Task(BaseModel):
     """
     A data model representing a task and its current state within a project
     or workflow.
     """
+    task_id: str = Field(
+        description="A unique task id to track and access current task and previous tasks",
+        default_factory=generate_task_id
+    )
 
     description: str = Field(
         description="A brief description outlining the objective of the task",
