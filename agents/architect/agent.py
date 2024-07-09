@@ -426,112 +426,122 @@ class ArchitectAgent:
             f"{self.agent_name}: Initiating the process of preparing the requirements overview."
         ))
 
-        if self.generation_step == 0: #0. Project Overview
-            self.add_message((
-                ChatRoles.USER.value,
-                f"{self.agent_name}: Progressing with Step 0 - Project Overview."
-            ))
+        try:
+            if self.generation_step == 0: #0. Project Overview
+                self.add_message((
+                    ChatRoles.USER.value,
+                    f"{self.agent_name}: Progressing with Step 0 - Project Overview."
+                ))
 
-            response: TaskOutput = self.project_overview_chain.invoke({
-                "user_request": f"{self.state['user_request']}\n",
-                "task_description": f"{self.state['current_task'].description}",
-                "additional_information": f"{self.state['current_task'].additional_info}"
-            })
+                response: TaskOutput = self.project_overview_chain.invoke({
+                    "user_request": f"{self.state['user_request']}\n",
+                    "task_description": f"{self.state['current_task'].description}",
+                    "additional_information": f"{self.state['current_task'].additional_info}"
+                })
 
-            self.handle_requirements_overview(response)
+                self.handle_requirements_overview(response)
 
-        if self.generation_step == 1: # 1. Architecture
-            self.add_message((
-                ChatRoles.USER.value,
-                f"{self.agent_name}: Progressing with Step 1 - Architecture."
-            ))
+            if self.generation_step == 1: # 1. Architecture
+                self.add_message((
+                    ChatRoles.USER.value,
+                    f"{self.agent_name}: Progressing with Step 1 - Architecture."
+                ))
 
-            response: TaskOutput = self.architecture_chain.invoke({
-                "project_overview": f"{self.state['requirements_overview']['project_details']}\n",
-            })
+                response: TaskOutput = self.architecture_chain.invoke({
+                    "project_overview": f"{self.state['requirements_overview']['project_details']}\n",
+                })
 
-            self.handle_requirements_overview(response)
+                self.handle_requirements_overview(response)
 
-        if self.generation_step == 2: # 2. Folder Structure
-            self.add_message((
-                ChatRoles.USER.value,
-                f"{self.agent_name}: Progressing with Step 2 - Folder Structure."
-            ))
+            if self.generation_step == 2: # 2. Folder Structure
+                self.add_message((
+                    ChatRoles.USER.value,
+                    f"{self.agent_name}: Progressing with Step 2 - Folder Structure."
+                ))
 
-            response: TaskOutput = self.folder_structure_chain.invoke({
-                "project_overview": f"{self.state['requirements_overview']['project_details']}\n",
-                "architecture": f"{self.state['requirements_overview']['architecture']}\n",
-            })
+                response: TaskOutput = self.folder_structure_chain.invoke({
+                    "project_overview": f"{self.state['requirements_overview']['project_details']}\n",
+                    "architecture": f"{self.state['requirements_overview']['architecture']}\n",
+                })
 
-            self.handle_requirements_overview(response)
+                self.handle_requirements_overview(response)
 
-        if self.generation_step == 3: # 3. Micro service Design
-            self.add_message((
-                ChatRoles.USER.value,
-                f"{self.agent_name}: Progressing with Step 3 - Microservice Design."
-            ))
+            if self.generation_step == 3: # 3. Micro service Design
+                self.add_message((
+                    ChatRoles.USER.value,
+                    f"{self.agent_name}: Progressing with Step 3 - Microservice Design."
+                ))
 
-            response: TaskOutput = self.microservice_design_chain.invoke({
-                "project_overview": f"{self.state['requirements_overview']['project_details']}\n",
-                "architecture": f"{self.state['requirements_overview']['architecture']}\n",
-            })
+                response: TaskOutput = self.microservice_design_chain.invoke({
+                    "project_overview": f"{self.state['requirements_overview']['project_details']}\n",
+                    "architecture": f"{self.state['requirements_overview']['architecture']}\n",
+                })
 
-            self.handle_requirements_overview(response)
+                self.handle_requirements_overview(response)
 
-        if self.generation_step == 4: # 4. Tasks Breakdown
-            self.add_message((
-                ChatRoles.USER.value,
-                f"{self.agent_name}: Progressing with Step 4 - Tasks Breakdown."
-            ))
+            if self.generation_step == 4: # 4. Tasks Breakdown
+                self.add_message((
+                    ChatRoles.USER.value,
+                    f"{self.agent_name}: Progressing with Step 4 - Tasks Breakdown."
+                ))
 
-            response: TaskOutput = self.tasks_breakdown_chain.invoke({
-                "project_overview": f"{self.state['requirements_overview']['project_details']}\n",
+                response: TaskOutput = self.tasks_breakdown_chain.invoke({
+                    "project_overview": f"{self.state['requirements_overview']['project_details']}\n",
+                    "architecture": f"{self.state['requirements_overview']['architecture']}\n",
+                    "microservice_design": f"{self.state['requirements_overview']['microservice_design']}\n",
+                })
+
+                self.handle_requirements_overview(response)
+
+            if self.generation_step == 5: # 5. Standards
+                self.add_message((
+                    ChatRoles.USER.value,
+                    f"{self.agent_name}: Progressing with Step 5 - Standards."
+                ))
+
+                response: TaskOutput = self.standards_chain.invoke({
+                    "user_request": f"{self.state['user_request']}\n",
+                    "task_description": f"{self.state['requirements_overview']['task_description']}\n",
+                })
+
+                self.handle_requirements_overview(response)
+
+            if self.generation_step == 6: # 6. Implementation Details
+                self.add_message((
+                    ChatRoles.USER.value,
+                    f"{self.agent_name}: Progressing with Step 6 - Implementation Details."
+                ))
+
+                response: TaskOutput = self.implementation_details_chain.invoke({
                 "architecture": f"{self.state['requirements_overview']['architecture']}\n",
                 "microservice_design": f"{self.state['requirements_overview']['microservice_design']}\n",
-            })
+                "folder_structure": f"{self.state['requirements_overview']['folder_structure']}\n",
+                })
 
-            self.handle_requirements_overview(response)
+                self.handle_requirements_overview(response)
 
-        if self.generation_step == 5: # 5. Standards
+            if self.generation_step == 7: # 7. License Details
+                self.add_message((
+                    ChatRoles.USER.value,
+                    f"{self.agent_name}: Progressing with Step 7 - License Details."
+                ))
+
+                response: TaskOutput = self.license_legal_chain.invoke({
+                    "user_request": f"{self.state['user_request']}\n",
+                    "license_text": f"{self.state['license_text']}\n",
+                })
+
+                
+                self.handle_requirements_overview(response)
+        
+        except Exception as e:
+            self.has_error_occured = True
+            self.error_message = f"An error occurred while processing the request: {str(e)}"
+
             self.add_message((
                 ChatRoles.USER.value,
-                f"{self.agent_name}: Progressing with Step 5 - Standards."
+                f"{self.agent_name}: {self.error_message}"
             ))
-
-            response: TaskOutput = self.standards_chain.invoke({
-                "user_request": f"{self.state['user_request']}\n",
-                "task_description": f"{self.state['requirements_overview']['task_description']}\n",
-            })
-
-            self.handle_requirements_overview(response)
-
-        if self.generation_step == 6: # 6. Implementation Details
-            self.add_message((
-                ChatRoles.USER.value,
-                f"{self.agent_name}: Progressing with Step 6 - Implementation Details."
-            ))
-
-            response: TaskOutput = self.implementation_details_chain.invoke({
-            "architecture": f"{self.state['requirements_overview']['architecture']}\n",
-            "microservice_design": f"{self.state['requirements_overview']['microservice_design']}\n",
-            "folder_structure": f"{self.state['requirements_overview']['folder_structure']}\n",
-            })
-
-            self.handle_requirements_overview(response)
-
-        if self.generation_step == 7: # 7. License Details
-            self.add_message((
-                ChatRoles.USER.value,
-                f"{self.agent_name}: Progressing with Step 7 - License Details."
-            ))
-
-            response: TaskOutput = self.license_legal_chain.invoke({
-                "user_request": f"{self.state['user_request']}\n",
-                "license_text": f"{self.state['license_text']}\n",
-            })
-
-            
-            self.handle_requirements_overview(response)
 
         self.is_requirements_document_generated = True
 
@@ -603,15 +613,15 @@ class ArchitectAgent:
         self.last_visited_node = self.tasks_separation_node_name
         self.update_state(state)
 
-        task_seperation_solution = self.task_seperation_chain.invoke({
-            "tasks": self.state['tasks'],
-            "error_message": self.error_message
-        })
-        
-        self.has_error_occured = False
-        self.error_message = ""
-
         try:
+            task_seperation_solution = self.task_seperation_chain.invoke({
+                "tasks": self.state['tasks'],
+                "error_message": self.error_message
+            })
+            
+            self.has_error_occured = False
+            self.error_message = ""
+            
             tasks = task_seperation_solution['tasks']
 
             if not isinstance(tasks, list):
@@ -679,16 +689,16 @@ class ArchitectAgent:
             f"{self.agent_name}: Initiating the process of gathering project details."
         ))
 
-        response: ProjectDetails = self.project_details_chain.invoke({
-            "user_request": f"{self.state['user_request']}\n",
-            "folder_structure_document": f"{self.state['requirements_overview']['folder_structure']}\n",
-            "error_message": f"{self.error_message}\n",
-        })
-
-        self.has_error_occured = False
-        self.error_message = ""
-
         try:
+            response: ProjectDetails = self.project_details_chain.invoke({
+                "user_request": f"{self.state['user_request']}\n",
+                "folder_structure_document": f"{self.state['requirements_overview']['folder_structure']}\n",
+                "error_message": f"{self.error_message}\n",
+            })
+
+            self.has_error_occured = False
+            self.error_message = ""
+
             required_keys = ["project_name", "project_folder_structure"]
             missing_keys = [key for key in required_keys if key not in response]
 
@@ -738,17 +748,17 @@ class ArchitectAgent:
             ChatRoles.USER.value,
             f"{self.agent_name}: Started working on gathering the additional information."
         ))
-
-        llm_response: QueryResult = self.additional_information_chain.invoke({
-            "requirements_document": self.generate_requirements_document(),
-            "question": self.state['current_task'].question,
-            "error_message": self.error_message
-        })
-
-        self.has_error_occured = False
-        self.error_message = ""
         
         try:
+            llm_response: QueryResult = self.additional_information_chain.invoke({
+                "requirements_document": self.generate_requirements_document(),
+                "question": self.state['current_task'].question,
+                "error_message": self.error_message
+            })
+
+            self.has_error_occured = False
+            self.error_message = ""
+
             required_keys = ["is_answer_found", "response_text"]
             missing_keys = [key for key in required_keys if key not in llm_response]
 
