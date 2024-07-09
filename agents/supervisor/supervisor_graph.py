@@ -2,6 +2,7 @@ from langgraph.graph import StateGraph, END
 from agents.supervisor.supervisor_state import SupervisorState
 from agents.supervisor.supervisor_agent import SupervisorAgent
 from langgraph.checkpoint.sqlite import SqliteSaver
+from utils.logs.logging_utils import logger
 
 class SupervisorWorkflow():
     def __init__(self, llm, collections, thread_id, members, memberids, user_input, rag_try_limit, project_path):
@@ -51,7 +52,8 @@ class SupervisorWorkflow():
             self.sup_app = self.supervisor_workflow.compile(checkpointer=self.memory)
         
         else:
-            print("You have not set the Thread ID so not persisting the workflow state.")
+            # print("You have not set the Thread ID so not persisting the workflow state.")
+            logger.info("You have not set the Thread ID so not persisting the workflow state.")
             self.sup_app = self.supervisor_workflow.compile()
 
     def get_current_state(self):
