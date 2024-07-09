@@ -78,3 +78,50 @@ class CoderModel(BaseModel):
 
     description: ClassVar[str] = "Schema representing the output from the "
     "Coder agent upon task completion."
+
+class CodeGeneration(BaseModel):
+    """
+    """
+
+    files_to_create: list[str] = Field(
+        description="""
+        A list of absolute file paths that need to be created as part of the task
+        "
+        [
+            'absolute_file_path1', 
+            'absolute_file_path2', 
+            'absolute_file_path3',
+            .
+            .
+            .
+            .,
+            'absolute_file_pathN'
+        ]        
+        """, 
+        required=True
+    )
+
+    code: dict[str, str] = Field(
+        description="""
+        A dictionary where each key-value pair represents a file and its corresponding code. The key 
+        should be the absolute path to the file, and the value should be the well-documented working 
+        code for that particular file. The code should adhere to all the requirements and standards 
+        provided.
+        """, 
+        required=True
+    )
+
+    infile_license_comments: dict[str, str] = Field(
+        description="""
+        The standard license text multiline comment which goes on top of each file, key of the dict 
+        should be the extension of the file. 
+        "
+            {
+                ".py": "multiline commment",
+                ".md": "multiline comment",
+                ".yml": "multiline comment",
+            }
+        "
+        """,
+        required=True
+    )

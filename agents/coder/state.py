@@ -40,6 +40,15 @@ class CoderState(TypedDict):
         "This path is used to store all the project-related files and directories."
     ]
 
+    # @in
+    license_url: Annotated[
+        str,
+        ""
+    ]
+
+    # @in
+    license_text: Annotated[str, ""]
+
     # @inout
     current_task: Annotated[
         Task,
