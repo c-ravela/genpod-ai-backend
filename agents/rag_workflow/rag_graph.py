@@ -2,6 +2,7 @@ from langgraph.graph import StateGraph, END
 from langgraph.checkpoint.sqlite import SqliteSaver
 from agents.rag_workflow.rag_state import RAGState
 from agents.rag_workflow.rag_agent import RAGAgent
+from utils.logs.logging_utils import logger
 
 class RAGWorkFlow():
     def __init__(self, llm, collection_name, thread_id=None, persist_directory=None):
@@ -56,7 +57,8 @@ class RAGWorkFlow():
             self.rag_app = self.rag_workflow.compile(checkpointer=self.memory)
         
         else:
-            print("You have not set the Thread ID so not persisting the workflow state.")
+            # print("You have not set the Thread ID so not persisting the workflow state.")
+            logger.info("You have not set the Thread ID so not persisting the workflow state.")
             self.rag_app = self.rag_workflow.compile()
     
     def get_current_state(self):

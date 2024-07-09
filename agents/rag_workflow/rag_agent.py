@@ -4,6 +4,7 @@ from langchain_community.vectorstores import Chroma
 from langchain_openai import OpenAIEmbeddings
 from agents.rag_workflow.rag_state import RAGState
 from agents.rag_workflow.rag_prompts import RAGPrompts
+from utils.logs.logging_utils import logger
 
 class RAGAgent():
     def __init__(self, llm, collection_name, persist_directory=None):
@@ -46,7 +47,8 @@ class RAGAgent():
         Returns:
             state (dict): New key added to state, documents, that contains retrieved documents
         """
-        print("---RETRIEVE---")
+        # print("----RETRIEVE----")
+        logger.info("----RETRIEVE----")
         question = state["question"]
 
         # Retrieval
@@ -63,7 +65,8 @@ class RAGAgent():
         Returns:
             state (dict): New key added to state, generation, that contains LLM generation
         """
-        print("---GENERATE---")
+        # print("----GENERATE----")
+        logger.info("----GENERATE----")
         question = state["question"]
         documents = state["documents"]
         state['query_answered'] = True
@@ -83,7 +86,8 @@ class RAGAgent():
             state (dict): Updates documents key with only filtered relevant documents
         """
 
-        print("---CHECK DOCUMENT RELEVANCE TO QUESTION---")
+        # print("----CHECK DOCUMENT RELEVANCE TO QUESTION----")
+        logger.info("----CHECK DOCUMENT RELEVANCE TO QUESTION----")
         question = state["question"]
         documents = state["documents"]
 
@@ -95,10 +99,12 @@ class RAGAgent():
             )
             grade = score["score"]
             if grade == "yes":
-                print("---GRADE: DOCUMENT RELEVANT---")
+                # print("----GRADE: DOCUMENT RELEVANT----")
+                logger.info("----GRADE: DOCUMENT RELEVANT----")
                 filtered_docs.append(d)
             else:
-                print("---GRADE: DOCUMENT NOT RELEVANT---")
+                # print("----GRADE: DOCUMENT NOT RELEVANT----")
+                logger.info("----GRADE: DOCUMENT NOT RELEVANT----")
                 continue
         return {**state, "documents": filtered_docs, "question": question}
 
@@ -117,7 +123,8 @@ class RAGAgent():
             state['query_answered'] = False
             return {**state, "next":"update_state"}
 
-        print("---TRANSFORM QUERY---")
+        # print("----TRANSFORM QUERY----")
+        logger.info("----TRANSFORM QUERY----")
         question = state["question"]
         documents = state["documents"]
         state["iteration_count"] -= 1
@@ -137,20 +144,23 @@ class RAGAgent():
             str: Binary decision for next node to call
         """
 
-        print("---ASSESS GRADED DOCUMENTS---")
+        # print("----ASSESS GRADED DOCUMENTS----")
+        logger.info("----ASSESS GRADED DOCUMENTS----")
         question = state["question"]
         filtered_documents = state["documents"]
 
         if not filtered_documents:
             # All documents have been filtered check_relevance
             # We will re-generate a new query
-            print(
-                "---DECISION: ALL DOCUMENTS ARE NOT RELEVANT TO QUESTION, TRANSFORM QUERY---"
-            )
+            # print(
+            #     "----DECISION: ALL DOCUMENTS ARE NOT RELEVANT TO QUESTION, TRANSFORM QUERY----"
+            # )
+            logger.info("----DECISION: ALL DOCUMENTS ARE NOT RELEVANT TO QUESTION, TRANSFORM QUERY----")
             return "transform_query"
         else:
             # We have relevant documents, so generate answer
-            print("---DECISION: GENERATE---")
+            # print("----DECISION: GENERATE----")
+            logger.info("----DECISION: GENERATE----")
             return "generate"
 
     def grade_generation_v_documents_and_question(self, state: RAGState):
@@ -164,7 +174,8 @@ class RAGAgent():
             str: Decision for next node to call
         """
 
-        print("---CHECK HALLUCINATIONS---")
+        # print("----CHECK HALLUCINATIONS----")
+        logger.info("----CHECK HALLUCINATIONS----")
         question = state["question"]
         documents = state["documents"]
         generation = state["generation"]
@@ -176,19 +187,24 @@ class RAGAgent():
 
         # Check hallucination
         if grade == "yes":
-            print("---DECISION: GENERATION IS GROUNDED IN DOCUMENTS---")
+            # print("----DECISION: GENERATION IS GROUNDED IN DOCUMENTS----")
+            logger.info("----DECISION: GENERATION IS GROUNDED IN DOCUMENTS----")
             # Check question-answering
-            print("---GRADE GENERATION vs QUESTION---")
+            # print("----GRADE GENERATION vs QUESTION----")
+            logger.info("----GRADE GENERATION vs QUESTION----")
             score = self.answer_grader.invoke({"question": question, "generation": generation})
             grade = score["score"]
             if grade == "yes":
-                print("---DECISION: GENERATION ADDRESSES QUESTION---")
+                # print("----DECISION: GENERATION ADDRESSES QUESTION----")
+                logger.info("----DECISION: GENERATION ADDRESSES QUESTION----")
                 return "useful"
             else:
-                print("---DECISION: GENERATION DOES NOT ADDRESS QUESTION---")
+                # print("----DECISION: GENERATION DOES NOT ADDRESS QUESTION----")
+                logger.info("----DECISION: GENERATION DOES NOT ADDRESS QUESTION----")
                 return "not useful"
         else:
-            print("---DECISION: GENERATION IS NOT GROUNDED IN DOCUMENTS, RE-TRY---")
+            # print("----DECISION: GENERATION IS NOT GROUNDED IN DOCUMENTS, RE-TRY----")
+            logger.info("----DECISION: GENERATION DOES NOT ADDRESS QUESTION----")
             return "not supported"
     
     def update_state(self, state: RAGState):
