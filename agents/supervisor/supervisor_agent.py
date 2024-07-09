@@ -423,9 +423,9 @@ class SupervisorAgent():
             for value in state['planned_task_map'][state['current_task'].description]:
                 # for each workpackage we need to create a planned_task
                 if state['planned_tasks'] is None:
-                    state['planned_tasks'] = [Task(description=json.dumps({"work_package_name": value, **state['planned_task_requiements'][value]}), task_status=Status.NEW.value, additional_info='',question='')]
+                    state['planned_tasks'] = [Task(description=json.dumps({"work_package_name": value, **state['planned_task_requirements'][value]}), task_status=Status.NEW.value, additional_info='',question='')]
                 else:
-                    state['planned_tasks'].append(Task(description=json.dumps({"work_package_name": value, **state['planned_task_requiements'][value]}), task_status=Status.NEW.value, additional_info='',question=''))
+                    state['planned_tasks'].append(Task(description=json.dumps({"work_package_name": value, **state['planned_task_requirements'][value]}), task_status=Status.NEW.value, additional_info='',question=''))
             state['agent_status'] = "Planner built the work packages"
             self.called_agent = 'Planner'
             logger.info("----------Response from Planner Agent----------")
