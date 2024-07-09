@@ -5,71 +5,65 @@ from langchain_core.prompts import PromptTemplate
 
 from langchain.output_parsers import PydanticOutputParser
 
-from models.coder import CoderModel
+from models.coder import CodeGeneration
 
 class CoderPrompts:
 
-    CODE_GENERATION_TEMPLATE: str ="""
-    As an expert programmer, you are collaborating with a team to complete an end-to-end project 
-    requested by a user. Your strengths lie in writing well-documented, optimized, secure, and 
-    production-ready code. 
+    code_generation_prompt: PromptTemplate = PromptTemplate(
+        template="""
+        As a proficient programmer, you are part of a collaborative team effort to deliver a comprehensive 
+        end-to-end project as requested by the user. Your expertise lies in crafting well-documented, optimized, 
+        secure, and production-ready code.
 
-    Project Name: '{project_name}'
+        You are currently engaged in the following project:
+        Project Name: '{project_name}'
 
-    Project Path: '{project_path}'
+        The project should be located at:
+        Project Path: '{project_path}'
 
-    From document provided below you will find facts about the project and set of guidelines to be 
-    followed while developing the project. Please adhere to the following guidelines specified by 
-    your team lead:
-    "{requirements_document}"
+        The document provided below offers a detailed overview of the project, including critical facts and a set 
+        of guidelines that must be strictly adhered to during the development process. These guidelines, carefully 
+        designed and specified by your team lead, are intended to ensure the highest quality of work. It is imperative 
+        that you diligently follow these guidelines:
 
-    The project requires certain files and directories. The required folder structure for the 
-    project is as follows at path:
-    "{folder_structure}"
+        "{requirements_document}"
 
-    If you need clarification on any aspect of the task, do not make assumptions. Instead, 
-    conclude that additional information is needed. Generate the output accordingly, and the 
-    required information will be provided to you. Additional information is only available 
-    upon request:
-    "{additional_information}"
+        Your strict adherence to these guidelines is vital for the successful and timely completion of the project. Let's 
+        strive to uphold the standards set forth in the document and work collaboratively towards our shared objective.
 
-    If the provided additional information is insufficient and you are unable to complete the 
-    task, you may conclude that the task cannot be finished.
+        The project necessitates certain files and directories. The required folder structure for the project is as follows:
+        "{folder_structure}"
 
-    Error messages will only be present if there is an issue with your previous response. 
-    "{error_message}"
+        Please note, error messages will only be present if there is an issue with your previous response:
+        "{error_message}"
 
-    The instructions for formatting are as follows:
-    {format_instructions}
+        The instructions for formatting are as follows:
+        {format_instructions}
 
-    Format the files to be created as a list of strings. For example:
-    "[file_path1, file_path2, file_path3, ..., file_pathN]"
-
-    You have access to the following tools:
-    {tools}.
-
-    To complete each task, you should select at least one tool. The tools should be executed in 
-    the order they are listed.
-
-    Now, here is your task to complete.
-    {task}.
-    """
+        Now, here is your task to complete:
+        {task}.
+        """,
+        input_variables=['project_name', 'project_path', 'requirements_document', 'folder_structure', 'error_message', 'task'],
+        partial_variables={
+            "format_instructions": PydanticOutputParser(pydantic_object=CodeGeneration).get_format_instructions()
+        }
+    )
     
-    def code_generation_prompt(self) -> PromptTemplate:
-        """
-        """
+    # def code_generation_prompt(self) -> PromptTemplate:
+    #     """
+    #     """
 
-        return PromptTemplate(
-            template=self.CODE_GENERATION_TEMPLATE,
-            input_variables=[
-                "project_name", "requirements_document", "project_path", 
-                "folder_structure", "additional_information", "error_message",
-                "tools", "task"
-            ],
-            partial_variables= {
-                "format_instructions": PydanticOutputParser(pydantic_object=CoderModel).get_format_instructions()
-            }
-        )
+    #     return PromptTemplate(
+    #         template=self.CODE_GENERATION_TEMPLATE,
+    #         input_variables=[
+    #             "project_name", "requirements_document", "project_path", 
+    #             "folder_structure", "additional_information", "error_message",
+    #             "tools", "task"
+    #         ],
+    #         partial_variables= {
+    #             "format_instructions": PydanticOutputParser(pydantic_object=CoderModel).get_format_instructions()
+    #         }
+    #     )
     
     # def tool_selection_prompt(self, pydantic_model: BaseModel) -> ChatPromptTemplate:
     #     """
