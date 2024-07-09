@@ -3,6 +3,7 @@ from agents.planner.planner_agent import PlannerAgent
 from langgraph.graph import StateGraph, END
 from langgraph.checkpoint.sqlite import SqliteSaver
 from models.models import Task
+from utils.logs.logging_utils import logger
 
 class PlannerWorkFlow():
     def __init__(self, llm, thread_id=None):
@@ -44,7 +45,8 @@ class PlannerWorkFlow():
             self.planner_app = self.planner_workflow.compile(checkpointer=self.memory)
         
         else:
-            print("You have not set the Thread ID so not persisting the workflow state.")
+            # print("You have not set the Thread ID so not persisting the workflow state.")
+            logger.info("You have not set the Thread ID so not persisting the workflow state.")
             self.planner_app = self.planner_workflow.compile()
         # self.planner_app = self.planner_workflow.compile()
 
