@@ -9,6 +9,9 @@ from pydantic import ValidationError
 import json
 from typing import List
 from pprint import pprint
+from utils.logs.logging_utils import logger
+import re, os, codecs
+from tools.code import CodeFileWriter
 
 class PlannerAgent():
     def __init__(self, llm):
@@ -30,6 +33,47 @@ class PlannerAgent():
         self.max_retries = 3
         self.error_messages = []
         self.backlog_requirements = {}
+        self.file_count = 0
+
+    def write_workpackages_to_files(self, backlog_dict, output_dir):
+        """
+        Write work packages from a dictionary to individual JSON files.
+
+        Args:
+        backlog_dict (dict): Dictionary containing work package data.
+        output_dir (str): Base directory for output files.
+
+        Returns:
+        int: Number of work packages written successfully.
+        """
+        if not backlog_dict:
+            logger.info("----Workpackage not present----")
+            return 0
+
+        logger.info("----Writing Workpackages to Project Docs Folder----")
+        work_packages_dir = os.path.join(output_dir, "docs", "work_packages")
+        os.makedirs(work_packages_dir, exist_ok=True)
+
+        for key, value in backlog_dict.items():
+            work_package = {'work_package_name': key, **value}
+            file_name = f'work_package_{self.file_count + 1}.json'
+            file_path = os.path.join(work_packages_dir, file_name)
+
+            try:
+                with codecs.open(file_path, 'w', encoding='utf-8') as file:
+                    json.dump(work_package, file, indent=4)
+                logger.info("Workpackage written to: %s", file_path)
+                self.file_count += 1
+            except UnicodeEncodeError:
+                try:
+                    with codecs.open(file_path, 'w', encoding='utf-8-sig') as file:
+                        json.dump(work_package, file, indent=4)
+                    logger.info("Workpackage written to: %s (with BOM)", file_path)
+                    file_count += 1
+                except Exception as e:
+                    logger.error("Unable to write workpackage to filepath: %s. Error: %s", file_path, str(e))
+
+        return self.file_count
     
     def new_deliverable_check(self, state: PlannerState):
         # self.current_task = {x:config['configurable'][x] for x in ['description','task_status','additional_info','question']}
@@ -43,9 +87,16 @@ class PlannerAgent():
     def backlog_planner(self, state: PlannerState):
         while(True):
             try:
-                print(f"----Working on building backlogs for the deliverable----\n{state['current_task'].description}")
+                # print(f"----Working on building backlogs for the deliverable----\n{state['current_task'].description}")
+                logger.info("----Working on building backlogs for the deliverable----")
+                logger.info("Deliverable: %s", state['current_task'].description)
                 generated_backlogs = self.backlog_plan.invoke({"deliverable":state['current_task'].description, "context":state['current_task'].additional_info, "feedback":self.error_messages})
-                backlogs_list = ast.literal_eval(generated_backlogs.content)
+                if generated_backlogs.content.startswith('```json') and generated_backlogs.content.endswith('```'):
+                    # Remove the ```json prefix and ``` suffix
+                    cleaned_generated_backlogs = generated_backlogs.content.removeprefix('```json').removesuffix('```').strip()
+                else:
+                    cleaned_generated_backlogs = generated_backlogs.content
+                backlogs_list = ast.literal_eval(cleaned_generated_backlogs)
                 # backlogs_list = self.parse_backlog_tasks(generated_backlogs.content)
                 # Validate the response using Pydantic
                 validated_backlogs = BacklogList(backlogs=backlogs_list)
@@ -65,24 +116,33 @@ class PlannerAgent():
             except (ValidationError, ValueError, SyntaxError) as e:
                 self.error_count += 1
                 error_message = f"Error generating backlogs: {str(e)}"
-                print(error_message)
+                # print(error_message)
+                logger.error(error_message)
                 self.error_messages.append(error_message)
                 
                 if self.error_count >= self.max_retries:
-                    print("Max retries reached. Halting")
+                    # print("Max retries reached. Halting")
+                    logger.info("Max retries reached. Halting")
                     self.error_count = 0
                     return {**state}
 
     def requirements_developer(self, state: PlannerState):
+        state['backlog_requirements'] = {}
         for backlog in state['deliverable_backlog_map'][state['current_task'].description]:
             while(True):
                 try:
-                    print(f"----Now Working on Generating detailed requirements for the backlog----\n{backlog}")
+                    # print(f"----Now Working on Generating detailed requirements for the backlog----\n{backlog}")
+                    logger.info("----Now Working on Generating detailed requirements for the backlog----")
+                    logger.info("Backlog: %s", backlog)
                     response = self.detailed_requirements.invoke({"backlog":backlog, "deliverable":state['deliverable'], "context":state['current_task'].additional_info, "feedback":self.error_messages})
 
                     # Let's clean the response to remove json prefix that llm sometimes appends to the actual text
                     # Strip whitespace from the beginning and end
                     cleaned_response = response.content.strip()
+                     # Remove single-line comments
+                    # cleaned_response = re.sub(r'//.*$', '', cleaned_response, flags=re.MULTILINE)
+                    # Remove multi-line comments
+                    # cleaned_response = re.sub(r'/\*.*?\*/', '', cleaned_response, flags=re.DOTALL)
                     
                     # Check if the text starts with ```json and ends with ```
                     if cleaned_response.startswith('```json') and cleaned_response.endswith('```'):
@@ -92,40 +152,51 @@ class PlannerAgent():
                         # If not enclosed in code blocks, use the text as is
                         cleaned_json = cleaned_response
                     parsed_response = json.loads(cleaned_json)
+
                     if "question" in parsed_response.keys():
-                        print(f"----Awaiting for additional information on----\n{parsed_response['question']}")
+                        # print(f"----Awaiting for additional information on----\n{parsed_response['question']}")
+                        logger.info("----Awaiting for additional information on----")
+                        logger.info("Question: %s", parsed_response['question'])
                         state['current_task'].task_status = Status.AWAITING
                         state['current_task'].question = parsed_response['question']
                         return {**state}
                     elif "description" in parsed_response.keys():
-                        print("----Generated Detailed requirements in JSON format for the backlog----\n")
-                        pprint(parsed_response)
-                        self.backlog_requirements[backlog] = parsed_response
+                        # print("----Generated Detailed requirements in JSON format for the backlog----\n")
+                        # pprint(parsed_response)
+                        logger.info("----Generated Detailed requirements in JSON format for the backlog----")
+                        logger.info("Requirements in JSON: %r", parsed_response)
+                        state['backlog_requirements'][backlog] = parsed_response
                         self.error_count = 0
                         self.error_messages = []
                         break
                 except Exception as e:
-                    print(f"Error parsing response for backlog: {backlog}, {e}")
+                    # print(f"Error parsing response for backlog: {backlog}, {e}")
+                    logger.info("Error parsing response for backlog: %s", backlog)
+                    logger.error("%s", str(e))
                     self.error_count += 1
                     error_message = f"Error in generated detailed requirements format: {str(e)}, I'm using python json.loads() to convert json to dictionary so take that into consideration."
-                    print(error_message)
+                    # print(error_message)
+                    logger.info("Error Message fed back to LLM: %s", error_message)
                     self.error_messages.append(error_message)
                     
                     if self.error_count >= self.max_retries:
-                        print("Max retries reached. Halting")
+                        # print("Max retries reached. Halting")
+                        logger.info("Max retries reached. Halting")
                         self.error_count = 0
                         return {**state}
         """Uncomment the below line to call coder on each workpackage created for the deliverable. Currently coder is not implemented yet so we will try to build workpackages for eacg deliverable using the Done mode."""
         # state['current_task'].task_status = Status.INPROGRESS
         state['current_task'].task_status = Status.DONE
+        files_written = self.write_workpackages_to_files(state['backlog_requirements'],state['generated_project_path'])
+        logger.info('Wrote %d work packages to the project folder', files_written)
         return {**state}
 
     def generate_response(self, state: PlannerState):
         if state['current_task'].task_status.value == Status.DONE.value:
             # ----when calling Coder----
-            # response = Task(description="All Backlogs for the deliverable is successfully generated proceed further", task_status=Status.INPROGRESS.value, additional_info='',question='')
+            response = Task(description=state['current_task'].description, task_status=Status.INPROGRESS.value, additional_info='',question='')
             # ----When recursively calling planner on each deliverable----
-            response = Task(description="All Backlogs for the deliverable is successfully generated proceed further", task_status=Status.DONE.value, additional_info=state['current_task'].additional_info,question='')
+            # response = Task(description="All Backlogs for the deliverable is successfully generated proceed further", task_status=Status.DONE.value, additional_info=state['current_task'].additional_info,question='')
         elif state['current_task'].task_status.value == Status.AWAITING.value:
             response = state['current_task']
         else:
