@@ -20,15 +20,21 @@ class SupervisorState(TypedDict):
 
     original_user_input: str
     project_path: str
+    license_url: str
+    license_text: str
     team_members: dict
     rag_retrieval: str
     tasks: List[str]
     current_task: Task
+    planned_tasks: List[Task] # This is list of work_packages created by the planner
+    planned_task_map: dict # This is the a map of deliverables to work_packages
+    planned_task_requirements: dict # This is the map of work_packages to json formatted requirements
     agents_status: str
     messages: List[Tuple[str, str]]
     rag_query_answer : bool
     requirements_doc : str
     human_feedback: List[Tuple[str, str]]
+    coder_inputs: dict
 
 def add_message(state: SupervisorState, message: tuple[str, str]) -> SupervisorState:
     """
