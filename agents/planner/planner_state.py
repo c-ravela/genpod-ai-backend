@@ -19,3 +19,5 @@ class PlannerState(TypedDict):
     response: List[Task]
     deliverable_backlog_map: Dict[str, List[str]]
     current_task: Task
+    backlog_requirements: Dict[str,str]
+    generated_project_path: str
