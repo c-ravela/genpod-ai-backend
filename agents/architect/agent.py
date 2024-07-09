@@ -704,6 +704,7 @@ class ArchitectAgent:
             ))
 
             self.are_project_details_provided = True
+            self.state['current_task'].task_status = Status.DONE
         except Exception as e:
             self.has_error_occured = True
             self.error_message = f"An error occurred while processing the request: {str(e)}"
