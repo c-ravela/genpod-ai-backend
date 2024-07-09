@@ -2,7 +2,7 @@
 import os
 import logging
 from pythonjsonlogger import jsonlogger
-from log_sanitization import sanitize_log_message, sanitize_dict
+from utils.logs.log_sanitization import sanitize_log_message, sanitize_dict
 
 class SanitizedJsonFormatter(jsonlogger.JsonFormatter):
     def process_log_record(self, log_record):
@@ -12,6 +12,9 @@ class SanitizedJsonFormatter(jsonlogger.JsonFormatter):
         # Sanitize extra fields
         if 'extra' in log_record:
             log_record['extra'] = sanitize_dict(log_record['extra'])
+
+        # Remove taskName if present
+        log_record.pop('taskName', None)
 
         return super().process_log_record(log_record)
 
@@ -34,7 +37,11 @@ def setup_logger():
         logging.Logger: Configured logger object.
     """
     log_level = os.environ.get('LOG_LEVEL', 'INFO').upper()
-    logger = logging.getLogger()
+
+    # Set root logger to WARNING
+    logging.basicConfig(level=logging.ERROR)
+
+    logger = logging.getLogger('Compage_AI_Backend')
     logger.setLevel(log_level)
 
     handler = logging.StreamHandler()
@@ -44,6 +51,12 @@ def setup_logger():
     )
     handler.setFormatter(formatter)
     logger.addHandler(handler)
+
+    # Set specific loggers for external libraries to a higher level
+    logging.getLogger('langchain').setLevel(logging.ERROR)
+    logging.getLogger('openai').setLevel(logging.ERROR)
+
+    logger.propagate = False
 
     return logger
 
