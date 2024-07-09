@@ -284,7 +284,7 @@ class ArchitectAgent:
         if not response['is_add_info_needed']:
             self.add_message((
                 ChatRoles.USER.value,
-                f"{self.agent_name}: {phase} prepared."
+                f"{self.agent_name}: {phase} is now ready and prepared."
             ))
             self.state['requirements_overview'][key] = response['content']
 
@@ -293,7 +293,7 @@ class ArchitectAgent:
         else:
             self.add_message((
                 ChatRoles.USER.value,
-                f"{self.agent_name}: {phase} has requested for additional information."
+                f"{self.agent_name}: Additional information has been requested by {phase}."
             ))
             self.request_for_additional_info(response)
 
@@ -413,7 +413,7 @@ class ArchitectAgent:
         """
         print(f"----{self.agent_name}: Commencing generation of Requirements Document----")
 
-        if not self.has_error_occured:
+        if (not self.has_error_occured) and (not self.is_additional_info_requested):
             state['requirements_overview'] = {}
             self.generation_step = 0
             
@@ -711,7 +711,7 @@ class ArchitectAgent:
 
             self.add_message((
                 ChatRoles.USER.value,
-                self.error_message
+                f"{self.agent_name}: {self.error_message}"
             ))
 
         return {**self.state}
@@ -764,7 +764,7 @@ class ArchitectAgent:
 
             self.add_message((
                 ChatRoles.USER.value,
-                message_text
+                f"{self.agent_name}: {message_text}"
             ))
 
             self.is_additional_info_provided = True
@@ -774,7 +774,7 @@ class ArchitectAgent:
 
             self.add_message((
                 ChatRoles.USER.value,
-                self.error_message
+                f"{self.agent_name}: {self.error_message}"
             ))
 
         return {**self.state}

@@ -34,7 +34,8 @@ class ArchitectPrompts:
     additional_info_prompt: PromptTemplate = PromptTemplate(
         template="""
         As a Solution Architect, you have previously prepared comprehensive requirements documents 
-        for your team members to work on the project.
+        for your team members to work on the project. You should not answer anything out of the 
+        provided context.
 
         We would appreciate your response to the following question:
         '{question}'
