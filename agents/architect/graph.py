@@ -141,4 +141,5 @@ class ArchitectGraph:
             ArchitectState: The current state of the Architect agent.
         """
         
-        return self.agent.current_state
+        return self.agent.state
+    
