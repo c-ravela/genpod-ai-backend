@@ -51,7 +51,8 @@ class RAGAgent():
         # print("----RETRIEVE----")
         logger.info("----RETRIEVE----")
         question = state["question"]
-        self.max_hallucination = state['max_hallucination']
+        if self.max_hallucination is None:
+            self.max_hallucination = state['max_hallucination']
 
         # Retrieval
         documents = self.retriever.get_relevant_documents(question)
