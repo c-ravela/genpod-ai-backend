@@ -11,7 +11,7 @@ class PlannerPrompts():
         Feedback: {feedback}
 
         Give a Deliverable and Additional context, you should return the output similar to the example_output below.
-        example_output: ['workpackage1','workpackage2','workpackage3']
+        example_output: "['workpackage1','workpackage2','workpackage3']"
 
         Provide the list of backlog tasks exactly as the example output format above for this deliverable.
 
