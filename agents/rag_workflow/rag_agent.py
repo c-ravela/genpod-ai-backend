@@ -36,7 +36,7 @@ class RAGAgent():
         )
 
         self.state = {}
-        self.max_halucination = None
+        self.max_hallucination = None
         
     def retrieve(self, state: RAGState):
         """
