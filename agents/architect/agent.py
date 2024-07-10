@@ -281,6 +281,7 @@ class ArchitectAgent:
         """
         print(f"----{self.agent_name}: Modifying key: {key} in requirements overview----")
 
+        
         if not response['is_add_info_needed']:
             self.add_message((
                 ChatRoles.USER.value,
@@ -345,6 +346,8 @@ class ArchitectAgent:
 
         if self.has_error_occured:
             return self.last_visited_node
+        elif self.is_additional_info_requested:
+            return self.update_state_node_name
         elif self.mode == "document_generation":
             if not self.is_requirements_document_generated:
                 return self.requirements_node_name
@@ -391,7 +394,7 @@ class ArchitectAgent:
 
         print(f"----{self.agent_name}: Initiating Graph Entry Point----")
 
-        self.update_state(state)
+        self.state={**state}
         self.last_visited_node = self.entry_node_name
 
         if self.state['project_status'] == PStatus.INITIAL.value:
@@ -417,7 +420,7 @@ class ArchitectAgent:
             state['requirements_overview'] = {}
             self.generation_step = 0
             
-        self.update_state(state)
+        self.state={**state}
         self.last_visited_node = self.requirements_node_name
         self.is_additional_info_requested = False
 
@@ -434,7 +437,7 @@ class ArchitectAgent:
                 ))
 
                 response: TaskOutput = self.project_overview_chain.invoke({
-                    "user_request": f"{self.state['user_request']}\n",
+                    "user_request": f"{self.state['user_request']}",
                     "task_description": f"{self.state['current_task'].description}",
                     "additional_information": f"{self.state['current_task'].additional_info}"
                 })
@@ -448,7 +451,7 @@ class ArchitectAgent:
                 ))
 
                 response: TaskOutput = self.architecture_chain.invoke({
-                    "project_overview": f"{self.state['requirements_overview']['project_details']}\n",
+                    "project_overview": f"{self.state['requirements_overview']['project_details']}",
                 })
 
                 self.handle_requirements_overview(response)
@@ -460,8 +463,8 @@ class ArchitectAgent:
                 ))
 
                 response: TaskOutput = self.folder_structure_chain.invoke({
-                    "project_overview": f"{self.state['requirements_overview']['project_details']}\n",
-                    "architecture": f"{self.state['requirements_overview']['architecture']}\n",
+                    "project_overview": f"{self.state['requirements_overview']['project_details']}",
+                    "architecture": f"{self.state['requirements_overview']['architecture']}",
                 })
 
                 self.handle_requirements_overview(response)
@@ -473,8 +476,8 @@ class ArchitectAgent:
                 ))
 
                 response: TaskOutput = self.microservice_design_chain.invoke({
-                    "project_overview": f"{self.state['requirements_overview']['project_details']}\n",
-                    "architecture": f"{self.state['requirements_overview']['architecture']}\n",
+                    "project_overview": f"{self.state['requirements_overview']['project_details']}",
+                    "architecture": f"{self.state['requirements_overview']['architecture']}",
                 })
 
                 self.handle_requirements_overview(response)
@@ -486,9 +489,9 @@ class ArchitectAgent:
                 ))
 
                 response: TaskOutput = self.tasks_breakdown_chain.invoke({
-                    "project_overview": f"{self.state['requirements_overview']['project_details']}\n",
-                    "architecture": f"{self.state['requirements_overview']['architecture']}\n",
-                    "microservice_design": f"{self.state['requirements_overview']['microservice_design']}\n",
+                    "project_overview": f"{self.state['requirements_overview']['project_details']}",
+                    "architecture": f"{self.state['requirements_overview']['architecture']}",
+                    "microservice_design": f"{self.state['requirements_overview']['microservice_design']}",
                 })
 
                 self.handle_requirements_overview(response)
@@ -501,7 +504,7 @@ class ArchitectAgent:
 
                 response: TaskOutput = self.standards_chain.invoke({
                     "user_request": f"{self.state['user_request']}\n",
-                    "task_description": f"{self.state['requirements_overview']['task_description']}\n",
+                    "task_description": f"{self.state['requirements_overview']['task_description']}",
                 })
 
                 self.handle_requirements_overview(response)
@@ -514,8 +517,8 @@ class ArchitectAgent:
 
                 response: TaskOutput = self.implementation_details_chain.invoke({
                 "architecture": f"{self.state['requirements_overview']['architecture']}\n",
-                "microservice_design": f"{self.state['requirements_overview']['microservice_design']}\n",
-                "folder_structure": f"{self.state['requirements_overview']['folder_structure']}\n",
+                "microservice_design": f"{self.state['requirements_overview']['microservice_design']}",
+                "folder_structure": f"{self.state['requirements_overview']['folder_structure']}",
                 })
 
                 self.handle_requirements_overview(response)
@@ -527,14 +530,15 @@ class ArchitectAgent:
                 ))
 
                 response: TaskOutput = self.license_legal_chain.invoke({
-                    "user_request": f"{self.state['user_request']}\n",
-                    "license_text": f"{self.state['license_text']}\n",
+                    "user_request": f"{self.state['user_request']}",
+                    "license_text": f"{self.state['license_text']}",
                 })
 
                 
                 self.handle_requirements_overview(response)
 
-            self.is_requirements_document_generated = True
+            if self.generation_step == 8:
+                self.is_requirements_document_generated = True
         except Exception as e:
             self.has_error_occured = True
             self.error_message = f"An error occurred while processing the request: {str(e)}"
@@ -561,7 +565,7 @@ class ArchitectAgent:
 
         print(f"----{self.agent_name}: Commencing the process of writing requirements documents to local filesystem----")
 
-        self.update_state(state)
+        self.state={**state}
 
         document = self.generate_requirements_document()
         if len(document) < 0:
@@ -610,7 +614,7 @@ class ArchitectAgent:
         print(f"----{self.agent_name}: Initiating the process of Tasks Separation----")
 
         self.last_visited_node = self.tasks_separation_node_name
-        self.update_state(state)
+        self.state={**state}
 
         try:
             task_seperation_solution = self.task_seperation_chain.invoke({
@@ -680,7 +684,7 @@ class ArchitectAgent:
 
         print(f"----{self.agent_name}: Initiating the process of gathering project details----")
 
-        self.update_state(state)
+        self.state={**state}
         self.last_visited_node = self.project_details_node_name
 
         self.add_message((
@@ -740,7 +744,7 @@ class ArchitectAgent:
         
         print(f"----{self.agent_name}: Working on gathering additional information----")
 
-        self.update_state(state)
+        self.state={**state}
         self.last_visited_node = self.additional_info_node_name
 
         self.add_message((
