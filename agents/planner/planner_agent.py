@@ -139,8 +139,8 @@ class PlannerAgent():
                     # Let's clean the response to remove json prefix that llm sometimes appends to the actual text
                     # Strip whitespace from the beginning and end
                     cleaned_response = response.content.strip()
-                     # Remove single-line comments
-                    # cleaned_response = re.sub(r'//.*$', '', cleaned_response, flags=re.MULTILINE)
+                    # Remove single-line comments
+                    cleaned_response = re.sub(r'//.*$', '', cleaned_response, flags=re.MULTILINE)
                     # Remove multi-line comments
                     # cleaned_response = re.sub(r'/\*.*?\*/', '', cleaned_response, flags=re.DOTALL)
                     
