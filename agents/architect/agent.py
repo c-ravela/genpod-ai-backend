@@ -533,7 +533,8 @@ class ArchitectAgent:
 
                 
                 self.handle_requirements_overview(response)
-        
+
+            self.is_requirements_document_generated = True
         except Exception as e:
             self.has_error_occured = True
             self.error_message = f"An error occurred while processing the request: {str(e)}"
@@ -542,8 +543,6 @@ class ArchitectAgent:
                 ChatRoles.USER.value,
                 f"{self.agent_name}: {self.error_message}"
             ))
-
-        self.is_requirements_document_generated = True
 
         return {**self.state}
 
