@@ -36,6 +36,7 @@ class RAGAgent():
         )
 
         self.state = {}
+        self.max_halucination = None
         
     def retrieve(self, state: RAGState):
         """
@@ -50,6 +51,7 @@ class RAGAgent():
         # print("----RETRIEVE----")
         logger.info("----RETRIEVE----")
         question = state["question"]
+        self.max_hallucination = state['max_hallucination']
 
         # Retrieval
         documents = self.retriever.get_relevant_documents(question)
@@ -66,10 +68,12 @@ class RAGAgent():
             state (dict): New key added to state, generation, that contains LLM generation
         """
         # print("----GENERATE----")
+        
         logger.info("----GENERATE----")
         question = state["question"]
         documents = state["documents"]
         state['query_answered'] = True
+        
 
         # RAG generation
         generation = self.rag_generation_chain.invoke({"context": documents, "question": question})
@@ -122,6 +126,12 @@ class RAGAgent():
             state['generation'] = "I don't have any additional information about the question."
             state['query_answered'] = False
             return {**state, "next":"update_state"}
+        
+        if self.max_hallucination == 0:
+            state['generation'] = "Model is hallucinating with too many inaccuracies."
+            state['query_answered'] = False
+            return {**state, "next":"update_state"}
+        
 
         # print("----TRANSFORM QUERY----")
         logger.info("----TRANSFORM QUERY----")
@@ -205,7 +215,11 @@ class RAGAgent():
         else:
             # print("----DECISION: GENERATION IS NOT GROUNDED IN DOCUMENTS, RE-TRY----")
             logger.info("----DECISION: GENERATION DOES NOT ADDRESS QUESTION----")
-            return "not supported"
+            self.max_hallucination -= 1
+            if self.max_hallucination == 0:
+                return "not useful"
+            else:
+                return "not supported"
     
     def update_state(self, state: RAGState):
         self.state = {**state}
