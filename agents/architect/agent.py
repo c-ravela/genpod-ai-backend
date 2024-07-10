@@ -396,7 +396,8 @@ class ArchitectAgent:
 
         self.state={**state}
         self.last_visited_node = self.entry_node_name
-
+        self.is_additional_info_requested = False
+        
         if self.state['project_status'] == PStatus.INITIAL.value:
             self.mode = "document_generation"
         elif self.state["current_task"].task_status.value == Status.AWAITING.value:
