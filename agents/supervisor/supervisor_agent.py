@@ -2,6 +2,7 @@ from agents.supervisor.supervisor_state import SupervisorState
 from agents.architect.graph import ArchitectGraph
 from agents.rag_workflow.rag_graph import RAGWorkFlow
 from agents.planner.planner_graph import PlannerWorkFlow
+from agents.coder.graph import CoderGraph
 from models.constants import Status, PStatus
 from models.models import Task
 from typing import Dict, List, Union, Tuple
@@ -142,9 +143,10 @@ class SupervisorAgent():
             elif member=='Planner':
                 self.team_members[member] = PlannerWorkFlow(ChatOpenAI(model="gpt-4o-2024-05-13", temperature=0.3, max_retries=5, streaming=True, seed=4000, top_p=0.6),
                                                             thread_id=self.memberids[member])
+            elif member=='Coder':
+                self.team_members[member] = CoderGraph(ChatOpenAI(model="gpt-4o-2024-05-13", temperature=0.3, max_retries=5, streaming=True, seed=4000, top_p=0.4))
+
             else:
-                # TODO: Implement other team members' graph instantiation here.
-                # For now, skip other team members.
                 continue
 
         # state['team_members'] = {**self.team_members}
@@ -310,7 +312,7 @@ class SupervisorAgent():
         message = ('Assistant', 'Calling Architect Agent')
         state['messages'] += [message]
         logger.info("---------- Calling Coder ----------")
-        coder_result = self.team_members['Coder'].planner_app.invoke({**state['coder_inputs']},
+        coder_result = self.team_members['Coder'].app.invoke({**state['coder_inputs'],'messages':[]},
                                                                      {'configurable':{'thread_id':self.memberids['Coder']}})
         # coder_state = self.team_members['Coder'].get_state()
 
