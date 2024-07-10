@@ -706,7 +706,7 @@ class ArchitectAgent:
                 raise KeyError(f"Missing keys: {missing_keys} in the response. Try Again!")
 
             self.state['project_name'] = response['project_name']
-            self.state['project_folder_strucutre'] = response['project_folder_structure']
+            self.state['project_folder_structure'] = response['project_folder_structure']
           
             self.add_message((
                 ChatRoles.USER.value,

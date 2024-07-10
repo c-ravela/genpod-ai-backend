@@ -254,7 +254,7 @@ class SupervisorAgent():
                 
                 # Lets extract the coder_inputs from the architect's final state
                 # TODO: We want to be able to ask each agent what they need as input to start working that way we don't need to hardcode it this way.
-                coder_inputs_needed = ['generated_project_path', 'license_text', 'license_url', 'project_name', 'project_folder_strucutre', 'requirements_overview']
+                coder_inputs_needed = ['generated_project_path', 'license_text', 'license_url', 'project_name', 'project_folder_structure', 'requirements_overview']
                 state['coder_inputs'] = {}
                 for needed_input in coder_inputs_needed:
                     if needed_input in architect_result.keys():
