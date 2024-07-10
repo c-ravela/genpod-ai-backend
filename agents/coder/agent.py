@@ -123,8 +123,10 @@ class CoderAgent:
         Args:
             message (tuple[str, str]): The message to be added.
         """
-
-        self.state['messages'] += [message]
+        if self.state['messages'] is None:
+            self.state['messages'] = [message]
+        else:
+            self.state['messages'] += [message]
 
     def router(self, state: CoderState) -> str:
         """
@@ -293,7 +295,6 @@ class CoderAgent:
                 f"{self.agent_name}: {self.error_message}"
             ))
         
-        pp.pp(llm_response)
         return {**self.state}
 
     def run_commands_node(self, state: CoderState) -> CoderState:
