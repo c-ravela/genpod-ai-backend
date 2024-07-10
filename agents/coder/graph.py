@@ -56,7 +56,7 @@ class CoderGraph:
             self.agent.router,
             {
                 self.agent.code_generation_node_name: self.agent.code_generation_node_name,
-                self.agent.run_commands_node_name: self.agent.run_commands_node_name,
+                self.agent.write_generated_code_node_name: self.agent.write_generated_code_node_name,
                 self.agent.update_state_node_name:self.agent.update_state_node_name
             }
         )
