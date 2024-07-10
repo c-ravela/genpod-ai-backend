@@ -1,6 +1,7 @@
 """Coder Agent
 """
 
+import os
 from langchain_openai import ChatOpenAI
 from langchain_community.chat_models import ChatOllama
 
@@ -32,6 +33,8 @@ from tools.code import CodeFileWriter
 from typing_extensions import Union
 from typing_extensions import Literal
 
+from utils.logs.logging_utils import logger
+
 import pprint as pp
 
 class CoderAgent:
@@ -47,10 +50,6 @@ class CoderAgent:
     download_license_node_name: str 
     add_license_node_name: str 
     update_state_node_name: str 
-
-    # tools used by this agent
-    tools: list[StructuredTool]
-    toolExecutor: ToolExecutor
 
     mode: Literal["code_generation"]
 
@@ -90,13 +89,6 @@ class CoderAgent:
         self.download_license_node_name = "download_license"
         self.add_license_node_name = "add_license_text"
         self.update_state_node_name = "state_update"
-        
-        self.tools = [
-            CodeFileWriter.write_generated_code_to_file,
-            Git.create_git_repo,
-            Shell.execute_command
-        ]
-        self.toolExecutor = ToolExecutor(self.tools)
 
         self.mode = ""
 
@@ -124,7 +116,6 @@ class CoderAgent:
             | JsonOutputParser()
         )
 
-
     def add_message(self, message: tuple[str, str]) -> None:
         """
         Adds a single message to the messages field in the state.
@@ -144,6 +135,10 @@ class CoderAgent:
         elif self.mode == "code_generation":
             if not self.is_code_generated:
                 return self.code_generation_node_name
+            # elif not self.has_command_execution_finished:
+            #     return self.run_commands_node_name
+            elif not self.has_code_been_written_locally:
+                return self.write_generated_code_node_name
             elif not self.is_license_file_downloaded:
                 return self.download_license_node_name
             elif not self.is_license_text_added_to_files:
@@ -161,12 +156,48 @@ class CoderAgent:
         Returns:
             ArchitectState: The updated state of the agent.
         """
-        print(f"----{self.agent_name}: Proceeding with state update----")
+        logger.info(f"----{self.agent_name}: Proceeding with state update----")
         
         self.state = {**state}
 
         return {**self.state}
     
+    def update_state_code_generation(self, current_cg: CodeGeneration) -> None:
+        """
+        """
+
+        if self.state['files_created'] is None:
+            self.state['files_created'] = current_cg['files_to_create']
+        else:
+            new_list = [item for item in current_cg['files_to_create'] if item not in self.state['files_created']]
+
+            self.state['files_created'] += new_list
+        
+        if self.state['code'] is None:
+            self.state["code"] = current_cg['code']
+        else:
+            state_ifc = current_cg['code'].copy()
+
+            for key in state_ifc:
+                if key in self.state['code']:
+                    del current_cg['code'][key]
+
+        if self.state['infile_license_comments'] is None:
+            self.state['infile_license_comments'] = current_cg['infile_license_comments']
+        else:
+            state_ifc = current_cg['infile_license_comments'].copy()
+
+            for key in state_ifc:
+                if key in self.state['infile_license_comments']:
+                    del current_cg['infile_license_comments'][key]
+            
+            self.state['infile_license_comments'].update(current_cg['infile_license_comments'])
+
+        if self.state['commands_to_execute'] is None:
+            self.state['commands_to_execute'] = current_cg['commands_to_execute']
+        else:
+            self.state['commands_to_execute'].update(current_cg['commands_to_execute'])
+
     def entry_node(self, state: CoderState) -> CoderState:
         """
         This method is the entry point of the Coder agent. It updates the current state 
@@ -180,8 +211,8 @@ class CoderAgent:
             CoderState: The updated state of the coder.
         """
 
-        print(f"----{self.agent_name}: Initiating Graph Entry Point----")
-
+        logger.info(f"----{self.agent_name}: Initiating Graph Entry Point----")
+        # logger.info(f"received  state {state}")
         self.update_state(state)
         self.last_visited_node = self.entry_node_name
 
@@ -200,14 +231,14 @@ class CoderAgent:
     def code_generation_node(self, state: CoderState) -> CoderState:
         """
         """
-        print(f"----{self.agent_name}: Initiating Code Generation----")
+        logger.info(f"----{self.agent_name}: Initiating Code Generation----")
 
         self.update_state(state)
         self.last_visited_node = self.code_generation_node_name
 
         task = self.state["current_task"]
 
-        print(f"----{self.agent_name}: Started working on the task: {task.description}.----")
+        logger.info(f"----{self.agent_name}: Started working on the task: {task.description}.----")
   
         self.add_message((
             ChatRoles.USER.value,
@@ -234,12 +265,16 @@ class CoderAgent:
                 raise KeyError(f"Missing keys: {missing_keys} in the response. Try Again!")
 
             # TODO: Need to update these to the state such that it holds the past tasks following field details along current task with no duplicates.
+          
+            self.update_state_code_generation(llm_response)
+
             # TODO: maintian class variable (local to class) to hold the current task's CodeGeneration object so that we are not gonna pass any extra
             # details to the code generation prompt - look self.current_code_generation
-            self.state["code"] = llm_response['code']
-            self.state["files_created"] = llm_response['files_to_create']
-            self.state['infile_license_comments'] = llm_response['infile_license_comments']
-            self.state['commands_to_execute'] = llm_response['commands_to_execute']
+
+            self.current_code_generation["code"] = llm_response['code']
+            self.current_code_generation["files_created"] = llm_response['files_to_create']
+            self.current_code_generation['infile_license_comments'] = llm_response['infile_license_comments']
+            self.current_code_generation['commands_to_execute'] = llm_response['commands_to_execute']
 
             self.add_message((
                 ChatRoles.USER.value,
@@ -248,7 +283,7 @@ class CoderAgent:
 
             self.is_code_generated = True
         except Exception as e:
-            print(f"----{self.agent_name}: Error Occured at code generation: {str(e)}.----")
+            logger.error(f"----{self.agent_name}: Error Occured at code generation: {str(e)}.----")
 
             self.hasError = True
             self.error_message = f"An error occurred while processing the request: {str(e)}"
@@ -264,33 +299,145 @@ class CoderAgent:
     def run_commands_node(self, state: CoderState) -> CoderState:
         """
         """
+        logger.info(f"----{self.agent_name}: Executing the commands ----")
+        #updating the state 
+        self.update_state(state)
+        self.last_visited_node = self.run_commands_node_name
 
         # TODO: Add logic for command execution. use self.current_code_generation
         # run one command at a time from the dictionary of commands to execute.
         # Need to add error handling prompt for this node.
         # When command execution fails llm need to re try with different commands
         # look into - Shell.execute_command, whitelisted commands for llm to pick
-        self.has_command_execution_finished = True
-        
+
+        #executing the commands one by one 
+        try:
+            for path, command in self.current_code_generation['commands_to_execute'].items():
+                
+                logger.info(f"----{self.agent_name}: Started executing the command: {command}, at the path: {path}.----")
+    
+                self.add_message((
+                    ChatRoles.USER.value,
+                    f"Started executing the command: {command}, in the path: {path}."
+                ))
+                execution_result=Shell.execute_command.invoke({
+                    "command": command,
+                    "repo_path": path
+                })
+                #if the command is successfully executed, run the next command 
+                if execution_result[0]==False:
+                    self.add_message((
+                    ChatRoles.USER.value,
+                    f"Successfully executed the command: {command}, in the path: {path}. The output of the command execution is {execution_result[1]}"
+                ))
+                    #if there is any error in the command execution log the error in the error_message and return the state to router by marking the has error as true and 
+                    #last visited node as code generation node to generate the code and commands again, with out running the next set of commands.
+                elif execution_result[0]==True:
+                    
+                    self.hasError=True
+                    self.last_visited_node = self.code_generation_node_name
+                    self.error_message= f"Error Occured while executing the command: {command}, in the path: {path}. The output of the command execution is {execution_result[1]}. This is the dictionary of commands and the paths where the respective command are supposed to be executed you have generated in previous run: {self.current_code_generation['commands_to_execute']}"
+                    self.add_message((
+                    ChatRoles.USER.value,
+                    f"{self.agent_name}: {self.error_message}"
+                ))
+                    logger.error(self.error_message)
+                    # return {**self.state}
+            
+            self.has_command_execution_finished = True
+        except Exception as e:
+            logger.error(f"----{self.agent_name}: Error Occured while executing the commands : {str(e)}.----")
+
+            self.hasError = True
+            self.error_message = f"An error occurred while processing the request: {str(e)}"
+
+            self.add_message((
+                ChatRoles.USER.value,
+                f"{self.agent_name}: {self.error_message}"
+            ))
         return {**self.state}
     
     def write_code_node(self, state: CoderState) -> CoderState:
         """
         """
-
         # TODO: Add logic to write code to local. use self.current_code_generation.code
         # just simply run wrire_generated_code_to_local tool to achieve this
         # need to look for the case when code is empty.
         # key and value of the code dict are the parameters for tool
-        self.has_code_been_written_locally = True
+
+        logger.info(f"----{self.agent_name}: Writing the generated code to the respective files in the specified paths ----")
+
+        self.update_state(state)
+        self.last_visited_node = self.write_generated_code_node_name
+
+        try:
+            for path, code in self.current_code_generation['code'].items():
+                
+                logger.info(f"----{self.agent_name}: Started writing the code to the file at the path: {path}.----")
+    
+                self.add_message((
+                    ChatRoles.USER.value,
+                    f"Started writing the code to the file in the path: {path}."
+                ))
+                execution_result=CodeFileWriter.write_generated_code_to_file.invoke({
+                    "generated_code": code,
+                    "file_path": path
+                })
+
+                #if the code successfully stored in the specifies path, write the next code in the file
+                if execution_result[0]==False:
+                    self.add_message((
+                    ChatRoles.USER.value,
+                    f"Successfully executed the command: , in the path: {path}. The output of the command execution is {execution_result[1]}"
+                ))
+                    
+                    #if there is any error in writing the code to the files log the error in the error_message and return the state to router by marking the has error as true and 
+                    #last visited node as code generation node to generate the code and, with out running the next set of writing the files.
+                elif execution_result[0]==True:
+                    
+                    self.hasError=True
+                    self.last_visited_node = self.code_generation_node_name
+                    self.error_message= f"Error Occured while writing the code in the path: {path}. The output of writing the code to the file is {execution_result[1]}."
+                    self.add_message((
+                    ChatRoles.USER.value,
+                    f"{self.agent_name}: {self.error_message}"
+                ))
+                logger.error(self.error_message)
+
+            self.has_code_been_written_locally = True
+        except Exception as e:
+            logger.error(f"----{self.agent_name}: Error Occured while writing the code to the respective files : {str(e)}.----")
+
+            self.hasError = True
+            self.error_message = f"An error occurred while processing the request: {str(e)}"
+
+            self.add_message((
+                ChatRoles.USER.value,
+                f"{self.agent_name}: {self.error_message}"
+            ))
 
         return {**self.state}
     
     def download_license_node(self, state: CoderState) -> CoderState:
         """
         """
+        logger.info(f"----{self.agent_name}: downloading the license file from the given location {self.state['license_url']} ----")
+
+        self.update_state(state)
+        self.last_visited_node = self.download_license_node_name
+
+        license_download_result=License.download_license_file.invoke({
+            "url": self.state["license_url"], 
+            "file_path": os.path.join(self.state["generated_project_path"], self.state["project_name"], "license")
+        })
+
+        self.add_message((
+                    ChatRoles.USER.value,
+                    f"Downloaded the license from the {self.state["license_url"]}. The output of the command execution is {license_download_result[1]}"
+                ))
 
         # TODO: from state pick the license url and user download_license tool to achieve this
+
         self.is_license_file_downloaded = True
 
         return {**self.state}
@@ -303,6 +450,27 @@ class CoderAgent:
         # use self.state['infile_license_text]
         # and only loop to add to the filepaths that self.current_code_generation.code.keys() has
         # or else there is chance for duplicating the license text to already written files.
+        logger.info("Edited the license of the files")
+
+        for path, code in self.current_code_generation['code'].items():
+
+            file_extension = os.path.splitext(path)[1]
+
+            if len(file_extension) <= 0:
+                continue
+        
+            file_comment = self.state['infile_license_comments'].get(file_extension, "")
+
+            if len(file_comment) > 0:
+
+                with open(path, 'r') as file:
+                    content = file.read()
+
+                with open(path, 'w') as file:
+                    file.write(file_comment + "\\n" + content)
+
         self.is_license_text_added_to_files = True
+        self.state['current_task'].task_status == Status.DONE
 
         return {**self.state}
+    
