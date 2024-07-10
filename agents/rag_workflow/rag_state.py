@@ -19,3 +19,4 @@ class RAGState(TypedDict):
     iteration_count: int
     next: str
     query_answered: bool
+    max_hallucination: int
