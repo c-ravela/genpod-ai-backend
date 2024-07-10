@@ -458,8 +458,8 @@ class CoderAgent:
 
             if len(file_extension) <= 0:
                 continue
-
-            file_comment = self.current_code_generation['infile_license_comments'][file_extension]
+        
+            file_comment = self.state['infile_license_comments'].get(file_extension, "")
 
             if len(file_comment) > 0:
 
