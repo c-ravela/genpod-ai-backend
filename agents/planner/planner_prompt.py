@@ -10,8 +10,7 @@ class PlannerPrompts():
         Additional context: {context}
         Feedback: {feedback}
 
-        Give a Deliverable and Additional context, you should return the output similar to the example_output below.
-        example_output: "['workpackage1','workpackage2','workpackage3']"
+        Given a Deliverable and Additional context, Please provide your response as a raw Python list, without any markdown formatting or code blocks. The output should look exactly like this, including the square brackets: "['item1', 'item2', 'item3']"
 
         Provide the list of backlog tasks exactly as the example output format above for this deliverable.
 

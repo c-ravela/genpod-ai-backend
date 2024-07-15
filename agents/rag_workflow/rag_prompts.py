@@ -11,7 +11,7 @@ class RAGPrompts():
         If the document contains keywords related to the user question, grade it as relevant. \n
         It does not need to be a stringent test. The goal is to filter out erroneous retrievals. \n
         Give a binary score 'yes' or 'no' score to indicate whether the document is relevant to the question. \n
-        Provide the binary score as a JSON with a single key 'score' and no premable or explanation.""",
+        Provide the binary score as a JSON with a single key 'score', without any markdown formatting or code blocks and no premable or explanation.""",
         input_variables=["question", "document"],
     )
 
@@ -24,7 +24,7 @@ class RAGPrompts():
         \n ------- \n
         Here is the answer: {generation}
         Give a binary score 'yes' or 'no' score to indicate whether the answer is grounded in / supported by a set of facts. \n
-        Provide the binary score as a JSON with a single key 'score' and no preamble or explanation.""",
+        Provide the binary score as a JSON with a single key 'score', without any markdown formatting or code blocks and no preamble or explanation.""",
         input_variables=["generation", "documents"],
     )
 
@@ -45,7 +45,7 @@ class RAGPrompts():
         \n ------- \n
         Here is the question: {question}
         Give a binary score 'yes' or 'no' to indicate whether the answer is useful to resolve a question. \n
-        Provide the binary score as a JSON with a single key 'score' and no preamble or explanation.""",
+        Provide the binary score as a JSON with a single key 'score', without any markdown formatting or code blocks and no preamble or explanation.""",
         input_variables=["generation", "question"],
     )
 

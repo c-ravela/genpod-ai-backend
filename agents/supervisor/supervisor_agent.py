@@ -187,7 +187,7 @@ class SupervisorAgent():
                 logger.debug("Cache miss for query: \n%s", question)
                 # result = your_rag_query_function(query)  # Replace with your actual RAG query function
             # return result
-                additional_info = self.team_members['RAG'].rag_app.invoke({'question': question,'iteration_count':self.rag_try_limit},{'configurable':{'thread_id':self.memberids['RAG']}})
+                additional_info = self.team_members['RAG'].rag_app.invoke({'question': question,'iteration_count':self.rag_try_limit, 'max_hallucination':3},{'configurable':{'thread_id':self.memberids['RAG']}})
                 result = additional_info['generation']
                 state['rag_query_answer'] = additional_info['query_answered']
                 self.rag_cache.add(question, result)
