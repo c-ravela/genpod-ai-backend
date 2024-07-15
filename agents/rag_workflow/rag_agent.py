@@ -224,4 +224,5 @@ class RAGAgent():
     
     def update_state(self, state: RAGState):
         self.state = {**state}
+        self.max_hallucination = state['max_hallucination']
         return {**state}
