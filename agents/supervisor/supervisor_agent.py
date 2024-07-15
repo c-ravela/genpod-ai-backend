@@ -94,7 +94,7 @@ class SupervisorAgent():
                     # print(f'----------RAG Agent Called to Query----------\n{req_query}')
                     logger.info('----------RAG Agent Called to Query----------')
                     logger.info("Query: %s", req_query)
-                    result = self.team_members['RAG'].rag_app.invoke({'question': req_query, 'iteration_count': self.rag_try_limit}, {'configurable': {'thread_id': self.memberids['RAG']}})
+                    result = self.team_members['RAG'].rag_app.invoke({'question': req_query, 'iteration_count': self.rag_try_limit, 'max_hallucination':3}, {'configurable': {'thread_id': self.memberids['RAG']}})
                     rag_response = result['generation']
                     self.rag_cache.add(req_query, rag_response)
                     # print(f'----------RAG Agent Response----------\n{rag_response}')
@@ -116,7 +116,7 @@ class SupervisorAgent():
                             logger.info("Follow-up: %s", follow_up_query)
                             
                             # Ask the follow-up query to the RAG agent
-                            follow_up_result = self.team_members['RAG'].rag_app.invoke({'question': follow_up_query, 'iteration_count': self.rag_try_limit}, {'configurable': {'thread_id': self.memberids['RAG']}})
+                            follow_up_result = self.team_members['RAG'].rag_app.invoke({'question': follow_up_query, 'iteration_count': self.rag_try_limit, 'max_hallucination':3}, {'configurable': {'thread_id': self.memberids['RAG']}})
                             follow_up_response = follow_up_result['generation']
                             self.rag_cache.add(follow_up_query, follow_up_response)
                             
@@ -393,7 +393,7 @@ class SupervisorAgent():
                 state['current_task'] = new_task
                 requirements_doc = ' '.join(str(value) for value in state['requirements_doc'].values())
                 state['current_task'].additional_info = requirements_doc + '\n' + state['rag_retrieval']
-                self.calling_agent = 'Supervisor'
+                self.called_agent = 'Supervisor'
                 return {**state}
         else:
             return {**state}
@@ -470,11 +470,11 @@ class SupervisorAgent():
         else:
             # print("----------Unable to handle Human Feedback currently so ending execution----------")
             logger.info("----------Unable to handle Human Feedback currently so ending execution----------")
-            exit()
+            # exit()
 
         # Process the input and update the state
         state.human_feedback = human_input
-        return state
+        return {**state}
 
     def update_state(self, state: SupervisorState):
         # TODO: Imple Update_state_mechanism
@@ -520,10 +520,12 @@ class SupervisorAgent():
             return 'call_architect'
         elif self.project_status==PStatus.EXECUTING.value and self.calling_agent!='Supervisor':
             return calling_map[self.calling_agent]
-        elif self.project_status==PStatus.EXECUTING.value and self.called_agent=='Architect':
+        elif self.project_status==PStatus.EXECUTING.value and (self.called_agent=='Architect' or self.called_agent=='Supervisor'):
             return 'call_planner'
-        elif self.project_status==PStatus.EXECUTING.value and self.called_agent=='Planner':
+        elif self.project_status==PStatus.EXECUTING.value and (self.called_agent=='Planner' or self.called_agent=='Coder'):
             return 'call_coder'
+        # elif self.project_status==PStatus.EXECUTING.value and self.called_agent=='Coder':
+        #     return 'call_coder'
         elif self.project_status==PStatus.HALTED.value:
             return 'Human'
 
