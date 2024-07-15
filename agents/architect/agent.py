@@ -443,6 +443,8 @@ class ArchitectAgent:
                     "additional_information": f"{self.state['current_task'].additional_info}"
                 })
 
+                self.has_error_occured = False
+                self.error_message = ""
                 self.handle_requirements_overview(response)
 
             if self.generation_step == 1: # 1. Architecture
@@ -455,6 +457,8 @@ class ArchitectAgent:
                     "project_overview": f"{self.state['requirements_overview']['project_details']}",
                 })
 
+                self.has_error_occured = False
+                self.error_message = ""
                 self.handle_requirements_overview(response)
 
             if self.generation_step == 2: # 2. Folder Structure
@@ -468,6 +472,8 @@ class ArchitectAgent:
                     "architecture": f"{self.state['requirements_overview']['architecture']}",
                 })
 
+                self.has_error_occured = False
+                self.error_message = ""
                 self.handle_requirements_overview(response)
 
             if self.generation_step == 3: # 3. Micro service Design
@@ -481,6 +487,8 @@ class ArchitectAgent:
                     "architecture": f"{self.state['requirements_overview']['architecture']}",
                 })
 
+                self.has_error_occured = False
+                self.error_message = ""
                 self.handle_requirements_overview(response)
 
             if self.generation_step == 4: # 4. Tasks Breakdown
@@ -495,6 +503,8 @@ class ArchitectAgent:
                     "microservice_design": f"{self.state['requirements_overview']['microservice_design']}",
                 })
 
+                self.has_error_occured = False
+                self.error_message = ""
                 self.handle_requirements_overview(response)
 
             if self.generation_step == 5: # 5. Standards
@@ -508,6 +518,8 @@ class ArchitectAgent:
                     "task_description": f"{self.state['requirements_overview']['task_description']}",
                 })
 
+                self.has_error_occured = False
+                self.error_message = ""
                 self.handle_requirements_overview(response)
 
             if self.generation_step == 6: # 6. Implementation Details
@@ -522,6 +534,8 @@ class ArchitectAgent:
                 "folder_structure": f"{self.state['requirements_overview']['folder_structure']}",
                 })
 
+                self.has_error_occured = False
+                self.error_message = ""
                 self.handle_requirements_overview(response)
 
             if self.generation_step == 7: # 7. License Details
@@ -535,7 +549,8 @@ class ArchitectAgent:
                     "license_text": f"{self.state['license_text']}",
                 })
 
-                
+                self.has_error_occured = False
+                self.error_message = ""
                 self.handle_requirements_overview(response)
 
             if self.generation_step == 8:
@@ -550,6 +565,7 @@ class ArchitectAgent:
             ))
 
         return {**self.state}
+
 
     def write_requirements_node(self, state: ArchitectState) -> ArchitectState:
         """

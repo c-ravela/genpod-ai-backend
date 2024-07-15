@@ -66,6 +66,8 @@ class CoderAgent:
 
     last_visited_node: str
     error_message: str
+    
+    track_add_license_txt: list[str]
 
     state: CoderState
     prompts: CoderPrompts
@@ -110,6 +112,7 @@ class CoderAgent:
 
         self.llm = llm
 
+        self.track_add_license_txt = []
         self.code_generation_chain = (
             self.prompts.code_generation_prompt
             | self.llm
@@ -454,21 +457,24 @@ class CoderAgent:
         logger.info("Edited the license of the files")
 
         for path, code in self.current_code_generation['code'].items():
+            
+            if path not in self.track_add_license_txt:
+                file_extension = os.path.splitext(path)[1]
 
-            file_extension = os.path.splitext(path)[1]
+                if len(file_extension) <= 0:
+                    continue
+            
+                file_comment = self.state['infile_license_comments'].get(file_extension, "")
 
-            if len(file_extension) <= 0:
-                continue
-        
-            file_comment = self.state['infile_license_comments'].get(file_extension, "")
+                if len(file_comment) > 0:
 
-            if len(file_comment) > 0:
+                    with open(path, 'r') as file:
+                        content = file.read()
 
-                with open(path, 'r') as file:
-                    content = file.read()
-
-                with open(path, 'w') as file:
-                    file.write(file_comment + "\\n" + content)
+                    with open(path, 'w') as file:
+                        file.write(file_comment + "\\n" + content)
+                    
+                    self.track_add_license_txt.append(path)
 
         self.is_license_text_added_to_files = True
         self.state['current_task'].task_status == Status.DONE
