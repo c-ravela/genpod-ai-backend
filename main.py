@@ -23,7 +23,7 @@ if __name__=="__main__":
     PROJECT_PATH = '/'
     SUPERVISOR = SupervisorWorkflow(LLM, VECTOR_DB_COLLECTIONS, SUPERVISOR_THREAD_ID, MEMBERS, THREAD_IDS, PROJECT_INPUT, RAG_TRY_LIMIT, PROJECT_PATH)
 
-    config = {"configurable":{"thread_id":SUPERVISOR_THREAD_ID}}
+    config = {"configurable":{"thread_id":SUPERVISOR_THREAD_ID,"recursion_limit":500}}
     result = SUPERVISOR.sup_app.invoke({"messages": [("Human", PROJECT_INPUT)],
                                         'license_url': LICENSE_URL,
                                         'license_text':LICENSE_TEXT},
