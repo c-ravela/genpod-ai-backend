@@ -477,7 +477,7 @@ class CoderAgent:
                     self.track_add_license_txt.append(path)
 
         self.is_license_text_added_to_files = True
-        self.state['current_task'].task_status == Status.DONE
+        self.state['current_task'].task_status = Status.DONE
 
         return {**self.state}
     
