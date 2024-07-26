@@ -2,7 +2,7 @@
 OUTPUT_PATH = $(CURDIR)/"output"
 
 # Define subdirectories within the output directory
-DB_FOLDER_NAME = "database"
+DB_FOLDER_NAME = "databases"
 OUTPUT_DB_PATH = $(OUTPUT_PATH)/$(DB_FOLDER_NAME)
 
 PROJECTS_FOLDER_NAME = "projects"
@@ -37,15 +37,15 @@ log-run:
 
 
 # Clean targets to remove generated files
-.PHONY: clean-logs clean-projects clean-database clean
+.PHONY: clean-logs clean-projects clean-databases clean
 
 clean-logs:
-	rm -rf $(OUTPUT_LOGS_PATH)
+	rm -rf $(OUTPUT_LOGS_PATH)/*
 
 clean-projects:
-	rm -rf $(OUTPUT_PROJECT_PATH)
+	rm -rf $(OUTPUT_PROJECT_PATH)/*
 
-clean-database:
-	rm -rf $(OUTPUT_DB_PATH)
+clean-databases:
+	rm -rf $(OUTPUT_DB_PATH)/*
 
-clean: clean-projects clean-database clean-logs
+clean: clean-projects clean-databases clean-logs
