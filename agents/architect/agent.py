@@ -565,7 +565,7 @@ class ArchitectAgent:
                 ChatRoles.USER.value,
                 f"{self.agent_name}: {self.error_message}"
             ))
-            logger.error(f"Exception: {type(e)} -> {self.agent_name}: {self.error_message}")
+            logger.error(f"Exception: {type(e)} --> {self.agent_name}: {self.error_message}")
 
         return {**self.state}
 
@@ -638,7 +638,7 @@ class ArchitectAgent:
 
         try:
             task_seperation_solution = self.task_seperation_chain.invoke({
-                "tasks": self.state['tasks'],
+                "tasks": self.state['requirements_overview']['task_description'],
                 "error_message": self.error_message
             })
             
@@ -649,10 +649,10 @@ class ArchitectAgent:
 
             if not isinstance(tasks, list):
                 raise TypeError(f"Expected 'tasks' to be of type list but received {type(tasks).__name__}.")
-          
+
             if not tasks:
-                raise ValueError("The 'tasks' list in the received in previous response is empty.")
-            
+                raise ValueError(f"The 'tasks' list received from the previous response is empty. Received: {tasks}, Expected: Non empty list of strings.")
+   
             self.state['tasks'] = self.create_tasks_list(tasks)
 
             self.are_tasks_seperated = True
@@ -669,7 +669,7 @@ class ArchitectAgent:
                 ChatRoles.USER.value,
                 f"{self.agent_name}: {self.error_message}"
             ))
-            logger.error(f"Exception: {type(ve)} -> {self.agent_name}: {self.error_message}")
+            logger.error(f"Exception: {type(ve)} --> {self.agent_name}: {self.error_message}")
         except TypeError as te:
             self.has_error_occured = True
             self.error_message = f"TypeError occurred: {te}"
@@ -678,7 +678,7 @@ class ArchitectAgent:
                 ChatRoles.USER.value,
                 f"{self.agent_name}: {self.error_message}"
             ))
-            logger.error(f"Exception: {type(te)} -> {self.agent_name}: {self.error_message}")
+            logger.error(f"Exception: {type(te)} --> {self.agent_name}: {self.error_message}")
         except Exception as e:
             self.has_error_occured = True
             self.error_message = f"An unexpected error occurred: {e}"
@@ -687,7 +687,7 @@ class ArchitectAgent:
                 ChatRoles.USER.value,
                 f"{self.agent_name}: {self.error_message}" 
             ))           
-            logger.error(f"Exception: {type(e)} -> {self.agent_name}: {self.error_message}")
+            logger.error(f"Exception: {type(e)} --> {self.agent_name}: {self.error_message}")
 
         return {**self.state}
 
@@ -748,7 +748,7 @@ class ArchitectAgent:
                 f"{self.agent_name}: {self.error_message}"
             ))
 
-            logger.error(f"Exception: {type(e)} -> {self.agent_name}: {self.error_message}")
+            logger.error(f"Exception: {type(e)} --> {self.agent_name}: {self.error_message}")
 
         return {**self.state}
     
@@ -813,6 +813,6 @@ class ArchitectAgent:
                 f"{self.agent_name}: {self.error_message}"
             ))
 
-            logger.error(f"Exception: {type(e)} -> {self.agent_name}: {self.error_message}")
+            logger.error(f"Exception: {type(e)} --> {self.agent_name}: {self.error_message}")
             
         return {**self.state}
