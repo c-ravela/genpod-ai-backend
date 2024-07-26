@@ -29,19 +29,20 @@ class PlannerPrompts():
         Feedback: {feedback}
 
         Instructions:
-        - If you have enough information, provide the detailed technical requirements as a JSON object with the following structure. Avoid adding generic comments within the JSON Object and use strict json format to add comments about any object:
+        - Below is a sample requirements document for the project. This serves as a reference. If you have enough information, provide the detailed technical requirements as a JSON object with the following structure. Avoid adding generic comments within the JSON Object and use strict json format to add comments about any object:
         {{
             "description": "Detailed description of the task",
             "name": "Name of the service or component",
             "language": "Programming language to be used",
             "restConfig": {{
             "server": {{
-                "sqlDB": "Database type",
-                "port": "Port number",
+                "DB": "Database type",
+                "uri_string": "<connection string>",
+                "port": "<Port number>",
                 "resources": [
                 {{
                     "name": "Resource name",
-                    "allowedMethods": ["POST", "LIST", "GET", "PUT", "DELETE"],
+                    "allowedMethods": [<list of http methods>],
                     "fields": {{
                     "FieldName": {{
                         "datatype": "Data type of the field"
@@ -54,8 +55,8 @@ class PlannerPrompts():
             }},
             "framework": "Framework to be used"
             }},
-            "LICENSE_URL": "URL to the license",
-            "LICENSE_TEXT": "Text of the license"
+            "LICENSE_URL": "URL to the license file as it is from the input",
+            "LICENSE_TEXT": "Text of the license as it is from the input"
         }}
 
         - If you need more information, respond with a JSON object containing a single detailed question that can be used to retrieve additional information from RAG or can be asked to the Architect of the project:
