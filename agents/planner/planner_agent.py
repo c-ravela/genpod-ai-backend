@@ -35,7 +35,7 @@ class PlannerAgent():
         self.backlog_requirements = {}
         self.file_count = 0
 
-    def write_workpackages_to_files(self, backlog_dict, output_dir):
+    def write_workpackages_to_files(self, backlog_dict, output_dir) -> tuple[int, int]:
         """
         Write work packages from a dictionary to individual JSON files.
 
@@ -48,12 +48,13 @@ class PlannerAgent():
         """
         if not backlog_dict:
             logger.info("----Workpackage not present----")
-            return 0
+            return 0, self.file_count
 
         logger.info("----Writing Workpackages to Project Docs Folder----")
         work_packages_dir = os.path.join(output_dir, "docs", "work_packages")
         os.makedirs(work_packages_dir, exist_ok=True)
 
+        session_file_count = 0
         for key, value in backlog_dict.items():
             work_package = {'work_package_name': key, **value}
             file_name = f'work_package_{self.file_count + 1}.json'
@@ -64,16 +65,18 @@ class PlannerAgent():
                     json.dump(work_package, file, indent=4)
                 logger.info("Workpackage written to: %s", file_path)
                 self.file_count += 1
+                session_file_count += 1
             except UnicodeEncodeError:
                 try:
                     with codecs.open(file_path, 'w', encoding='utf-8-sig') as file:
                         json.dump(work_package, file, indent=4)
                     logger.info("Workpackage written to: %s (with BOM)", file_path)
-                    file_count += 1
+                    self.file_count += 1
+                    session_file_count += 1
                 except Exception as e:
                     logger.error("Unable to write workpackage to filepath: %s. Error: %s", file_path, str(e))
 
-        return self.file_count
+        return session_file_count, self.file_count
     
     def new_deliverable_check(self, state: PlannerState):
         # self.current_task = {x:config['configurable'][x] for x in ['description','task_status','additional_info','question']}
@@ -187,8 +190,8 @@ class PlannerAgent():
         """Uncomment the below line to call coder on each workpackage created for the deliverable. Currently coder is not implemented yet so we will try to build workpackages for eacg deliverable using the Done mode."""
         # state['current_task'].task_status = Status.INPROGRESS
         state['current_task'].task_status = Status.DONE
-        files_written = self.write_workpackages_to_files(state['backlog_requirements'],state['generated_project_path'])
-        logger.info('Wrote %d work packages to the project folder', files_written)
+        files_written, total_files_written = self.write_workpackages_to_files(state['backlog_requirements'],state['generated_project_path'])
+        logger.info('Wrote down %d work packages into the project folder during the current session. Total files written during the current run %d', files_written, total_files_written)
         return {**state}
 
     def generate_response(self, state: PlannerState):
