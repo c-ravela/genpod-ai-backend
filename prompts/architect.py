@@ -62,35 +62,16 @@ class ArchitectPrompts:
 
             '{tasks}'
 
-            Below is an example of how the deliverables should be formatted from the source:
-
-            [
-                "**Project Setup**
-                    - Initialize the project structure.
-                    - Set up version control with Git.
-                    - Create `.gitignore` and `.dockerignore` files.",
-
-                "**Database Configuration**
-                    - Set up MySQL database.
-                    - Create database connection module.", 
-
-                "**API Endpoints**
-                    - Create FastAPI application.
-                    - Implement CRUD operations for User resource.",
-                .
-                .
-                .
-                .
-                "Task N"
-            ]
-
             Your task is to convert the deliverables from this markdown document into a list or an array. 
             Each task should be copied exactly as it appears in the markdown document and transformed 
-            into an item in the list or array. No modifications should be made to the statements.
+            into an item of an list or array. No modifications should be made to the statements.
 
             Error messages will only be present if there is an issue with your previous response. 
             '{error_message}'
 
+            "Example:
+            [Task1, Task2, Task3, .... TaskN]
+            "
             output format instructions:
             '{format_instructions}'
         """,
