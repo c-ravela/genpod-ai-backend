@@ -1,6 +1,7 @@
 """ Contain all the prompts needed by the RAG Agent"""
-from langchain_core.prompts import ChatPromptTemplate
 from langchain.prompts import PromptTemplate
+from langchain_core.prompts import ChatPromptTemplate
+
 
 class RAGPrompts():
     # Prompt 1
