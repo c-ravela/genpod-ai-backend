@@ -1,18 +1,19 @@
-from langgraph.graph import StateGraph, END
 from langgraph.checkpoint.sqlite import SqliteSaver
-from agents.rag_workflow.rag_state import RAGState
+from langgraph.graph import END, StateGraph
+
 from agents.rag_workflow.rag_agent import RAGAgent
+from agents.rag_workflow.rag_state import RAGState
 from utils.logs.logging_utils import logger
 
+
 class RAGWorkFlow():
-    def __init__(self, llm, collection_name, thread_id=None, persist_directory=None):
+    def __init__(self, llm, collection_name, persistance_db_path: str, persist_directory=None):
         self.agent = RAGAgent(llm, collection_name = collection_name, persist_directory=persist_directory)
         self.rag_workflow = StateGraph(RAGState)
-        # Memory for Persistence
-        self.thread_id = thread_id
 
-        if thread_id is not None:
-            self.memory = SqliteSaver.from_conn_string(":memory:")
+        # Memory for Persistence
+        self.memory = SqliteSaver.from_conn_string(persistance_db_path)
+
         # Define the nodes
         self.rag_workflow.add_node("retrieve", self.agent.retrieve)  # retrieve
         self.rag_workflow.add_node("grade_documents", self.agent.grade_documents)  # grade documents
@@ -51,16 +52,9 @@ class RAGWorkFlow():
         )
         self.rag_workflow.add_edge("update_state", END)
 
-        # # Compile
-        # self.rag_app = self.rag_workflow.compile()
-        if thread_id is not None:
-            self.rag_app = self.rag_workflow.compile(checkpointer=self.memory)
+        # Compile
+        self.rag_app = self.rag_workflow.compile(checkpointer=self.memory)
         
-        else:
-            # print("You have not set the Thread ID so not persisting the workflow state.")
-            logger.info("You have not set the Thread ID so not persisting the workflow state.")
-            self.rag_app = self.rag_workflow.compile()
-    
     def get_current_state(self):
         """ Returns the current state dictionary of the agent """
         return self.agent.state
@@ -68,9 +62,10 @@ class RAGWorkFlow():
 
 if __name__=="__main__":
     #  Example using in you main graph.
-    from langchain_openai import ChatOpenAI
     from pprint import pprint
+
     from dotenv import load_dotenv
+    from langchain_openai import ChatOpenAI
     load_dotenv()
 
     llm = ChatOpenAI(model="gpt-4o-2024-05-13", temperature=0, max_retries=5, streaming=True, seed=4000)
