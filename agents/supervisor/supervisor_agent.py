@@ -1,36 +1,42 @@
-from agents.supervisor.supervisor_state import SupervisorState
-from agents.architect.graph import ArchitectGraph
-from agents.rag_workflow.rag_graph import RAGWorkFlow
-from agents.planner.planner_graph import PlannerWorkFlow
-from agents.coder.graph import CoderGraph
-from models.constants import Status, PStatus
-from models.models import Task
-from typing import Dict, List, Union, Tuple
-from configs.project_path import set_project_path
-from configs.supervisor_config import calling_map
-from utils.fuzzy_rag_cache import FuzzyRAGCache
-import ast, json
-from agents.supervisor.supervisor_prompts import SupervisorPrompts
-from agents.supervisor.supervisor_models import QueryList
-from pydantic import ValidationError
-from langchain_openai import ChatOpenAI
+import ast
+import json
 from pprint import pprint
+from typing import Dict, List, Tuple, Union
+
+from langchain_openai import ChatOpenAI
+from pydantic import ValidationError
+
+from agents.architect.graph import ArchitectGraph
+from agents.coder.graph import CoderGraph
+from agents.planner.planner_graph import PlannerWorkFlow
+from agents.rag_workflow.rag_graph import RAGWorkFlow
+from agents.supervisor.supervisor_models import QueryList
+from agents.supervisor.supervisor_prompts import SupervisorPrompts
+from agents.supervisor.supervisor_state import SupervisorState
+
+from configs.supervisor_config import calling_map
+from models.constants import PStatus, Status
+from models.models import Task
+from utils.fuzzy_rag_cache import FuzzyRAGCache
 from utils.logs.logging_utils import logger
 
+
 class SupervisorAgent():
-    def __init__(self, llm, collections, members, memberids, user_input, rag_try_limit, project_path):
+    def __init__(self, llm, collections, members, memberids, user_input, rag_try_limit, project_path, persistance_db_path: str):
         self.llm = llm
         self.collections = collections
         self.members = members
         self.memberids = memberids
         self.rag_try_limit = rag_try_limit
         self.project_path = project_path
+        self.persistance_db_path = persistance_db_path
+
         self.rag_cache = FuzzyRAGCache()
         self.rag_cache_building = ''
 
         self.calling_agent = None
         self.called_agent = None
-        self.team_members: Dict[str, Union[object, None]] = {x: None for x in self.members}
+        self.team_members: Dict[str, Union[object, None]] = {v.agent_id: None for k, v in self.members.items()}
         # {
         #     'Architect': None,
         #     'RAG': None,
@@ -94,7 +100,7 @@ class SupervisorAgent():
                     # print(f'----------RAG Agent Called to Query----------\n{req_query}')
                     logger.info('----------RAG Agent Called to Query----------')
                     logger.info("Query: %s", req_query)
-                    result = self.team_members['RAG'].rag_app.invoke({'question': req_query, 'iteration_count': self.rag_try_limit, 'max_hallucination':3}, {'configurable': {'thread_id': self.memberids['RAG']}})
+                    result = self.team_members['RAG'].rag_app.invoke({'question': req_query, 'iteration_count': self.rag_try_limit, 'max_hallucination':3}, {'configurable': {'thread_id': self.memberids['RAG'],  "project_id": "createbymerag"}})
                     rag_response = result['generation']
                     self.rag_cache.add(req_query, rag_response)
                     # print(f'----------RAG Agent Response----------\n{rag_response}')
@@ -116,7 +122,7 @@ class SupervisorAgent():
                             logger.info("Follow-up: %s", follow_up_query)
                             
                             # Ask the follow-up query to the RAG agent
-                            follow_up_result = self.team_members['RAG'].rag_app.invoke({'question': follow_up_query, 'iteration_count': self.rag_try_limit, 'max_hallucination':3}, {'configurable': {'thread_id': self.memberids['RAG']}})
+                            follow_up_result = self.team_members['RAG'].rag_app.invoke({'question': follow_up_query, 'iteration_count': self.rag_try_limit, 'max_hallucination':3}, {'configurable': {'thread_id': self.memberids['RAG'],  "project_id": "createbymerag"}})
                             follow_up_response = follow_up_result['generation']
                             self.rag_cache.add(follow_up_query, follow_up_response)
                             
@@ -132,26 +138,67 @@ class SupervisorAgent():
     def instantiate_team_members(self, state: SupervisorState):
         for member,_ in self.team_members.items():
             if member=='Architect':
-                self.team_members[member] = ArchitectGraph(ChatOpenAI(model="gpt-4o-2024-05-13", temperature=0.3, max_retries=5, streaming=True, seed=4000, top_p=0.4))
+                self.team_members[member] = ArchitectGraph(
+                    ChatOpenAI(
+                        model="gpt-4o-2024-05-13", 
+                        temperature=0.3, 
+                        max_retries=5, 
+                        streaming=True, 
+                        seed=4000, 
+                        top_p=0.4
+                    ), 
+                    self.persistance_db_path
+                )
+
             elif member=='RAG':
                 # We can to implement a scenario where we are able to use appropriate collection_name from the list of collections based on the user_input
                 # This will probably mechanism should probably go inside ragworkflow implementation. For now lets keep it simple
-                self.team_members[member] = RAGWorkFlow(ChatOpenAI(model="gpt-4o-2024-05-13", temperature=0, max_retries=5, streaming=True, seed=4000, top_p=0.3),
-                                                        collection_name=list(self.collections.keys())[0],
-                                                        thread_id=self.memberids[member],
-                                                        persist_directory=self.collections[list(self.collections.keys())[0]])
+                self.team_members[member] = RAGWorkFlow(
+                    ChatOpenAI(
+                        model="gpt-4o-2024-05-13", 
+                        temperature=0, 
+                        max_retries=5, 
+                        streaming=True, 
+                        seed=4000, 
+                        top_p=0.3
+                    ),
+                    collection_name=list(self.collections.keys())[0],
+                    persistance_db_path=self.persistance_db_path,
+                    persist_directory=self.collections[list(self.collections.keys())[0]]
+                )
+
             elif member=='Planner':
-                self.team_members[member] = PlannerWorkFlow(ChatOpenAI(model="gpt-4o-2024-05-13", temperature=0.3, max_retries=5, streaming=True, seed=4000, top_p=0.6),
-                                                            thread_id=self.memberids[member])
+                self.team_members[member] = PlannerWorkFlow(
+                    ChatOpenAI(
+                        model="gpt-4o-2024-05-13",
+                        temperature=0.3,
+                        max_retries=5,
+                        streaming=True,
+                        seed=4000,
+                        top_p=0.6
+                    ),
+                    persistance_db_path=self.persistance_db_path
+                )
+
             elif member=='Coder':
-                self.team_members[member] = CoderGraph(ChatOpenAI(model="gpt-4o-2024-05-13", temperature=0.3, max_retries=5, streaming=True, seed=4000, top_p=0.4))
+                self.team_members[member] = CoderGraph(
+                    ChatOpenAI(
+                        model="gpt-4o-2024-05-13",
+                        temperature=0.3,
+                        max_retries=5,
+                        streaming=True,
+                        seed=4000,
+                        top_p=0.4
+                    ), 
+                    self.persistance_db_path
+                )
 
             else:
                 continue
 
         # state['team_members'] = {**self.team_members}
         state['original_user_input'] = self.user_prompt
-        state['project_path'] = set_project_path(self.project_path)
+        state['project_path'] = self.project_path
         state['rag_retrieval'] = ''
         state['current_task'] = Task(description='retrieve additional context from RAG system',
                                      task_status = Status.NEW.value,
@@ -187,7 +234,7 @@ class SupervisorAgent():
                 logger.debug("Cache miss for query: \n%s", question)
                 # result = your_rag_query_function(query)  # Replace with your actual RAG query function
             # return result
-                additional_info = self.team_members['RAG'].rag_app.invoke({'question': question,'iteration_count':self.rag_try_limit, 'max_hallucination':3},{'configurable':{'thread_id':self.memberids['RAG']}})
+                additional_info = self.team_members['RAG'].rag_app.invoke({'question': question,'iteration_count':self.rag_try_limit, 'max_hallucination':3},{'configurable':{'thread_id':self.memberids['RAG'],  "project_id": "createbymerag"}})
                 result = additional_info['generation']
                 state['rag_query_answer'] = additional_info['query_answered']
                 self.rag_cache.add(question, result)
@@ -234,7 +281,7 @@ class SupervisorAgent():
                                                                           'user_requested_standards':state['current_task'].additional_info,
                                                                           'license_text':state['license_text'],
                                                                           'messages':[]},
-                                                                         {'configurable':{'thread_id':self.memberids['Architect']}})
+                                                                         {'configurable':{'thread_id':self.memberids['Architect'], "project_id": "createbymearc"}})
 
             # architect_state = self.team_members['Architect'].app.get_current_state()
             message = ('Assistant', f'Response from Architect: {architect_result['tasks']}')
@@ -287,7 +334,7 @@ class SupervisorAgent():
                                                                           'generated_project_path':state['project_path'],
                                                                           'user_requested_standards':state['current_task'].additional_info,
                                                                           'messages':[]},
-                                                                         {'configurable':{'thread_id':self.memberids['Architect']}})
+                                                                         {'configurable':{'thread_id':self.memberids['Architect'],  "project_id": "createbymearc"}})
             # print(f"----------Response from Architect Agent----------\n{architect_result['current_task']}")
             logger.info("----------Response from Architect Agent----------")
             logger.info("Architect Response: %r", architect_result['current_task'])
@@ -313,7 +360,7 @@ class SupervisorAgent():
         state['messages'] += [message]
         logger.info("---------- Calling Coder ----------")
         coder_result = self.team_members['Coder'].app.invoke({**state['coder_inputs'],'messages':[]},
-                                                                     {'configurable':{'thread_id':self.memberids['Coder']}})
+                                                                     {'configurable':{'thread_id':self.memberids['Coder'],  "project_id": "createbymecod"}})
         # coder_state = self.team_members['Coder'].get_state()
 
         if coder_result['current_task'].task_status.value == Status.DONE.value:
@@ -378,21 +425,24 @@ class SupervisorAgent():
                     return {**state}
                 else:
                     # all work_packages are provided to coder so we can now move to next deliverable
-                    state['current_task'].task_status.value = Status.DONE.value
+                    state['current_task'].task_status = Status.DONE
 
             if state['current_task'].task_status.value == Status.DONE.value:
                 # We need to work on calling planner on deliverables provided by architect
-                if len(state['tasks']) is None:
+                if len(state['tasks']) is None or len(state['tasks']) == 0:
                     new_task = None
                 else:
                     # next_task = Task(description=self.tasks.pop(), task_status=Status.NEW.value, additional_info='', question='')
                     new_task = state['tasks'].pop(0)
                 # new_task = self.pick_next_task(state)
                 if new_task is None:
+                    logger.info("Received next task as None. Changing to Halted State.")
                     self.project_status = PStatus.HALTED.value
-                state['current_task'] = new_task
-                requirements_doc = ' '.join(str(value) for value in state['requirements_doc'].values())
-                state['current_task'].additional_info = requirements_doc + '\n' + state['rag_retrieval']
+                else:
+                    state['current_task'] = new_task
+                    requirements_doc = ' '.join(str(value) for value in state['requirements_doc'].values())
+                    state['current_task'].additional_info = requirements_doc + '\n' + state['rag_retrieval']
+                    
                 self.called_agent = 'Supervisor'
                 return {**state}
         else:
@@ -406,7 +456,7 @@ class SupervisorAgent():
         logger.info("----------Calling Planner----------")
         planner_result = self.team_members['Planner'].planner_app.invoke({'current_task':state['current_task'],
                                                                           'generated_project_path':state['project_path']},
-                                                                          {'configurable':{'thread_id':self.memberids['Planner']}})
+                                                                          {'configurable':{'thread_id':self.memberids['Planner'],  "project_id": "createbymeplan"}})
         # planner_state = self.team_members['Planner'].planner_app.get_state()
         state['current_task'] = planner_result['response'][-1]
         if state['current_task'].task_status.value == Status.DONE.value:
@@ -472,8 +522,12 @@ class SupervisorAgent():
             logger.info("----------Unable to handle Human Feedback currently so ending execution----------")
             # exit()
 
+        human_input = input(f"Please provide additional input for the question:\n{state['current_task'].question}")
+
         # Process the input and update the state
-        state.human_feedback = human_input
+        state['human_feedback'] += [human_input]
+        self.project_status = PStatus.EXECUTING.value
+        # state.human_feedback = human_input
         return {**state}
 
     def update_state(self, state: SupervisorState):
