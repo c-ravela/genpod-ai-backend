@@ -4,17 +4,19 @@ This module contains the Architect class which is responsible for defining
 the state graph for the Architect agent. The state graph determines the flow 
 of control between different states of the Architect agent.
 """
+import io
 
-from langgraph.graph import END
-from langgraph.graph import StateGraph
-from langgraph.graph.graph import CompiledGraph 
-
+from langchain_community.chat_models import ChatOllama
+from langchain_openai import ChatOpenAI
 from langgraph.checkpoint.sqlite import SqliteSaver
+from langgraph.graph import END, StateGraph
+from langgraph.graph.graph import CompiledGraph
+from PIL import Image
+from typing_extensions import Union
 
 from agents.architect.agent import ArchitectAgent
 from agents.architect.state import ArchitectState
 
-from configs.persistence_db import PERSISTANCE_DB_PATH
 
 class ArchitectGraph:
     """
@@ -31,7 +33,7 @@ class ArchitectGraph:
     memory: SqliteSaver
     app: CompiledGraph
 
-    def __init__(self, llm) -> None:
+    def __init__(self, llm: Union[ChatOpenAI, ChatOllama], persistance_db_path: str) -> None:
         """
         Constructor for the ArchitectGraph class.
 
@@ -41,7 +43,7 @@ class ArchitectGraph:
         
         self.state = ArchitectState()
         self.agent = ArchitectAgent(llm)
-        self.memory = SqliteSaver.from_conn_string(PERSISTANCE_DB_PATH)
+        self.memory = SqliteSaver.from_conn_string(persistance_db_path)
         self.app = self.define_graph()
 
     def define_graph(self) -> CompiledGraph:
@@ -143,3 +145,14 @@ class ArchitectGraph:
         
         return self.agent.state
     
+    def display_graph(self) -> None:
+        """
+        """
+
+        try:
+            img = Image.open(io.BytesIO(self.app.get_graph().draw_mermaid_png()))
+            img.show()
+
+        except Exception:
+            # This requires some extra dependencies and is optional
+            pass
