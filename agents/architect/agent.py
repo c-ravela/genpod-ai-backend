@@ -5,36 +5,25 @@ managing the state of the Architect agent, processing user inputs, and
 generating appropriate responses.
 """
 
-from langchain_openai import ChatOpenAI
-from langchain_community.chat_models import ChatOllama
-
-from langchain_core.runnables.base import RunnableSequence
-
-from langchain_core.output_parsers import JsonOutputParser
-
-from prompts.architect import ArchitectPrompts
-
-from models.constants import PStatus
-from models.constants import Status
-from models.constants import ChatRoles
-
-from models.models import Task
-
-from models.architect import ProjectDetails, TaskOutput
-from models.architect import QueryResult
-
-from agents.architect.state import ArchitectState
-
-from tools.code import CodeFileWriter
-
-from typing_extensions import Union
-from typing_extensions import Literal
-
-from utils.logs.logging_utils import logger
-
 import os
 
-class ArchitectAgent:
+from langchain_community.chat_models import ChatOllama
+from langchain_core.output_parsers import JsonOutputParser
+from langchain_core.runnables.base import RunnableSequence
+from langchain_openai import ChatOpenAI
+from typing_extensions import Literal, Union
+
+from agents.architect.state import ArchitectState
+from models.architect import ProjectDetails, QueryResult, TaskOutput
+from models.constants import ChatRoles, PStatus, Status
+from models.models import Task
+from prompts.architect import ArchitectPrompts
+from tools.code import CodeFileWriter
+from utils.logs.logging_utils import logger
+
+from agents.agent.agent import Agent
+
+class ArchitectAgent(Agent):
     """
     ArchitectAgent Class
 
@@ -42,8 +31,6 @@ class ArchitectAgent:
     agent, processes user inputs, and generates appropriate responses. It uses 
     a chain of tools to parse the user input and generate a structured output.
     """
-    agent_name: str # The name of the agent
-
     # names of the graph node
     entry_node_name: str # The entry point of the graph
     requirements_node_name: str # Node for handling requirements generation
@@ -97,8 +84,13 @@ class ArchitectAgent:
         Args:
             llm (Union[ChatOpenAI, ChatOllama]): The Language Learning Model to be used by the ArchitectAgent.
         """
-
-        self.agent_name = "Solution Architect"
+        
+        super.__init__(
+            "Solution Architect",
+            "2_architect",
+            ArchitectState(),
+            llm
+        )
 
         self.entry_node_name = "entry"
         self.requirements_node_name = "requirements"
@@ -122,11 +114,8 @@ class ArchitectAgent:
         self.last_visited_node = self.entry_node_name # entry point node
         self.error_message = ""
 
-        self.state = ArchitectState()
         self.prompts = ArchitectPrompts()
         
-        self.llm = llm
-
         self.project_overview_chain = ( 
             self.prompts.project_overview_prompt
             | self.llm
