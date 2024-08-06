@@ -3,10 +3,10 @@
 Agent graph state
 """
 
+from typing_extensions import Annotated, TypedDict
+
 from models.models import Task
 
-from typing_extensions import TypedDict
-from typing_extensions import Annotated
 
 class CoderState(TypedDict):
     """

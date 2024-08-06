@@ -1,17 +1,22 @@
-from langchain_core.output_parsers import JsonOutputParser
-from agents.planner.planner_state import PlannerState
-from agents.planner.planner_prompt import PlannerPrompts
-from models.models import Task
-from models.constants import Status
 import ast
-from agents.planner.planner_models import BacklogList
-from pydantic import ValidationError
+import codecs
 import json
-from typing import List
+import os
+import re
 from pprint import pprint
-from utils.logs.logging_utils import logger
-import re, os, codecs
+from typing import List
+
+from langchain_core.output_parsers import JsonOutputParser
+from pydantic import ValidationError
+
+from agents.planner.planner_models import BacklogList
+from agents.planner.planner_prompt import PlannerPrompts
+from agents.planner.planner_state import PlannerState
+from models.constants import Status
+from models.models import Task
 from tools.code import CodeFileWriter
+from utils.logs.logging_utils import logger
+
 
 class PlannerAgent():
     def __init__(self, llm):
@@ -217,6 +222,7 @@ class PlannerAgent():
     
     def parse_backlog_tasks(self, response: str) -> List[str]:
         import re
+
         # Split the response into lines
         lines = response.split('\n')
         

@@ -12,14 +12,11 @@ inputs and how to structure its outputs. They are essential for ensuring that
 the Architect agent can effectively assist users in implementing their projects.
 """
 
+from langchain.output_parsers import PydanticOutputParser
 from langchain_core.prompts import PromptTemplate
 
-from langchain.output_parsers import PydanticOutputParser
+from models.architect import ProjectDetails, QueryResult, TaskOutput, TasksList
 
-from models.architect import TasksList
-from models.architect import ProjectDetails
-from models.architect import QueryResult
-from models.architect import TaskOutput
 
 class ArchitectPrompts:
     """

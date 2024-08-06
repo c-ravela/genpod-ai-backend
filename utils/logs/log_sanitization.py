@@ -2,6 +2,7 @@
 import re
 from typing import Any, Dict
 
+
 def sanitize_log_message(message: str) -> str:
     # Sanitize API keys
     api_key_pattern = r'(api[_-]?key|access[_-]?token)["\']?\s*[:=]\s*["\']?([^\s"\']+)'

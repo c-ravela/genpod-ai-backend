@@ -2,11 +2,12 @@
 This module provides a FS class with a method to write generated code to a specified file.
 """
 
-from langchain.tools import tool
-
+import codecs
+import os
 from typing import Annotated
 
-import os, codecs
+from langchain.tools import tool
+
 
 class CodeFileWriter:
     """

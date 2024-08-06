@@ -14,7 +14,7 @@ THREAD_IDS = {
 VECTOR_DB_COLLECTIONS = {'MISMO-version-3.6-docs': os.path.join(os.getcwd(), "vector_collections")}
 
 # Agent Members to use in the setup. Ideal memebers are as below.
-MEMBERS = ['RAG','Architect','Planner','Coder']
+MEMBERS = ['RAG', 'Architect', 'Planner', 'Coder', 'Tester']
 # MEMBERS = ['RAG','Architect','Planner']
 
 # Rag Agent tries to transform the original query for better vector search if failed the first time. This value can be used to set a limit on number of retries.

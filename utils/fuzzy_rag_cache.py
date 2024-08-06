@@ -1,6 +1,7 @@
 import re
 from difflib import SequenceMatcher
 
+
 class FuzzyRAGCache:
     def __init__(self):
         self.cache = {}

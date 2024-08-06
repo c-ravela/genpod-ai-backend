@@ -1,7 +1,10 @@
 """ Graph State for Planner Agent """
-from typing import List, Dict
+from typing import Dict, List
+
 from typing_extensions import TypedDict
+
 from models.models import Task
+
 
 class PlannerState(TypedDict):
     """

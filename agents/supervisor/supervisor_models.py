@@ -1,5 +1,7 @@
-from pydantic import BaseModel, Field, field_validator
 from typing import List
+
+from pydantic import BaseModel, Field, field_validator
+
 
 class QueryList(BaseModel):
     req_queries: list[str]

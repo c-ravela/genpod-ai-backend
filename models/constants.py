@@ -8,6 +8,7 @@ for use in other modules.
 
 from enum import Enum
 
+
 class ChatRoles(Enum):
     """
     An enumeration representing the various roles in a chat conversation with 

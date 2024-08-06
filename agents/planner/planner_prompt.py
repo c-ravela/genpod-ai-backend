@@ -1,6 +1,7 @@
 """ Define the prompt template for the Planner """
 from langchain.prompts import PromptTemplate
 
+
 class PlannerPrompts():
     backlog_planner_prompt = PromptTemplate(
         template="""Given the deliverable, additional context and feedback, provide work packages of tasks needed to complete this deliverable.
@@ -55,8 +56,8 @@ class PlannerPrompts():
             }},
             "framework": "Framework to be used"
             }},
-            "LICENSE_URL": "URL to the license file as it is from the input",
-            "LICENSE_TEXT": "Text of the license as it is from the input"
+            "LICENSE_URL": "<URL to the license file as it is from the input>",
+            "LICENSE_TEXT": "<Text of the license as it is from the input>"
         }}
 
         - If you need more information, respond with a JSON object containing a single detailed question that can be used to retrieve additional information from RAG or can be asked to the Architect of the project:
