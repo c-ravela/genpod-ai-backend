@@ -8,19 +8,32 @@ from typing_extensions import Union
 
 class Agent:
     """
+    Represents an agent equipped with a language learning model (LLM) that can perform various tasks.
+
+    Attributes:
+        agent_id (str): A unique identifier for the agent, typically a combination of ID and name.
+        agent_name (str): The name of the agent.
+        description (str): A brief description of the agent's purpose or functionality.
+        state (Any): The current state of the agent, which can be of any type.
+        llm (Union[ChatOpenAI, ChatOllama]): The language learning model used by the agent, which can be either a ChatOpenAI or ChatOllama model.
     """
 
-    # follow this pattern for creating  a agent id
-    # <id>_<name>
-    agent_id : str # id for the agent
-    agent_name: str # name of the agent
-    description: str # description of the agent
+    agent_id : str # Unique identifier for the agent
+    agent_name: str # Name of the agent
+    description: str # Description of the agent's functionality
 
-    state: Any
-    llm: Union[ChatOpenAI, ChatOllama] # This is the language learning model (llm) for the Architect agent. It can be either a ChatOpenAI model or a ChatOllama model
+    state: Any # Current state of the agent
+    llm: Union[ChatOpenAI, ChatOllama] # This is the language learning model (llm) for the agent.
 
-    def __init__(self, agent_id, agent_name, state, llm) -> None:
+    def __init__(self, agent_id: str, agent_name: str, state: Any, llm: Union[ChatOpenAI, ChatOllama]) -> None:
         """
+        Initializes the Agent with the specified parameters.
+
+        Args:
+            agent_id (str): The unique identifier for the agent.
+            agent_name (str): The name of the agent.
+            state (Any): The initial state of the agent.
+            llm (Union[ChatOpenAI, ChatOllama]): The language learning model used by the agent.
         """
 
         self.agent_id = agent_id
@@ -30,15 +43,23 @@ class Agent:
 
     def update_state(self, state: Any) -> Any:
         """
-        This method updates the current state of the Architect agent with the provided state. 
+        Updates the current state of the agent with the provided state.
 
         Args:
-            state (ArchitectState): The new state to update the current state of the agent with.
+            state (Any): The new state to update the current state of the agent with.
 
         Returns:
-            ArchitectState: The updated state of the agent.
+            Any: The updated state of the agent.
         """
 
         self.state = {**state}
-
         return {**self.state}
+    
+    def __repr__(self) -> str:
+        """
+        Provides a string representation of the Agent instance.
+
+        Returns:
+            str: A string representation of the Agent instance.
+        """
+        return f"Agent(id={self.agent_id}, name={self.agent_name}, state={self.state})"
