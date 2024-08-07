@@ -64,7 +64,7 @@ class CoderAgent(Agent):
         """
         """
         
-        super.__init__(
+        super().__init__(
             "Software Programmer",
             "3_coder",
             CoderState(),

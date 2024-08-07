@@ -85,7 +85,7 @@ class ArchitectAgent(Agent):
             llm (Union[ChatOpenAI, ChatOllama]): The Language Learning Model to be used by the ArchitectAgent.
         """
         
-        super.__init__(
+        super().__init__(
             "Solution Architect",
             "2_architect",
             ArchitectState(),
