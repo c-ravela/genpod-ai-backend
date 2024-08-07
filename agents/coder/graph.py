@@ -11,22 +11,23 @@ from typing_extensions import Union
 from agents.coder.agent import CoderAgent
 from agents.coder.state import CoderState
 
+from agents.agent.graph import Graph
+from configs.project_config import ProjectGraphs
 
-class CoderGraph:
+class CoderGraph(Graph[CoderAgent]):
     """
     """
-
-    state: CoderState
-    agent: CoderAgent
-    memory: SqliteSaver
-    app: CompiledGraph
 
     def __init__(self,  llm: Union[ChatOpenAI, ChatOllama], persistance_db_path: str) -> None:
+        """"""
+        super().__init__(
+            ProjectGraphs.coder.graph_name, 
+            ProjectGraphs.coder.graph_id,
+            CoderAgent(llm),
+            persistance_db_path
+        )
 
-        self.state = CoderState()
-        self.agent = CoderAgent(llm)
-        self.memory = SqliteSaver.from_conn_string(persistance_db_path)
-        self.app = self.define_graph()
+        self.compile_graph_with_persistence()
     
     def define_graph(self) -> CompiledGraph:
 
@@ -107,9 +108,8 @@ class CoderGraph:
         # entry point
         coder_flow.set_entry_point(self.agent.entry_node_name)
 
-        return coder_flow.compile(checkpointer=self.memory)
+        return coder_flow
     
-
     def get_current_state(self) -> CoderState:
         """
         returns the current state of the graph.
