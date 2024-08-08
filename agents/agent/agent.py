@@ -6,8 +6,9 @@ from langchain_openai import ChatOpenAI
 from typing_extensions import Any, Union
 
 GenericAgentState = TypeVar('GenericAgentState', bound=Any)
+GenericPrompts = TypeVar('GenericPrompts', bound=Any)
 
-class Agent(Generic[GenericAgentState]):
+class Agent(Generic[GenericAgentState, GenericPrompts]):
     """
     Represents an agent equipped with a language learning model (LLM) that can perform various tasks.
 
@@ -24,9 +25,10 @@ class Agent(Generic[GenericAgentState]):
     description: str # Description of the agent's functionality
 
     state: GenericAgentState # Current state of the agent
+    prompts: GenericPrompts
     llm: Union[ChatOpenAI, ChatOllama] # This is the language learning model (llm) for the agent.
 
-    def __init__(self, agent_id: str, agent_name: str, state: GenericAgentState, llm: Union[ChatOpenAI, ChatOllama]) -> None:
+    def __init__(self, agent_id: str, agent_name: str, state: GenericAgentState, prompts: GenericPrompts, llm: Union[ChatOpenAI, ChatOllama]) -> None:
         """
         Initializes the Agent with the specified parameters.
 
@@ -40,6 +42,7 @@ class Agent(Generic[GenericAgentState]):
         self.agent_id = agent_id
         self.agent_name = agent_name
         self.state = state
+        self.prompts = prompts
         self.llm = llm
 
     def update_state(self, state: GenericAgentState) -> GenericAgentState:

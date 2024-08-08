@@ -8,8 +8,7 @@ from agents.rag_workflow.rag_state import RAGState
 from configs.project_config import ProjectAgents
 from utils.logs.logging_utils import logger
 
-
-class RAGAgent(Agent[RAGState]):
+class RAGAgent(Agent[RAGState, RAGPrompts]):
     def __init__(self, llm, collection_name, persist_directory=None):
         assert persist_directory is not None, "Currently only Local Chroma VectorDB is supported"
         
@@ -17,6 +16,7 @@ class RAGAgent(Agent[RAGState]):
             ProjectAgents.rag.agent_name,
             ProjectAgents.rag.agent_id,
             RAGState(),
+            RAGPrompts(),
             llm
         )
         self.mismo_vectorstore = Chroma(
@@ -26,20 +26,20 @@ class RAGAgent(Agent[RAGState]):
         self.retriever = self.mismo_vectorstore.as_retriever(search_kwargs={'k': 20})
         
         # Document retrieval Grader chain
-        self.retrieval_grader = RAGPrompts.retriever_grader_prompt | self.llm | JsonOutputParser()
+        self.retrieval_grader = self.prompts.retriever_grader_prompt | self.llm | JsonOutputParser()
         
         # Halucination Grader chain
-        self.hallucination_grader = RAGPrompts.halucination_grader_prompt | self.llm | JsonOutputParser()
+        self.hallucination_grader = self.prompts.halucination_grader_prompt | self.llm | JsonOutputParser()
 
         # Question Re-writer chain
-        self.question_rewriter = RAGPrompts.re_write_prompt | self.llm | StrOutputParser()
+        self.question_rewriter = self.prompts.re_write_prompt | self.llm | StrOutputParser()
 
         # Answer grader from the chain
-        self.answer_grader = RAGPrompts.answer_grader_prompt | self.llm | JsonOutputParser()
+        self.answer_grader = self.prompts.answer_grader_prompt | self.llm | JsonOutputParser()
 
         # RAG Answering chain 
         self.rag_generation_chain = (
-            RAGPrompts.rag_generation_prompt
+            self.prompts.rag_generation_prompt
             | self.llm
             | StrOutputParser()
         )

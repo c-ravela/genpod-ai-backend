@@ -2,30 +2,26 @@
 """
 
 import os
-import pprint as pp
 
 from langchain_community.chat_models import ChatOllama
 from langchain_core.output_parsers import JsonOutputParser
 from langchain_core.runnables.base import RunnableSequence
-from langchain_core.tools import StructuredTool
 from langchain_openai import ChatOpenAI
-from langgraph.prebuilt import ToolExecutor, ToolInvocation
 from typing_extensions import Literal, Union
 
 from agents.agent.agent import Agent
 from agents.coder.state import CoderState
 from configs.project_config import ProjectAgents
-from models.coder import CodeGeneration, CoderModel
+from models.coder import CodeGeneration
 from models.constants import ChatRoles, Status
 from prompts.coder import CoderPrompts
 from tools.code import CodeFileWriter
-from tools.git import Git
+
 from tools.license import License
 from tools.shell import Shell
 from utils.logs.logging_utils import logger
 
-
-class CoderAgent(Agent[CoderState]):
+class CoderAgent(Agent[CoderState, CoderPrompts]):
     """
     """
     # names of the graph node
@@ -55,7 +51,6 @@ class CoderAgent(Agent[CoderState]):
     
     track_add_license_txt: list[str]
 
-    prompts: CoderPrompts
     current_code_generation: CodeGeneration
 
     # chains
@@ -69,6 +64,7 @@ class CoderAgent(Agent[CoderState]):
             ProjectAgents.coder.agent_name,
             ProjectAgents.coder.agent_id,
             CoderState(),
+            CoderPrompts(),
             llm
         )
 
@@ -92,8 +88,6 @@ class CoderAgent(Agent[CoderState]):
 
         self.last_visited_node = self.code_generation_node_name
         self.error_message = ""
-
-        self.prompts = CoderPrompts()
 
         self.current_code_generation = {}
 

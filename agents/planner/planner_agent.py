@@ -3,10 +3,9 @@ import codecs
 import json
 import os
 import re
-from pprint import pprint
+
 from typing import List
 
-from langchain_core.output_parsers import JsonOutputParser
 from pydantic import ValidationError
 
 from agents.agent.agent import Agent
@@ -16,25 +15,25 @@ from agents.planner.planner_state import PlannerState
 from configs.project_config import ProjectAgents
 from models.constants import Status
 from models.models import Task
-from tools.code import CodeFileWriter
+
 from utils.logs.logging_utils import logger
 
-
-class PlannerAgent(Agent[PlannerState]):
+class PlannerAgent(Agent[PlannerState, PlannerPrompts]):
     def __init__(self, llm):
         
         super().__init__(
             ProjectAgents.planner.agent_name,
             ProjectAgents.planner.agent_id,
             PlannerState(),
+            PlannerPrompts(),
             llm
         )
 
         # backlog planner for each deliverable chain
-        self.backlog_plan = PlannerPrompts.backlog_planner_prompt | self.llm
+        self.backlog_plan = self.prompts.backlog_planner_prompt | self.llm
         
         # detailed requirements generator chain
-        self.detailed_requirements = PlannerPrompts.detailed_requirements_prompt | self.llm
+        self.detailed_requirements = self.prompts.detailed_requirements_prompt | self.llm
 
         self.current_task : Task = None
 
@@ -221,7 +220,6 @@ class PlannerAgent(Agent[PlannerState]):
         return {**state}
     
     def parse_backlog_tasks(self, response: str) -> List[str]:
-        import re
 
         # Split the response into lines
         lines = response.split('\n')

@@ -23,8 +23,7 @@ from prompts.architect import ArchitectPrompts
 from tools.code import CodeFileWriter
 from utils.logs.logging_utils import logger
 
-
-class ArchitectAgent(Agent[ArchitectState]):
+class ArchitectAgent(Agent[ArchitectState, ArchitectPrompts]):
     """
     ArchitectAgent Class
 
@@ -57,11 +56,6 @@ class ArchitectAgent(Agent[ArchitectState]):
     last_visited_node: str # The last node that was visited in the graph
     error_message: str # The error message, if an error occurred
 
-    state: ArchitectState # Architect agent graphs state
-    prompts: ArchitectPrompts # Architect agents the prompts
-
-    llm: Union[ChatOpenAI, ChatOllama] # This is the language learning model (llm) for the Architect agent. It can be either a ChatOpenAI model or a ChatOllama model
-
     # chains
     project_overview_chain: RunnableSequence # This is for project comprehensive overview in markdown format
     architecture_chain: RunnableSequence
@@ -90,6 +84,7 @@ class ArchitectAgent(Agent[ArchitectState]):
             ProjectAgents.architect.agent_name,
             ProjectAgents.architect.agent_id,
             ArchitectState(),
+            ArchitectPrompts(),
             llm
         )
 
@@ -115,8 +110,6 @@ class ArchitectAgent(Agent[ArchitectState]):
         self.last_visited_node = self.entry_node_name # entry point node
         self.error_message = ""
 
-        self.prompts = ArchitectPrompts()
-        
         self.project_overview_chain = ( 
             self.prompts.project_overview_prompt
             | self.llm
