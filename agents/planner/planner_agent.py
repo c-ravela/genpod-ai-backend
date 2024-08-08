@@ -17,21 +17,25 @@ from models.models import Task
 from tools.code import CodeFileWriter
 from utils.logs.logging_utils import logger
 
+from agents.agent.agent import Agent
+from configs.project_config import ProjectAgents
 
-class PlannerAgent():
+class PlannerAgent(Agent[PlannerState]):
     def __init__(self, llm):
         
-        self.llm = llm
-        
+        super().__init__(
+            ProjectAgents.planner.agent_name,
+            ProjectAgents.planner.agent_id,
+            PlannerState(),
+            llm
+        )
+
         # backlog planner for each deliverable chain
         self.backlog_plan = PlannerPrompts.backlog_planner_prompt | self.llm
         
         # detailed requirements generator chain
         self.detailed_requirements = PlannerPrompts.detailed_requirements_prompt | self.llm
 
-        # State to maintain when responding back to supervisor
-        self.state = {}
-        
         self.current_task : Task = None
 
         self.error_count = 0
@@ -214,10 +218,6 @@ class PlannerAgent():
             state["response"] = [response]
         else:
             state["response"].append(response)
-        return {**state}
-
-    def update_state(self, state: PlannerState):
-        self.state = {**state}
         return {**state}
     
     def parse_backlog_tasks(self, response: str) -> List[str]:

@@ -20,10 +20,19 @@ from models.models import Task
 from utils.fuzzy_rag_cache import FuzzyRAGCache
 from utils.logs.logging_utils import logger
 
+from agents.agent.agent import Agent
+from configs.project_config import ProjectAgents
 
-class SupervisorAgent():
+class SupervisorAgent(Agent[SupervisorState]):
     def __init__(self, llm, collections, members, memberids, user_input, rag_try_limit, project_path, persistance_db_path: str):
-        self.llm = llm
+
+        super().__init__(
+            ProjectAgents.supervisor.agent_name,
+            ProjectAgents.supervisor.agent_id,
+            SupervisorState(),
+            llm
+        )
+
         self.collections = collections
         self.members = members
         self.memberids = memberids
@@ -43,7 +52,7 @@ class SupervisorAgent():
         #     'Coder': None,
         #     'Planner': None
         # }
-        self.state = {}
+
         self.user_prompt = user_input
         # self.project_status = None
         self.responses: Dict[str, List[Tuple[str, Task]]] = {
@@ -530,9 +539,9 @@ class SupervisorAgent():
         # state.human_feedback = human_input
         return {**state}
 
-    def update_state(self, state: SupervisorState):
-        # TODO: Imple Update_state_mechanism
-        pass
+    # def update_state(self, state: SupervisorState):
+    #     # TODO: Imple Update_state_mechanism
+    #     pass
     
     def pick_next_task(self, state):
         if len(state['tasks']) is None:

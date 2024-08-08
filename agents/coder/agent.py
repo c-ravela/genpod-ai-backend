@@ -23,8 +23,9 @@ from tools.shell import Shell
 from utils.logs.logging_utils import logger
 
 from agents.agent.agent import Agent
+from configs.project_config import ProjectAgents
 
-class CoderAgent(Agent):
+class CoderAgent(Agent[CoderState]):
     """
     """
     # names of the graph node
@@ -65,8 +66,8 @@ class CoderAgent(Agent):
         """
         
         super().__init__(
-            "Software Programmer",
-            "3_coder",
+            ProjectAgents.coder.agent_name,
+            ProjectAgents.coder.agent_id,
             CoderState(),
             llm
         )
@@ -134,23 +135,7 @@ class CoderAgent(Agent):
                 return self.add_license_node_name
         
         return self.update_state_node_name
-    
-    def update_state(self, state: CoderState) -> CoderState:
-        """
-        This method updates the current state of the Architect agent with the provided state. 
 
-        Args:
-            state (ArchitectState): The new state to update the current state of the agent with.
-
-        Returns:
-            ArchitectState: The updated state of the agent.
-        """
-        logger.info(f"----{self.agent_name}: Proceeding with state update----")
-        
-        self.state = {**state}
-
-        return {**self.state}
-    
     def update_state_code_generation(self, current_cg: CodeGeneration) -> None:
         """
         """

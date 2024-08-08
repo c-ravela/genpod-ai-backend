@@ -2,11 +2,14 @@
 from langchain_community.chat_models import ChatOllama
 from langchain_openai import ChatOpenAI
 
+from typing import TypeVar, Generic
+
 from typing_extensions import Any
 from typing_extensions import Union
 
+GenericAgentState = TypeVar('GenericAgentState', bound=Any)
 
-class Agent:
+class Agent(Generic[GenericAgentState]):
     """
     Represents an agent equipped with a language learning model (LLM) that can perform various tasks.
 
@@ -22,10 +25,10 @@ class Agent:
     agent_name: str # Name of the agent
     description: str # Description of the agent's functionality
 
-    state: Any # Current state of the agent
+    state: GenericAgentState # Current state of the agent
     llm: Union[ChatOpenAI, ChatOllama] # This is the language learning model (llm) for the agent.
 
-    def __init__(self, agent_id: str, agent_name: str, state: Any, llm: Union[ChatOpenAI, ChatOllama]) -> None:
+    def __init__(self, agent_id: str, agent_name: str, state: GenericAgentState, llm: Union[ChatOpenAI, ChatOllama]) -> None:
         """
         Initializes the Agent with the specified parameters.
 
@@ -41,7 +44,7 @@ class Agent:
         self.state = state
         self.llm = llm
 
-    def update_state(self, state: Any) -> Any:
+    def update_state(self, state: GenericAgentState) -> GenericAgentState:
         """
         Updates the current state of the agent with the provided state.
 

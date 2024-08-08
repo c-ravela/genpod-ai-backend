@@ -22,8 +22,9 @@ from tools.code import CodeFileWriter
 from utils.logs.logging_utils import logger
 
 from agents.agent.agent import Agent
+from configs.project_config import ProjectAgents
 
-class ArchitectAgent(Agent):
+class ArchitectAgent(Agent[ArchitectState]):
     """
     ArchitectAgent Class
 
@@ -86,8 +87,8 @@ class ArchitectAgent(Agent):
         """
         
         super().__init__(
-            "Solution Architect",
-            "2_architect",
+            ProjectAgents.architect.agent_name,
+            ProjectAgents.architect.agent_id,
             ArchitectState(),
             llm
         )
@@ -353,22 +354,6 @@ class ArchitectAgent(Agent):
                 return self.additional_info_node_name
         
         return self.update_state_node_name
-    
-    def update_state(self, state: ArchitectState) -> ArchitectState:
-        """
-        This method updates the current state of the Architect agent with the provided state. 
-
-        Args:
-            state (ArchitectState): The new state to update the current state of the agent with.
-
-        Returns:
-            ArchitectState: The updated state of the agent.
-        """
-        logger.info(f"----{self.agent_name}: Proceeding with state update----")
-        
-        self.state = {**state}
-
-        return {**self.state}
     
     def entry_node(self, state: ArchitectState) -> ArchitectState:
         """
