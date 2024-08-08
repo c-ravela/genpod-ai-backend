@@ -67,7 +67,6 @@ if __name__=="__main__":
     # Database insertion - END
     
     supervisor_info = config.agents.supervisor
-    print(config.agents_config[config.agents.supervisor.agent_id].thread_id)
     SUPERVISOR = SupervisorWorkflow(
         config.agents_config[supervisor_info.agent_id].llm, 
         config.vector_db_collections, 
