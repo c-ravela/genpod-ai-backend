@@ -12,7 +12,9 @@ from langchain_openai import ChatOpenAI
 from langgraph.prebuilt import ToolExecutor, ToolInvocation
 from typing_extensions import Literal, Union
 
+from agents.agent.agent import Agent
 from agents.coder.state import CoderState
+from configs.project_config import ProjectAgents
 from models.coder import CodeGeneration, CoderModel
 from models.constants import ChatRoles, Status
 from prompts.coder import CoderPrompts
@@ -22,8 +24,6 @@ from tools.license import License
 from tools.shell import Shell
 from utils.logs.logging_utils import logger
 
-from agents.agent.agent import Agent
-from configs.project_config import ProjectAgents
 
 class CoderAgent(Agent[CoderState]):
     """

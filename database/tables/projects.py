@@ -1,11 +1,11 @@
 import sqlite3
 from datetime import datetime
-from typing import Self
-from typing import Any, Dict
-from database.tables.table import Table
+from typing import Any, Dict, Self
 
+from database.tables.table import Table
 from models.constants import PStatus
 from utils.logs.logging_utils import logger
+
 
 class Projects(Table):
     """

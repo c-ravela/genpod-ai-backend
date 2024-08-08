@@ -2,19 +2,17 @@
 Driving code file for this project.
 """
 
+import os
 from pprint import pprint
 
 from agents.supervisor.supervisor_graph import SupervisorWorkflow
 from configs.database import get_client_local_db_file_path
+from configs.project_config import ProjectConfig
 from configs.project_path import set_project_path
-from configs.supervisor_config import (RAG_TRY_LIMIT, THREAD_IDS)
+from configs.supervisor_config import RAG_TRY_LIMIT, THREAD_IDS
 from database.database import Database
 from utils.logs.logging_utils import logger
 from utils.time import get_timestamp
-
-from configs.project_config import ProjectConfig
-
-import os
 
 print("\n\nWe greatly appreciate your interest! Please note that we are in the midst of active development and are striving to make improvements every day!\n\n")
 

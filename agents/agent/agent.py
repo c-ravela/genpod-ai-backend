@@ -1,11 +1,9 @@
 
+from typing import Generic, TypeVar
+
 from langchain_community.chat_models import ChatOllama
 from langchain_openai import ChatOpenAI
-
-from typing import TypeVar, Generic
-
-from typing_extensions import Any
-from typing_extensions import Union
+from typing_extensions import Any, Union
 
 GenericAgentState = TypeVar('GenericAgentState', bound=Any)
 

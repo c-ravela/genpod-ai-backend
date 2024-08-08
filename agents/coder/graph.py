@@ -8,11 +8,11 @@ from langgraph.graph import END, StateGraph
 from langgraph.graph.graph import CompiledGraph
 from typing_extensions import Union
 
+from agents.agent.graph import Graph
 from agents.coder.agent import CoderAgent
 from agents.coder.state import CoderState
-
-from agents.agent.graph import Graph
 from configs.project_config import ProjectGraphs
+
 
 class CoderGraph(Graph[CoderAgent]):
     """

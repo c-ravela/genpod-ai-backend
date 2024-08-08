@@ -1,12 +1,11 @@
 import sqlite3
 from datetime import datetime
-from typing import Self
-from typing import Any, Dict
+from typing import Any, Dict, Self
 
+from database.tables.table import Table
 from models.constants import Status
 from utils.logs.logging_utils import logger
 
-from database.tables.table import Table
 
 class Microservices(Table):
     """

@@ -13,7 +13,9 @@ from langchain_core.runnables.base import RunnableSequence
 from langchain_openai import ChatOpenAI
 from typing_extensions import Literal, Union
 
+from agents.agent.agent import Agent
 from agents.architect.state import ArchitectState
+from configs.project_config import ProjectAgents
 from models.architect import ProjectDetails, QueryResult, TaskOutput
 from models.constants import ChatRoles, PStatus, Status
 from models.models import Task
@@ -21,8 +23,6 @@ from prompts.architect import ArchitectPrompts
 from tools.code import CodeFileWriter
 from utils.logs.logging_utils import logger
 
-from agents.agent.agent import Agent
-from configs.project_config import ProjectAgents
 
 class ArchitectAgent(Agent[ArchitectState]):
     """

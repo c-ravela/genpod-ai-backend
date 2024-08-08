@@ -9,12 +9,11 @@ from langchain_openai import ChatOpenAI
 from langgraph.graph import END, StateGraph
 from typing_extensions import Union
 
+from agents.agent.graph import Graph
 from agents.architect.agent import ArchitectAgent
 from agents.architect.state import ArchitectState
-
-from agents.agent.graph import Graph
-
 from configs.project_config import ProjectGraphs
+
 
 class ArchitectGraph(Graph[ArchitectAgent]):
     """

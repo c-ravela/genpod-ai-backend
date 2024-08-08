@@ -2,12 +2,12 @@ from langchain_community.vectorstores import Chroma
 from langchain_core.output_parsers import JsonOutputParser, StrOutputParser
 from langchain_openai import OpenAIEmbeddings
 
+from agents.agent.agent import Agent
 from agents.rag_workflow.rag_prompts import RAGPrompts
 from agents.rag_workflow.rag_state import RAGState
+from configs.project_config import ProjectAgents
 from utils.logs.logging_utils import logger
 
-from agents.agent.agent import Agent
-from configs.project_config import ProjectAgents
 
 class RAGAgent(Agent[RAGState]):
     def __init__(self, llm, collection_name, persist_directory=None):

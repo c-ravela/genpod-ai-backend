@@ -1,13 +1,13 @@
 from langgraph.checkpoint.sqlite import SqliteSaver
 from langgraph.graph import END, StateGraph
 
+from agents.agent.graph import Graph
 from agents.supervisor.supervisor_agent import SupervisorAgent
 from agents.supervisor.supervisor_state import SupervisorState
+from configs.project_config import ProjectGraphs
 from utils.logs.logging_utils import logger
 
-from agents.agent.graph import Graph
 
-from configs.project_config import ProjectGraphs
 class SupervisorWorkflow(Graph[SupervisorAgent]):
     def __init__(self, llm, collections, thread_id, members, memberids, user_input, rag_try_limit, project_path, persistance_db_path: str):
         self.collections = collections

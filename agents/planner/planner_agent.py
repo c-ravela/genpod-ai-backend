@@ -9,16 +9,16 @@ from typing import List
 from langchain_core.output_parsers import JsonOutputParser
 from pydantic import ValidationError
 
+from agents.agent.agent import Agent
 from agents.planner.planner_models import BacklogList
 from agents.planner.planner_prompt import PlannerPrompts
 from agents.planner.planner_state import PlannerState
+from configs.project_config import ProjectAgents
 from models.constants import Status
 from models.models import Task
 from tools.code import CodeFileWriter
 from utils.logs.logging_utils import logger
 
-from agents.agent.agent import Agent
-from configs.project_config import ProjectAgents
 
 class PlannerAgent(Agent[PlannerState]):
     def __init__(self, llm):

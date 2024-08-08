@@ -2,14 +2,12 @@
 Constants that gonna be used by the project
 """
 import os
-
-from langchain_openai import ChatOpenAI
-from langchain_community.chat_models import ChatOllama
-
-from typing import Union, Dict, Any
+from enum import Enum
+from typing import Any, Dict, Union
 
 from dotenv import load_dotenv
-from enum import Enum
+from langchain_community.chat_models import ChatOllama
+from langchain_openai import ChatOpenAI
 
 load_dotenv()
 
