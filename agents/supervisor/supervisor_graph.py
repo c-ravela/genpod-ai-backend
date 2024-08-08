@@ -1,25 +1,29 @@
 from langgraph.checkpoint.sqlite import SqliteSaver
 from langgraph.graph import END, StateGraph
+from langchain_openai import ChatOpenAI
+from langchain_community.chat_models import ChatOllama
+from typing import Dict, Union
 
 from agents.agent.graph import Graph
 from agents.supervisor.supervisor_agent import SupervisorAgent
 from agents.supervisor.supervisor_state import SupervisorState
+from configs.project_config import AgentConfig
 from configs.project_config import ProjectGraphs
 from utils.logs.logging_utils import logger
 
 
 class SupervisorWorkflow(Graph[SupervisorAgent]):
-    def __init__(self, llm, collections, thread_id, members, memberids, user_input, rag_try_limit, project_path, persistance_db_path: str):
-        self.collections = collections
-        self.thread_id = thread_id
-        self.members = members
-        self.memberids = memberids
-        self.user_input = user_input
+    def __init__(self, 
+                llm: Union[ChatOpenAI, ChatOllama],
+                collections: dict[str, str], 
+                user_input: str, rag_try_limit: int, 
+                project_path: str, persistance_db_path: str,
+                agents_config: Dict[str, AgentConfig]):
     
         super().__init__(
             ProjectGraphs.supervisor.graph_name, 
             ProjectGraphs.supervisor.graph_id,
-            SupervisorAgent(llm, self.collections, self.members, self.memberids, self.user_input, rag_try_limit, project_path, persistance_db_path),
+            SupervisorAgent(llm, collections, user_input, rag_try_limit, project_path, persistance_db_path, agents_config),
             persistance_db_path
         )
 
