@@ -5,7 +5,6 @@ categories using symbolic names, enhancing the readability and maintainability
 of the code. Each enumeration is defined as a separate class and can be imported 
 for use in other modules.
 """
-
 from enum import Enum
 
 

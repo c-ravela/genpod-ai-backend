@@ -8,6 +8,7 @@ from agents.rag_workflow.rag_state import RAGState
 from configs.project_config import ProjectAgents
 from utils.logs.logging_utils import logger
 
+
 class RAGAgent(Agent[RAGState, RAGPrompts]):
     def __init__(self, llm, collection_name, persist_directory=None):
         assert persist_directory is not None, "Currently only Local Chroma VectorDB is supported"

@@ -3,7 +3,6 @@ import codecs
 import json
 import os
 import re
-
 from typing import List
 
 from pydantic import ValidationError
@@ -15,8 +14,8 @@ from agents.planner.planner_state import PlannerState
 from configs.project_config import ProjectAgents
 from models.constants import Status
 from models.models import Task
-
 from utils.logs.logging_utils import logger
+
 
 class PlannerAgent(Agent[PlannerState, PlannerPrompts]):
     def __init__(self, llm):

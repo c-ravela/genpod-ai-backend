@@ -4,7 +4,6 @@ This module contains the ArchitectAgent class which is responsible for
 managing the state of the Architect agent, processing user inputs, and 
 generating appropriate responses.
 """
-
 import os
 
 from langchain_community.chat_models import ChatOllama
@@ -22,6 +21,7 @@ from models.models import Task
 from prompts.architect import ArchitectPrompts
 from tools.code import CodeFileWriter
 from utils.logs.logging_utils import logger
+
 
 class ArchitectAgent(Agent[ArchitectState, ArchitectPrompts]):
     """

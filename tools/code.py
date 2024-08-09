@@ -1,7 +1,6 @@
 """
 This module provides a FS class with a method to write generated code to a specified file.
 """
-
 import codecs
 import os
 from typing import Annotated

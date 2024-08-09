@@ -2,31 +2,26 @@ import ast
 import json
 from typing import Dict, List, Tuple, Union
 
-from pydantic import ValidationError
-from langchain_openai import ChatOpenAI
 from langchain_community.chat_models import ChatOllama
+from langchain_openai import ChatOpenAI
+from pydantic import ValidationError
 
 from agents.agent.agent import Agent
 from agents.agent.graph import Graph
-
-from agents.coder.graph import CoderGraph
 from agents.architect.graph import ArchitectGraph
-from agents.rag_workflow.rag_graph import RAGWorkFlow
+from agents.coder.graph import CoderGraph
 from agents.planner.planner_graph import PlannerWorkFlow
-
+from agents.rag_workflow.rag_graph import RAGWorkFlow
 from agents.supervisor.supervisor_models import QueryList
 from agents.supervisor.supervisor_prompts import SupervisorPrompts
 from agents.supervisor.supervisor_state import SupervisorState
-
-from configs.project_config import AgentConfig
-from configs.project_config import ProjectAgents
+from configs.project_config import AgentConfig, ProjectAgents
 from configs.supervisor_config import calling_map
-
 from models.constants import PStatus, Status
 from models.models import Task
-
 from utils.fuzzy_rag_cache import FuzzyRAGCache
 from utils.logs.logging_utils import logger
+
 
 class SupervisorAgent(Agent[SupervisorState, SupervisorPrompts]):
     def __init__(self, 

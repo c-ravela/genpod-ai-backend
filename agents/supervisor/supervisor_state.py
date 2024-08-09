@@ -1,6 +1,5 @@
 """ Graph State for PM Agent """
-import operator
-from typing import Annotated, List, Tuple
+from typing import List, Tuple
 
 from typing_extensions import TypedDict
 

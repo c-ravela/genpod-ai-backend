@@ -8,10 +8,7 @@ The main function in this module is `set_project_path`, which sets the path
 for a new project and creates a new directory at that path with the current 
 timestamp.
 """
-
 import os
-
-from utils.fs import create_directory_with_timestamp
 
 
 def set_project_path(project_path: str=os.path.join(os.getcwd(), "output", "projects"), timestamp: str="") -> str:

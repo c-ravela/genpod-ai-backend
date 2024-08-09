@@ -3,7 +3,6 @@ Coder Graph
 """
 from langchain_community.chat_models import ChatOllama
 from langchain_openai import ChatOpenAI
-from langgraph.checkpoint.sqlite import SqliteSaver
 from langgraph.graph import END, StateGraph
 from langgraph.graph.graph import CompiledGraph
 from typing_extensions import Union

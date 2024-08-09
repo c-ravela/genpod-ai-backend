@@ -1,5 +1,4 @@
 """ constants to use in the supervisor agent"""
-
 import os
 
 # thread ids are crucial for graph state persistence so there should be unique for each agent key.

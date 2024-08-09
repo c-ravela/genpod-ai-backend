@@ -1,6 +1,5 @@
 """Coder Agent
 """
-
 import os
 
 from langchain_community.chat_models import ChatOllama
@@ -16,10 +15,10 @@ from models.coder import CodeGeneration
 from models.constants import ChatRoles, Status
 from prompts.coder import CoderPrompts
 from tools.code import CodeFileWriter
-
 from tools.license import License
 from tools.shell import Shell
 from utils.logs.logging_utils import logger
+
 
 class CoderAgent(Agent[CoderState, CoderPrompts]):
     """

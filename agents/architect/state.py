@@ -4,7 +4,6 @@ This module contains the ArchitectState class which is a TypedDict representing
 the state of the Architect agent. It also includes functions to manipulate the 
 state.
 """
-
 from typing_extensions import Annotated, TypedDict
 
 from models.architect import RequirementsOverview

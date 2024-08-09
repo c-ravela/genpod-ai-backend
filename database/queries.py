@@ -1,6 +1,3 @@
-import sqlite3
-
-
 def get_max_row_id_of_the_table_query(table: str) -> str:
     """
     """
