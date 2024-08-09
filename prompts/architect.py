@@ -11,7 +11,6 @@ The prompts are used to instruct the Architect agent on how to respond to user
 inputs and how to structure its outputs. They are essential for ensuring that 
 the Architect agent can effectively assist users in implementing their projects.
 """
-
 from langchain.output_parsers import PydanticOutputParser
 from langchain_core.prompts import PromptTemplate
 

@@ -2,7 +2,6 @@
 This module manages the persistence of data for a single agent using a 
 SQLite database.
 """
-
 import os
 
 db_dir = os.path.join(os.getcwd(), "output", "databases")

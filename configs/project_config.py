@@ -2,9 +2,9 @@
 Constants used by the project.
 """
 import os
+from dataclasses import dataclass
 from enum import Enum, EnumType
 from typing import Any, Dict, Union
-from dataclasses import dataclass
 
 from dotenv import load_dotenv
 from langchain_community.chat_models import ChatOllama

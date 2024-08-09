@@ -3,7 +3,6 @@ This module provides a Shell class for executing shell commands on the local mac
 
 The Shell class is designed to execute a set of whitelisted commands securely and efficiently.
 """
-
 import shlex
 import subprocess
 from typing import Annotated

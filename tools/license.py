@@ -1,7 +1,6 @@
 """
 This module provides a tool for downloading and saving license files from a given URL.
 """
-
 import os
 from typing import Annotated
 

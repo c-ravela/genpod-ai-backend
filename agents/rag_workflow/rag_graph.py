@@ -1,3 +1,5 @@
+import os
+
 from langgraph.graph import END, StateGraph
 
 from agents.agent.graph import Graph
@@ -5,7 +7,6 @@ from agents.rag_workflow.rag_agent import RAGAgent
 from agents.rag_workflow.rag_state import RAGState
 from configs.project_config import ProjectGraphs
 
-import os
 
 class RAGWorkFlow(Graph[RAGAgent]):
 

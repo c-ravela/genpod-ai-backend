@@ -1,13 +1,14 @@
-from langgraph.graph import END, StateGraph
-from langchain_openai import ChatOpenAI
-from langchain_community.chat_models import ChatOllama
 from typing import Dict, Union
+
+from langchain_community.chat_models import ChatOllama
+from langchain_openai import ChatOpenAI
+from langgraph.graph import END, StateGraph
 
 from agents.agent.graph import Graph
 from agents.supervisor.supervisor_agent import SupervisorAgent
 from agents.supervisor.supervisor_state import SupervisorState
-from configs.project_config import AgentConfig
-from configs.project_config import ProjectGraphs
+from configs.project_config import AgentConfig, ProjectGraphs
+
 
 class SupervisorWorkflow(Graph[SupervisorAgent]):
     def __init__(self, 

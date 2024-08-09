@@ -2,7 +2,6 @@
 
 Agent graph state
 """
-
 from typing_extensions import Annotated, TypedDict
 
 from models.models import Task

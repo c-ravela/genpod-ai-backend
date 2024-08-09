@@ -1,7 +1,6 @@
 """
 This module provides a Git class with a method to create a new Git repository at a specified path.
 """
-
 import os
 import subprocess
 from typing import Annotated

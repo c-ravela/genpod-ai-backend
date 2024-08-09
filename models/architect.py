@@ -3,12 +3,8 @@ This module defines the data model for the output of the Architect agent in
 the form of a Requirements Document.
 
 """
-
 from pydantic import BaseModel, Field
 from typing_extensions import ClassVar
-
-from models.constants import Status
-from models.models import Task
 
 
 class ProjectDetails(BaseModel):
