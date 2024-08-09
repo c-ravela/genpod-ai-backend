@@ -25,6 +25,7 @@ class SupervisorWorkflow():
         self.supervisor_workflow.add_node("update_state", self.agent.update_state)
         self.supervisor_workflow.add_node("Supervisor", self.agent.call_supervisor)
         self.supervisor_workflow.add_node("Human", self.agent.call_human)
+        self.supervisor_workflow.add_node("TestGenerator",self.agent.call_test_code_generator)
 
         # Build graph
         self.supervisor_workflow.set_entry_point("kickoff")
@@ -38,12 +39,14 @@ class SupervisorWorkflow():
                                                       "call_planner" : "Planner",
                                                       "call_supervisor": 'Supervisor',
                                                       "update_state" : "update_state",
-                                                      "Human" : 'Human'
-                                                  })
+                                                      "Human" : 'Human',
+                                                      "call_test_code_generator":"TestGenerator"
+                                                          })
         self.supervisor_workflow.add_edge("RAG","Supervisor")
         self.supervisor_workflow.add_edge("Architect","Supervisor")
         self.supervisor_workflow.add_edge("Planner","Supervisor")
         self.supervisor_workflow.add_edge("Coder","Supervisor")
+        self.supervisor_workflow.add_edge("TestGenerator","Supervisor")
         self.supervisor_workflow.add_edge("Human","Supervisor")
         self.supervisor_workflow.add_edge("update_state",END)
         # # Compile

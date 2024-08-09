@@ -2,6 +2,7 @@ from agents.supervisor.supervisor_state import SupervisorState
 from agents.architect.graph import ArchitectGraph
 from agents.rag_workflow.rag_graph import RAGWorkFlow
 from agents.planner.planner_graph import PlannerWorkFlow
+from agents.tester.graph import TestCoderGraph
 from agents.coder.graph import CoderGraph
 from models.constants import Status, PStatus
 from models.models import Task
@@ -14,6 +15,7 @@ from agents.supervisor.supervisor_prompts import SupervisorPrompts
 from agents.supervisor.supervisor_models import QueryList
 from pydantic import ValidationError
 from langchain_openai import ChatOpenAI
+from langchain_ollama import OllamaLLM
 from pprint import pprint
 from utils.logs.logging_utils import logger
 
@@ -27,7 +29,7 @@ class SupervisorAgent():
         self.project_path = project_path
         self.rag_cache = FuzzyRAGCache()
         self.rag_cache_building = ''
-
+        self.is_test_generator_agent_called=False
         self.calling_agent = None
         self.called_agent = None
         self.team_members: Dict[str, Union[object, None]] = {x: None for x in self.members}
@@ -44,7 +46,8 @@ class SupervisorAgent():
             'Architect': [],
             'RAG': [],
             'Coder': [],
-            'Planner': []
+            'Planner': [],
+            'TestGenerator':[]
         }
         self.tasks = []
         self.prompts = SupervisorPrompts()
@@ -133,6 +136,7 @@ class SupervisorAgent():
         for member,_ in self.team_members.items():
             if member=='Architect':
                 self.team_members[member] = ArchitectGraph(ChatOpenAI(model="gpt-4o-2024-05-13", temperature=0.3, max_retries=5, streaming=True, seed=4000, top_p=0.4))
+                # self.team_members[member] = ArchitectGraph(OllamaLLM(model="stablelm2:1.6b"))
             elif member=='RAG':
                 # We can to implement a scenario where we are able to use appropriate collection_name from the list of collections based on the user_input
                 # This will probably mechanism should probably go inside ragworkflow implementation. For now lets keep it simple
@@ -140,11 +144,22 @@ class SupervisorAgent():
                                                         collection_name=list(self.collections.keys())[0],
                                                         thread_id=self.memberids[member],
                                                         persist_directory=self.collections[list(self.collections.keys())[0]])
+                # self.team_members[member] = RAGWorkFlow(OllamaLLM(model="stablelm2:1.6b"),
+                #                         collection_name=list(self.collections.keys())[0],
+                #                         thread_id=self.memberids[member],
+                #                         persist_directory=self.collections[list(self.collections.keys())[0]])
             elif member=='Planner':
-                self.team_members[member] = PlannerWorkFlow(ChatOpenAI(model="gpt-4o-2024-05-13", temperature=0.3, max_retries=5, streaming=True, seed=4000, top_p=0.6),
+                # self.team_members[member] = PlannerWorkFlow(ChatOpenAI(model="gpt-4o-2024-05-13", temperature=0.3, max_retries=5, streaming=True, seed=4000, top_p=0.6),
+                #                                             thread_id=self.memberids[member])
+                self.team_members[member] = PlannerWorkFlow(OllamaLLM(model="stablelm2:1.6b"),
                                                             thread_id=self.memberids[member])
             elif member=='Coder':
                 self.team_members[member] = CoderGraph(ChatOpenAI(model="gpt-4o-2024-05-13", temperature=0.3, max_retries=5, streaming=True, seed=4000, top_p=0.4))
+                # self.team_members[member] = CoderGraph(OllamaLLM(model="stablelm2:1.6b"))
+
+            elif member== 'TestGenerator':
+                self.team_members[member]= TestCoderGraph(ChatOpenAI(model="gpt-4o-2024-05-13", temperature=0.3, max_retries=5, streaming=True, seed=4000, top_p=0.4))
+                # self.team_members[member]= TestCoderGraph(OllamaLLM(model="stablelm2:1.6b"))
 
             else:
                 continue
@@ -308,12 +323,13 @@ class SupervisorAgent():
         return {**state}
 
     def call_coder(self, state: SupervisorState) -> SupervisorState:
+        self.is_test_generator_agent_called=False
         # Implement the logic to call the Coder agent
-        message = ('Assistant', 'Calling Architect Agent')
+        message = ('Coder', 'Calling Coder Agent')
         state['messages'] += [message]
         logger.info("---------- Calling Coder ----------")
         coder_result = self.team_members['Coder'].app.invoke({**state['coder_inputs'],'messages':[]},
-                                                                     {'configurable':{'thread_id':self.memberids['Coder']}})
+                                                                     {'configurable':{'thread_id':self.memberids['Coder'],"recursion_limit": 5}})
         # coder_state = self.team_members['Coder'].get_state()
 
         if coder_result['current_task'].task_status.value == Status.DONE.value:
@@ -331,6 +347,37 @@ class SupervisorAgent():
         self.responses['Coder'].append(("Returned from Coder",state['current_task']))
         return {**state}
 
+# print(type(state['coder_inputs']['current_task'].description))
+
+# classifier= json.loads(state['coder_inputs']['current_task'].description)
+# print(classifier['is_function_generation_required'])
+    def call_test_code_generator(self, state: SupervisorState) -> SupervisorState:
+        # Implement the logic to call the Test code generator  agent
+        message = ('Test_code_generator', 'Calling Test Code Generator Agent')
+        state['messages'] += [message]
+        logger.info("---------- Calling Test Code Generator ----------")
+        test_coder_result = self.team_members['TestGenerator'].app.invoke({**state['coder_inputs'],'messages':[]},
+                                                                     {'configurable':{'thread_id':self.memberids['TestGenerator']}})
+        # coder_state = self.team_members['Coder'].get_state()
+        # 
+        state['coder_inputs']['test_code']=test_coder_result['test_code']
+        state['coder_inputs']['functions_skeleton']=test_coder_result['functions_skeleton']
+        if test_coder_result['current_task'].task_status.value == Status.DONE.value:
+            logger.info("Test Code Generator completed work package")
+            state['agents_status'] = 'Test Coder Generator Completed'
+
+        elif test_coder_result['current_task'].task_status.value == Status.ABANDONED.value:
+            logger.info("Test Coder Generator unable to complete the work package due to : %s", test_coder_result['current_task'].additional_info)
+            state['agent_status'] = "Coder Completed With Abandonment"
+        else:
+            logger.info("Test Coder Generator awaiting for additional information\nCoder Query: %s", test_coder_result['current_task'].question)
+            state['agents_status'] = 'Test Coder Generator Awaiting'
+
+        self.called_agent = 'TestGenerator'
+        self.responses['TestGenerator'].append(("Returned from Test Coder Generator",state['current_task']))
+        self.is_test_generator_agent_called=True
+        return {**state}
+    
     def call_supervisor(self, state: SupervisorState):
         # Handling new requests vs pending requests
         if self.project_status == PStatus.NEW.value:
@@ -378,7 +425,7 @@ class SupervisorAgent():
                     return {**state}
                 else:
                     # all work_packages are provided to coder so we can now move to next deliverable
-                    state['current_task'].task_status.value = Status.DONE.value
+                    state['current_task'].task_status = Status.DONE
 
             if state['current_task'].task_status.value == Status.DONE.value:
                 # We need to work on calling planner on deliverables provided by architect
@@ -522,7 +569,9 @@ class SupervisorAgent():
             return calling_map[self.calling_agent]
         elif self.project_status==PStatus.EXECUTING.value and (self.called_agent=='Architect' or self.called_agent=='Supervisor'):
             return 'call_planner'
-        elif self.project_status==PStatus.EXECUTING.value and (self.called_agent=='Planner' or self.called_agent=='Coder'):
+        elif self.project_status== PStatus.EXECUTING.value and (self.called_agent=='Planner' or self.called_agent=='Coder') and ((classifier := json.loads(state['coder_inputs']['current_task'].description))['is_function_generation_required']) and not(self.is_test_generator_agent_called) :
+            return 'call_test_code_generator' 
+        elif self.project_status==PStatus.EXECUTING.value and (self.called_agent=='Planner' or self.called_agent=='Coder' or self.called_agent =='TestGenerator') and (((classifier := json.loads(state['coder_inputs']['current_task'].description))['is_function_generation_required'] and self.is_test_generator_agent_called) or not ((classifier := json.loads(state['coder_inputs']['current_task'].description))['is_function_generation_required'])) :
             return 'call_coder'
         # elif self.project_status==PStatus.EXECUTING.value and self.called_agent=='Coder':
         #     return 'call_coder'

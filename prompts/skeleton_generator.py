@@ -12,7 +12,8 @@ class SkeletonGeneratorPrompts:
     skeleton_generation_prompt: PromptTemplate =PromptTemplate(
         template="""
     You are a highly skilled software developer assistant. Your task is to generate a detailed function skeleton based on the provided description.
-    
+
+
     You are currently working on the following project:
     Project Name: '{project_name}'
 

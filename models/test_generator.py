@@ -49,11 +49,11 @@ class TestCodeGeneration(BaseModel):
         required=True
     )
 
-    code: dict[str, str] = Field(
+    test_code: dict[str, str] = Field(
         description="""
         A dictionary where each key-value pair represents a file and its corresponding code. The key 
         should be the absolute path to the file, and the value should be the well-documented working 
-        code for that particular file. The code should adhere to all the requirements and standards 
+        unit test code for that particular file. The code should adhere to all the requirements and standards 
         provided.
         """, 
         required=True

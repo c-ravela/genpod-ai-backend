@@ -44,7 +44,7 @@ class FunctionSkeleton(BaseModel):
         A dictionary where each key-value pair represents a file and its corresponding function skeleton. The key 
         should be the absolute path to the file, and the value should be the well-descriptive function skeleton
           for that particular file.
-        """, 
+          """, 
         required=True
     )
 

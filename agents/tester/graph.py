@@ -35,7 +35,7 @@ class TestCoderGraph:
         # node
         unit_test_coder_flow.add_node(self.agent.entry_node_name, self.agent.entry_node)
         unit_test_coder_flow.add_node(self.agent.skeleton_generation_node_name,self.agent.skeleton_generation_node)
-        unit_test_coder_flow.add_node(self.agent.code_generation_node_name, self.agent.test_code_generation_node)
+        unit_test_coder_flow.add_node(self.agent.test_code_generation_node_name, self.agent.test_code_generation_node)
         unit_test_coder_flow.add_node(self.agent.run_commands_node_name, self.agent.run_commands_node)
         unit_test_coder_flow.add_node(self.agent.write_skeleton_node_name, self.agent.write_skeleton_node)
         unit_test_coder_flow.add_node(self.agent.write_generated_code_node_name, self.agent.write_code_node)
@@ -63,17 +63,17 @@ class TestCoderGraph:
             self.agent.router,
             {
                 self.agent.write_skeleton_node_name: self.agent.write_skeleton_node_name,
-                self.agent.code_generation_node_name: self.agent.code_generation_node_name,
+                self.agent.test_code_generation_node_name: self.agent.test_code_generation_node_name,
                 self.agent.update_state_node_name:self.agent.update_state_node_name
             }
         )
 
 
         unit_test_coder_flow.add_conditional_edges(
-            self.agent.code_generation_node_name,
+            self.agent.test_code_generation_node_name,
             self.agent.router,
             {
-                self.agent.code_generation_node_name: self.agent.code_generation_node_name,
+                self.agent.test_code_generation_node_name: self.agent.test_code_generation_node_name,
                 self.agent.write_generated_code_node_name: self.agent.write_generated_code_node_name,
                 self.agent.update_state_node_name:self.agent.update_state_node_name
             }

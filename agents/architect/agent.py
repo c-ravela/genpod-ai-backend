@@ -635,7 +635,7 @@ class ArchitectAgent:
 
         try:
             task_seperation_solution = self.task_seperation_chain.invoke({
-                "tasks": self.state['tasks'],
+                "tasks": self.state['requirements_overview']['task_description'],
                 "error_message": self.error_message
             })
             

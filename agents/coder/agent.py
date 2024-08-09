@@ -36,6 +36,7 @@ from typing_extensions import Literal
 from utils.logs.logging_utils import logger
 
 import pprint as pp
+import json
 
 class CoderAgent:
     """
@@ -171,37 +172,37 @@ class CoderAgent:
         """
         """
 
-        if self.state['files_created'] is None:
-            self.state['files_created'] = current_cg['files_to_create']
-        else:
-            new_list = [item for item in current_cg['files_to_create'] if item not in self.state['files_created']]
+        # if self.state['files_created'] is None:
+        #     self.state['files_created'] = current_cg['files_to_create']
+        # else:
+        #     new_list = [item for item in current_cg['files_to_create'] if item not in self.state['files_created']]
 
-            self.state['files_created'] += new_list
+        #     self.state['files_created'] += new_list
         
-        if self.state['code'] is None:
-            self.state["code"] = current_cg['code']
-        else:
-            state_ifc = current_cg['code'].copy()
+        # if self.state['code'] is None:
+        #     self.state["code"] = current_cg['code']
+        # else:
+        #     state_ifc = current_cg['code'].copy()
 
-            for key in state_ifc:
-                if key in self.state['code']:
-                    del current_cg['code'][key]
+        #     for key in state_ifc:
+        #         if key in self.state['code']:
+        #             del current_cg['code'][key]
 
-        if self.state['infile_license_comments'] is None:
-            self.state['infile_license_comments'] = current_cg['infile_license_comments']
-        else:
-            state_ifc = current_cg['infile_license_comments'].copy()
+        # if self.state['infile_license_comments'] is None:
+        #     self.state['infile_license_comments'] = current_cg['infile_license_comments']
+        # else:
+        #     state_ifc = current_cg['infile_license_comments'].copy()
 
-            for key in state_ifc:
-                if key in self.state['infile_license_comments']:
-                    del current_cg['infile_license_comments'][key]
+        #     for key in state_ifc:
+        #         if key in self.state['infile_license_comments']:
+        #             del current_cg['infile_license_comments'][key]
             
-            self.state['infile_license_comments'].update(current_cg['infile_license_comments'])
+        #     self.state['infile_license_comments'].update(current_cg['infile_license_comments'])
 
-        if self.state['commands_to_execute'] is None:
-            self.state['commands_to_execute'] = current_cg['commands_to_execute']
-        else:
-            self.state['commands_to_execute'].update(current_cg['commands_to_execute'])
+        # if self.state['commands_to_execute'] is None:
+        #     self.state['commands_to_execute'] = current_cg['commands_to_execute']
+        # else:
+        #     self.state['commands_to_execute'].update(current_cg['commands_to_execute'])
 
     def entry_node(self, state: CoderState) -> CoderState:
         """
@@ -251,19 +252,34 @@ class CoderAgent:
         ))
 
         try:
-            llm_response = self.code_generation_chain.invoke({
-                "project_name": self.state['project_name'],
-                "project_path": self.state['generated_project_path'],
-                "requirements_document": self.state['requirements_overview'],
-                "folder_structure": self.state['project_folder_strucutre'],
-                "task": task.description,
-                "error_message": self.error_message,
-            })
+
+            if ((classifier := json.loads(task.description))['is_function_generation_required']):
+                llm_response = self.code_generation_chain.invoke({
+                    "project_name": self.state['project_name'],
+                    "project_path": self.state['generated_project_path'],
+                    "requirements_document": self.state['requirements_overview'],
+                    "folder_structure": self.state['project_folder_strucutre'],
+                    "task": task.description,
+                    "error_message": self.error_message,
+                    "unit_test":self.state['test_code'],
+                    "functions_skeleton":self.state['functions_skeleton']
+                })
+            else:
+                 llm_response = self.code_generation_chain.invoke({
+                    "project_name": self.state['project_name'],
+                    "project_path": self.state['generated_project_path'],
+                    "requirements_document": self.state['requirements_overview'],
+                    "folder_structure": self.state['project_folder_strucutre'],
+                    "task": task.description,
+                    "error_message": self.error_message,
+                    "unit_test":"No UnitTests",
+                    "functions_skeleton":"No_skeleton"
+                })
 
             self.hasError = False
             self.error_message = ""
 
-            required_keys = ["files_to_create", "code", "infile_license_comments", "commands_to_execute"]
+            required_keys = [ "code"]
             missing_keys = [key for key in required_keys if key not in llm_response]
 
             if missing_keys:
@@ -277,9 +293,9 @@ class CoderAgent:
             # details to the code generation prompt - look self.current_code_generation
 
             self.current_code_generation["code"] = llm_response['code']
-            self.current_code_generation["files_created"] = llm_response['files_to_create']
-            self.current_code_generation['infile_license_comments'] = llm_response['infile_license_comments']
-            self.current_code_generation['commands_to_execute'] = llm_response['commands_to_execute']
+            # self.current_code_generation["files_created"] = llm_response['files_to_create']
+            # self.current_code_generation['infile_license_comments'] = llm_response['infile_license_comments']
+            # self.current_code_generation['commands_to_execute'] = llm_response['commands_to_execute']
 
             self.add_message((
                 ChatRoles.USER.value,
@@ -464,17 +480,17 @@ class CoderAgent:
                 if len(file_extension) <= 0:
                     continue
             
-                file_comment = self.state['infile_license_comments'].get(file_extension, "")
+                # file_comment = self.state['infile_license_comments'].get(file_extension, "")
 
-                if len(file_comment) > 0:
+                # if len(file_comment) > 0:
 
-                    with open(path, 'r') as file:
-                        content = file.read()
+                #     with open(path, 'r') as file:
+                #         content = file.read()
 
-                    with open(path, 'w') as file:
-                        file.write(file_comment + "\\n" + content)
+                #     with open(path, 'w') as file:
+                #         file.write(file_comment + "\\n" + content)
                     
-                    self.track_add_license_txt.append(path)
+                #     self.track_add_license_txt.append(path)
 
         self.is_license_text_added_to_files = True
         self.state['current_task'].task_status = Status.DONE
