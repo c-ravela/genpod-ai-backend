@@ -13,8 +13,8 @@ class RAGAgent(Agent[RAGState, RAGPrompts]):
         assert persist_directory is not None, "Currently only Local Chroma VectorDB is supported"
         
         super().__init__(
-            ProjectAgents.rag.agent_name,
             ProjectAgents.rag.agent_id,
+            ProjectAgents.rag.agent_name,
             RAGState(),
             RAGPrompts(),
             llm

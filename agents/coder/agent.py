@@ -61,8 +61,8 @@ class CoderAgent(Agent[CoderState, CoderPrompts]):
         """
         
         super().__init__(
-            ProjectAgents.coder.agent_name,
             ProjectAgents.coder.agent_id,
+            ProjectAgents.coder.agent_name,
             CoderState(),
             CoderPrompts(),
             llm

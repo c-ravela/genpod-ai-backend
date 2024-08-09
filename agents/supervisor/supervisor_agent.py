@@ -1,6 +1,6 @@
 import ast
 import json
-from typing import Dict, List, Any, Tuple, Union
+from typing import Dict, List, Tuple, Union
 
 from pydantic import ValidationError
 from langchain_openai import ChatOpenAI
@@ -37,8 +37,8 @@ class SupervisorAgent(Agent[SupervisorState, SupervisorPrompts]):
                 agents_config: Dict[str, AgentConfig]):
 
         super().__init__(
-            ProjectAgents.supervisor.agent_name,
             ProjectAgents.supervisor.agent_id,
+            ProjectAgents.supervisor.agent_name,
             SupervisorState(),
             SupervisorPrompts(),
             llm
@@ -201,10 +201,10 @@ class SupervisorAgent(Agent[SupervisorState, SupervisorPrompts]):
                     self.persistance_db_path
                 )
 
-            elif member==ProjectAgents.tester.agent_id:
+            elif member==ProjectAgents.tester.agent_id and False:
                 raise NotImplementedError("Need implement flow for tester")
             
-            elif member==ProjectAgents.modernizer.agent_id:
+            elif member==ProjectAgents.modernizer.agent_id and False:
                 raise NotImplementedError("Need implement flow for modernizer")
 
             else:

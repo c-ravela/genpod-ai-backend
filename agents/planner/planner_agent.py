@@ -22,8 +22,8 @@ class PlannerAgent(Agent[PlannerState, PlannerPrompts]):
     def __init__(self, llm):
         
         super().__init__(
-            ProjectAgents.planner.agent_name,
             ProjectAgents.planner.agent_id,
+            ProjectAgents.planner.agent_name,
             PlannerState(),
             PlannerPrompts(),
             llm

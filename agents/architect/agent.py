@@ -81,8 +81,8 @@ class ArchitectAgent(Agent[ArchitectState, ArchitectPrompts]):
         """
         
         super().__init__(
-            ProjectAgents.architect.agent_name,
             ProjectAgents.architect.agent_id,
+            ProjectAgents.architect.agent_name,
             ArchitectState(),
             ArchitectPrompts(),
             llm
