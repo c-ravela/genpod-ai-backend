@@ -4,15 +4,14 @@ This module provides a Shell class for executing shell commands on the local mac
 The Shell class is designed to execute a set of whitelisted commands securely and efficiently.
 """
 
-from langchain.tools import tool
-
-from typing import Annotated
-
-from configs.shell_config import CODER_COMMANDS
-from configs.shell_config import SHELL_COMMANDS_JOIN_SYMBOLS
-
 import shlex
 import subprocess
+from typing import Annotated
+
+from langchain.tools import tool
+
+from configs.shell_config import CODER_COMMANDS, SHELL_COMMANDS_JOIN_SYMBOLS
+
 
 class Shell:
     """

@@ -6,10 +6,9 @@ the Coder agent includes information about the steps to complete a task,
 the files to be created, the location of the code, the actual code.
 """
 
+from pydantic import BaseModel, Field
 from typing_extensions import ClassVar
 
-from pydantic import Field
-from pydantic import BaseModel
 
 class ToolCall(BaseModel):
     """

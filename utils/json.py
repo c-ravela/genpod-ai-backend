@@ -1,5 +1,6 @@
 import json
 
+
 class Json:
     def read_input_json(file_path) -> str:
         """Reads JSON data from a file and returns it as a string.

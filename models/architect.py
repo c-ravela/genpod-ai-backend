@@ -4,13 +4,12 @@ the form of a Requirements Document.
 
 """
 
+from pydantic import BaseModel, Field
 from typing_extensions import ClassVar
-
-from pydantic import Field
-from pydantic import BaseModel
 
 from models.constants import Status
 from models.models import Task
+
 
 class ProjectDetails(BaseModel):
     """

@@ -1,8 +1,11 @@
 """Logging utility function to use throughout the agents"""
-import os
 import logging
+import os
+
 from pythonjsonlogger import jsonlogger
-from utils.logs.log_sanitization import sanitize_log_message, sanitize_dict
+
+from utils.logs.log_sanitization import sanitize_dict, sanitize_log_message
+
 
 class SanitizedJsonFormatter(jsonlogger.JsonFormatter):
     def process_log_record(self, log_record):

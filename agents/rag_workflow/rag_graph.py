@@ -1,29 +1,39 @@
-from langgraph.graph import StateGraph, END
-from langgraph.checkpoint.sqlite import SqliteSaver
-from agents.rag_workflow.rag_state import RAGState
+from langgraph.graph import END, StateGraph
+
+from agents.agent.graph import Graph
 from agents.rag_workflow.rag_agent import RAGAgent
-from utils.logs.logging_utils import logger
+from agents.rag_workflow.rag_state import RAGState
+from configs.project_config import ProjectGraphs
 
-class RAGWorkFlow():
-    def __init__(self, llm, collection_name, thread_id=None, persist_directory=None):
-        self.agent = RAGAgent(llm, collection_name = collection_name, persist_directory=persist_directory)
-        self.rag_workflow = StateGraph(RAGState)
-        # Memory for Persistence
-        self.thread_id = thread_id
+import os
 
-        if thread_id is not None:
-            self.memory = SqliteSaver.from_conn_string(":memory:")
+class RAGWorkFlow(Graph[RAGAgent]):
+
+    def __init__(self, llm, collection_name, persistance_db_path: str, persist_directory=None):
+        super().__init__(
+            ProjectGraphs.rag.graph_id,
+            ProjectGraphs.rag.graph_name, 
+            RAGAgent(llm, collection_name = collection_name, persist_directory=persist_directory),
+            persistance_db_path
+        )
+
+        self.compile_graph_with_persistence()
+
+    def define_graph(self) -> StateGraph:
+        
+        rag_workflow = StateGraph(RAGState)
+
         # Define the nodes
-        self.rag_workflow.add_node("retrieve", self.agent.retrieve)  # retrieve
-        self.rag_workflow.add_node("grade_documents", self.agent.grade_documents)  # grade documents
-        self.rag_workflow.add_node("generate", self.agent.generate)  # generate
-        self.rag_workflow.add_node("transform_query", self.agent.transform_query)  # transform_query
-        self.rag_workflow.add_node("update_state", self.agent.update_state)
+        rag_workflow.add_node("retrieve", self.agent.retrieve)  # retrieve
+        rag_workflow.add_node("grade_documents", self.agent.grade_documents)  # grade documents
+        rag_workflow.add_node("generate", self.agent.generate)  # generate
+        rag_workflow.add_node("transform_query", self.agent.transform_query)  # transform_query
+        rag_workflow.add_node("update_state", self.agent.update_state)
 
         # Build graph
-        self.rag_workflow.set_entry_point("retrieve")
-        self.rag_workflow.add_edge("retrieve", "grade_documents")
-        self.rag_workflow.add_conditional_edges(
+        rag_workflow.set_entry_point("retrieve")
+        rag_workflow.add_edge("retrieve", "grade_documents")
+        rag_workflow.add_conditional_edges(
             "grade_documents",
             self.agent.decide_to_generate,
             {
@@ -32,7 +42,7 @@ class RAGWorkFlow():
             },
         )
         # self.rag_workflow.add_edge("transform_query", "retrieve")
-        self.rag_workflow.add_conditional_edges(
+        rag_workflow.add_conditional_edges(
             "transform_query",
             lambda x: x["next"],
             {
@@ -40,7 +50,7 @@ class RAGWorkFlow():
                 "update_state": "update_state",
             },
         )
-        self.rag_workflow.add_conditional_edges(
+        rag_workflow.add_conditional_edges(
             "generate",
             self.agent.grade_generation_v_documents_and_question,
             {
@@ -49,17 +59,9 @@ class RAGWorkFlow():
                 "not useful": "transform_query",
             },
         )
-        self.rag_workflow.add_edge("update_state", END)
+        rag_workflow.add_edge("update_state", END)
 
-        # # Compile
-        # self.rag_app = self.rag_workflow.compile()
-        if thread_id is not None:
-            self.rag_app = self.rag_workflow.compile(checkpointer=self.memory)
-        
-        else:
-            # print("You have not set the Thread ID so not persisting the workflow state.")
-            logger.info("You have not set the Thread ID so not persisting the workflow state.")
-            self.rag_app = self.rag_workflow.compile()
+        return rag_workflow
     
     def get_current_state(self):
         """ Returns the current state dictionary of the agent """
@@ -68,9 +70,10 @@ class RAGWorkFlow():
 
 if __name__=="__main__":
     #  Example using in you main graph.
-    from langchain_openai import ChatOpenAI
     from pprint import pprint
+
     from dotenv import load_dotenv
+    from langchain_openai import ChatOpenAI
     load_dotenv()
 
     llm = ChatOpenAI(model="gpt-4o-2024-05-13", temperature=0, max_retries=5, streaming=True, seed=4000)
@@ -78,7 +81,7 @@ if __name__=="__main__":
     # Currently only use this value for collection_name if you have embeded and saved vector into the db with a differnet name then you can use it here.
     collection_name = 'MISMO-version-3.6-docs'
 
-    persist_directory = "C:/Users/vkumar/Desktop/genpod-ai-backend/vector_collections"
+    persist_directory = os.path.join(os.getcwd(), "../../vector_collections")
 
     RAG_thread_id = "1"
     try:
@@ -87,7 +90,7 @@ if __name__=="__main__":
         rag_input = {"question": "Any question related to MISMO_Standards"}
 
         result = ''
-        for output in RAG.rag_app.stream(rag_input, thread_id= RAG.thread_id):
+        for output in RAG.workflow.stream(rag_input, thread_id= RAG.thread_id):
             for key, value in output.items():
                 # Node
                 pprint(f"Node '{key}':")

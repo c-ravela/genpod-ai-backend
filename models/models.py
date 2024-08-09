@@ -6,11 +6,12 @@ capturing a specific set of information required for the project. These models
 are used to structure the data in a consistent and organized manner, enhancing 
 the readability and maintainability of the code.
 """
+from pydantic import BaseModel, Field
 from typing_extensions import ClassVar
 
-from pydantic import Field, BaseModel
 from models.constants import Status
 from utils.task_utils import generate_task_id
+
 
 class Task(BaseModel):
     """

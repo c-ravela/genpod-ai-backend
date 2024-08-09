@@ -1,4 +1,7 @@
 """ constants to use in the supervisor agent"""
+
+import os
+
 # thread ids are crucial for graph state persistence so there should be unique for each agent key.
 THREAD_IDS = {
     'RAG':'1',
@@ -8,10 +11,10 @@ THREAD_IDS = {
 }
 
 # Currently only use this value for collection_name if you have embeded and saved vector into the db with a differnet name then you can use it here.
-VECTOR_DB_COLLECTIONS = {'MISMO-version-3.6-docs':"path/to/your/vector_collections"}
+VECTOR_DB_COLLECTIONS = {'MISMO-version-3.6-docs': os.path.join(os.getcwd(), "vector_collections")}
 
 # Agent Members to use in the setup. Ideal memebers are as below.
-MEMBERS = ['RAG','Architect','Planner','Coder']
+MEMBERS = ['RAG', 'Architect', 'Planner', 'Coder', 'Tester', 'Modernizer']
 # MEMBERS = ['RAG','Architect','Planner']
 
 # Rag Agent tries to transform the original query for better vector search if failed the first time. This value can be used to set a limit on number of retries.

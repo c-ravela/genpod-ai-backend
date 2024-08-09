@@ -1,6 +1,8 @@
 """ Graph State for RAG Agent """
 from typing import List
+
 from typing_extensions import TypedDict
+
 
 class RAGState(TypedDict):
     """

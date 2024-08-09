@@ -9,11 +9,12 @@ for a new project and creates a new directory at that path with the current
 timestamp.
 """
 
-from utils.fs import create_directory_with_timestamp
-
 import os
 
-def set_project_path(project_path: str=os.path.join(os.getcwd(), "output", "projects")) -> str:
+from utils.fs import create_directory_with_timestamp
+
+
+def set_project_path(project_path: str=os.path.join(os.getcwd(), "output", "projects"), timestamp: str="") -> str:
     """
     Sets the path for a new project and creates a new directory at that path 
     with the current timestamp. If the path already exists, no new directory 
@@ -35,5 +36,10 @@ def set_project_path(project_path: str=os.path.join(os.getcwd(), "output", "proj
         returned path will be '<cwd>/output/project/2024-06-27 22:22:43.027072'.
 
     """
+    new_directory_path = os.path.join(project_path, timestamp)
 
-    return create_directory_with_timestamp(project_path)
+    if not os.path.exists(new_directory_path):
+        os.makedirs(new_directory_path)
+
+    return new_directory_path
+

@@ -1,5 +1,7 @@
-from pydantic import BaseModel, Field, field_validator
 from typing import List
+
+from pydantic import BaseModel, Field, field_validator
+
 
 class BacklogList(BaseModel):
     backlogs: List[str] = Field(..., description="List of backlog items")

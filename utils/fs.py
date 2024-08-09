@@ -1,6 +1,7 @@
 import os
 from datetime import datetime
 
+
 def create_directory_with_timestamp(parent_directory: str) -> str:
     """
     This function creates a new directory within the specified parent directory. 

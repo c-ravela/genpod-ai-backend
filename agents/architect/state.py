@@ -5,11 +5,11 @@ the state of the Architect agent. It also includes functions to manipulate the
 state.
 """
 
-from typing_extensions import TypedDict
-from typing_extensions import Annotated
+from typing_extensions import Annotated, TypedDict
 
 from models.architect import RequirementsOverview
 from models.models import Task
+
 
 class ArchitectState(TypedDict): 
     """

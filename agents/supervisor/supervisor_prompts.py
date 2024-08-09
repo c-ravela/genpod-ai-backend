@@ -1,6 +1,7 @@
 """ Contain all the prompts needed by the Supervisor Agent"""
 from langchain.prompts import PromptTemplate
 
+
 class SupervisorPrompts():
     delegator_prompt = PromptTemplate(
         template="""You are a Supervisor of a team who always tracks the status of the project and the tasks \n 

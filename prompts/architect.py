@@ -12,14 +12,11 @@ inputs and how to structure its outputs. They are essential for ensuring that
 the Architect agent can effectively assist users in implementing their projects.
 """
 
+from langchain.output_parsers import PydanticOutputParser
 from langchain_core.prompts import PromptTemplate
 
-from langchain.output_parsers import PydanticOutputParser
+from models.architect import ProjectDetails, QueryResult, TaskOutput, TasksList
 
-from models.architect import TasksList
-from models.architect import ProjectDetails
-from models.architect import QueryResult
-from models.architect import TaskOutput
 
 class ArchitectPrompts:
     """
@@ -62,35 +59,16 @@ class ArchitectPrompts:
 
             '{tasks}'
 
-            Below is an example of how the deliverables should be formatted from the source:
-
-            [
-                "**Project Setup**
-                    - Initialize the project structure.
-                    - Set up version control with Git.
-                    - Create `.gitignore` and `.dockerignore` files.",
-
-                "**Database Configuration**
-                    - Set up MySQL database.
-                    - Create database connection module.", 
-
-                "**API Endpoints**
-                    - Create FastAPI application.
-                    - Implement CRUD operations for User resource.",
-                .
-                .
-                .
-                .
-                "Task N"
-            ]
-
             Your task is to convert the deliverables from this markdown document into a list or an array. 
             Each task should be copied exactly as it appears in the markdown document and transformed 
-            into an item in the list or array. No modifications should be made to the statements.
+            into an item of an list or array. No modifications should be made to the statements.
 
             Error messages will only be present if there is an issue with your previous response. 
             '{error_message}'
 
+            "Example:
+            [Task1, Task2, Task3, .... TaskN]
+            "
             output format instructions:
             '{format_instructions}'
         """,

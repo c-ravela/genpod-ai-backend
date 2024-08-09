@@ -5,34 +5,25 @@ managing the state of the Architect agent, processing user inputs, and
 generating appropriate responses.
 """
 
-from langchain_openai import ChatOpenAI
-from langchain_community.chat_models import ChatOllama
-
-from langchain_core.runnables.base import RunnableSequence
-
-from langchain_core.output_parsers import JsonOutputParser
-
-from prompts.architect import ArchitectPrompts
-
-from models.constants import PStatus
-from models.constants import Status
-from models.constants import ChatRoles
-
-from models.models import Task
-
-from models.architect import ProjectDetails, TaskOutput
-from models.architect import QueryResult
-
-from agents.architect.state import ArchitectState
-
-from tools.code import CodeFileWriter
-
-from typing_extensions import Union
-from typing_extensions import Literal
-
 import os
 
-class ArchitectAgent:
+from langchain_community.chat_models import ChatOllama
+from langchain_core.output_parsers import JsonOutputParser
+from langchain_core.runnables.base import RunnableSequence
+from langchain_openai import ChatOpenAI
+from typing_extensions import Literal, Union
+
+from agents.agent.agent import Agent
+from agents.architect.state import ArchitectState
+from configs.project_config import ProjectAgents
+from models.architect import ProjectDetails, QueryResult, TaskOutput
+from models.constants import ChatRoles, PStatus, Status
+from models.models import Task
+from prompts.architect import ArchitectPrompts
+from tools.code import CodeFileWriter
+from utils.logs.logging_utils import logger
+
+class ArchitectAgent(Agent[ArchitectState, ArchitectPrompts]):
     """
     ArchitectAgent Class
 
@@ -40,8 +31,6 @@ class ArchitectAgent:
     agent, processes user inputs, and generates appropriate responses. It uses 
     a chain of tools to parse the user input and generate a structured output.
     """
-    agent_name: str # The name of the agent
-
     # names of the graph node
     entry_node_name: str # The entry point of the graph
     requirements_node_name: str # Node for handling requirements generation
@@ -67,11 +56,6 @@ class ArchitectAgent:
     last_visited_node: str # The last node that was visited in the graph
     error_message: str # The error message, if an error occurred
 
-    state: ArchitectState # Architect agent graphs state
-    prompts: ArchitectPrompts # Architect agents the prompts
-
-    llm: Union[ChatOpenAI, ChatOllama] # This is the language learning model (llm) for the Architect agent. It can be either a ChatOpenAI model or a ChatOllama model
-
     # chains
     project_overview_chain: RunnableSequence # This is for project comprehensive overview in markdown format
     architecture_chain: RunnableSequence
@@ -95,8 +79,14 @@ class ArchitectAgent:
         Args:
             llm (Union[ChatOpenAI, ChatOllama]): The Language Learning Model to be used by the ArchitectAgent.
         """
-
-        self.agent_name = "Solution Architect"
+        
+        super().__init__(
+            ProjectAgents.architect.agent_id,
+            ProjectAgents.architect.agent_name,
+            ArchitectState(),
+            ArchitectPrompts(),
+            llm
+        )
 
         self.entry_node_name = "entry"
         self.requirements_node_name = "requirements"
@@ -119,11 +109,6 @@ class ArchitectAgent:
 
         self.last_visited_node = self.entry_node_name # entry point node
         self.error_message = ""
-
-        self.state = ArchitectState()
-        self.prompts = ArchitectPrompts()
-        
-        self.llm = llm
 
         self.project_overview_chain = ( 
             self.prompts.project_overview_prompt
@@ -209,7 +194,7 @@ class ArchitectAgent:
             str: A string representing the requirements document.
         """
         
-        print(f"----{self.agent_name}: Generating requirements document----")
+        logger.info(f"----{self.agent_name}: Generating requirements document----")
 
         return f"""
 # Project Requirements Document
@@ -243,7 +228,7 @@ class ArchitectAgent:
             from the input list and a 'status' attribute set as NEW.
         """
 
-        print(f"----{self.agent_name}: Initiating the process of Task List Creation----")
+        logger.info(f"----{self.agent_name}: Initiating the process of Task List Creation----")
 
         tasks_list: list[Task] = []
 
@@ -264,7 +249,7 @@ class ArchitectAgent:
             response (TaskOutput): The output of the task that requires additional information.
         """
 
-        print(f"----{self.agent_name}: Initiating request for additional information----")
+        logger.info(f"----{self.agent_name}: Initiating request for additional information----")
 
         self.is_additional_info_requested = True
         self.state['current_task'].question = response['question_for_additional_info']
@@ -279,7 +264,7 @@ class ArchitectAgent:
             phase (str): The phase of the task.
             response (TaskOutput): The output of the task.
         """
-        print(f"----{self.agent_name}: Modifying key: {key} in requirements overview----")
+        logger.info(f"----{self.agent_name}: Modifying key: {key} in requirements overview----")
 
         
         if not response['is_add_info_needed']:
@@ -310,7 +295,7 @@ class ArchitectAgent:
             for the current section of the requirements overview.
         """
         
-        print(f"----{self.agent_name}: Progressing with requirements overview. Current Step: {self.generation_step}----")
+        logger.info(f"----{self.agent_name}: Progressing with requirements overview. Current Step: {self.generation_step}----")
 
         if self.generation_step == 0: # Project Overview
             self.update_requirements_overview("project_details", "Project Overview", response)
@@ -342,7 +327,7 @@ class ArchitectAgent:
             str: The name of the next agent to be invoked.
         """
 
-        print(f"----{self.agent_name}: Router in action: Determining the next node----")
+        logger.info(f"----{self.agent_name}: Router in action: Determining the next node----")
 
         if self.has_error_occured:
             return self.last_visited_node
@@ -363,22 +348,6 @@ class ArchitectAgent:
         
         return self.update_state_node_name
     
-    def update_state(self, state: ArchitectState) -> ArchitectState:
-        """
-        This method updates the current state of the Architect agent with the provided state. 
-
-        Args:
-            state (ArchitectState): The new state to update the current state of the agent with.
-
-        Returns:
-            ArchitectState: The updated state of the agent.
-        """
-        print(f"----{self.agent_name}: Proceeding with state update----")
-        
-        self.state = {**state}
-
-        return {**self.state}
-    
     def entry_node(self, state: ArchitectState) -> ArchitectState:
         """
         This method is the entry point of the Architect agent. It updates the current state 
@@ -392,7 +361,7 @@ class ArchitectAgent:
             ArchitectState: The updated state of the architect.
         """
 
-        print(f"----{self.agent_name}: Initiating Graph Entry Point----")
+        logger.info(f"----{self.agent_name}: Initiating Graph Entry Point----")
 
         self.state={**state}
         self.last_visited_node = self.entry_node_name
@@ -415,7 +384,7 @@ class ArchitectAgent:
         Returns:
             ArchitectState: The updated state of the architect.
         """
-        print(f"----{self.agent_name}: Commencing generation of Requirements Document----")
+        logger.info(f"----{self.agent_name}: Commencing generation of Requirements Document----")
 
         if (not self.has_error_occured) and (not self.is_additional_info_requested):
             state['requirements_overview'] = {}
@@ -563,6 +532,7 @@ class ArchitectAgent:
                 ChatRoles.USER.value,
                 f"{self.agent_name}: {self.error_message}"
             ))
+            logger.error(f"Exception: {type(e)} --> {self.agent_name}: {self.error_message}")
 
         return {**self.state}
 
@@ -580,7 +550,7 @@ class ArchitectAgent:
             ArchitectState: The updated state of the architect.
         """
 
-        print(f"----{self.agent_name}: Commencing the process of writing requirements documents to local filesystem----")
+        logger.info(f"----{self.agent_name}: Commencing the process of writing requirements documents to local filesystem----")
 
         self.state={**state}
 
@@ -628,14 +598,14 @@ class ArchitectAgent:
             ArchitectState: The updated state of the architect.
         """
 
-        print(f"----{self.agent_name}: Initiating the process of Tasks Separation----")
+        logger.info(f"----{self.agent_name}: Initiating the process of Tasks Separation----")
 
         self.last_visited_node = self.tasks_separation_node_name
         self.state={**state}
 
         try:
             task_seperation_solution = self.task_seperation_chain.invoke({
-                "tasks": self.state['tasks'],
+                "tasks": self.state['requirements_overview']['task_description'],
                 "error_message": self.error_message
             })
             
@@ -646,10 +616,10 @@ class ArchitectAgent:
 
             if not isinstance(tasks, list):
                 raise TypeError(f"Expected 'tasks' to be of type list but received {type(tasks).__name__}.")
-          
+
             if not tasks:
-                raise ValueError("The 'tasks' list in the received in previous response is empty.")
-            
+                raise ValueError(f"The 'tasks' list received from the previous response is empty. Received: {tasks}, Expected: Non empty list of strings.")
+   
             self.state['tasks'] = self.create_tasks_list(tasks)
 
             self.are_tasks_seperated = True
@@ -664,26 +634,27 @@ class ArchitectAgent:
 
             self.add_message((
                 ChatRoles.USER.value,
-                self.error_message
+                f"{self.agent_name}: {self.error_message}"
             ))
-
+            logger.error(f"Exception: {type(ve)} --> {self.agent_name}: {self.error_message}")
         except TypeError as te:
             self.has_error_occured = True
             self.error_message = f"TypeError occurred: {te}"
 
             self.add_message((
                 ChatRoles.USER.value,
-                self.error_message
+                f"{self.agent_name}: {self.error_message}"
             ))
-            
+            logger.error(f"Exception: {type(te)} --> {self.agent_name}: {self.error_message}")
         except Exception as e:
             self.has_error_occured = True
             self.error_message = f"An unexpected error occurred: {e}"
 
             self.add_message((
                 ChatRoles.USER.value,
-                self.error_message
+                f"{self.agent_name}: {self.error_message}" 
             ))           
+            logger.error(f"Exception: {type(e)} --> {self.agent_name}: {self.error_message}")
 
         return {**self.state}
 
@@ -699,7 +670,7 @@ class ArchitectAgent:
             ArchitectState: The updated state of the architect.
         """
 
-        print(f"----{self.agent_name}: Initiating the process of gathering project details----")
+        logger.info(f"----{self.agent_name}: Initiating the process of gathering project details----")
 
         self.state={**state}
         self.last_visited_node = self.project_details_node_name
@@ -744,6 +715,8 @@ class ArchitectAgent:
                 f"{self.agent_name}: {self.error_message}"
             ))
 
+            logger.error(f"Exception: {type(e)} --> {self.agent_name}: {self.error_message}")
+
         return {**self.state}
     
     def additional_information_node(self, state: ArchitectState) -> ArchitectState:
@@ -759,7 +732,7 @@ class ArchitectAgent:
             ArchitectState: The updated state of the architect.
         """
         
-        print(f"----{self.agent_name}: Working on gathering additional information----")
+        logger.info(f"----{self.agent_name}: Working on gathering additional information----")
 
         self.state={**state}
         self.last_visited_node = self.additional_info_node_name
@@ -807,4 +780,6 @@ class ArchitectAgent:
                 f"{self.agent_name}: {self.error_message}"
             ))
 
+            logger.error(f"Exception: {type(e)} --> {self.agent_name}: {self.error_message}")
+            
         return {**self.state}

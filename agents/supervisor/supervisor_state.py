@@ -1,8 +1,11 @@
 """ Graph State for PM Agent """
-from typing import List, Tuple, Annotated
 import operator
+from typing import Annotated, List, Tuple
+
 from typing_extensions import TypedDict
+
 from models.models import Task
+
 
 class SupervisorState(TypedDict):
     """
