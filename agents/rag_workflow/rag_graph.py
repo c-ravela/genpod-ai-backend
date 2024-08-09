@@ -1,19 +1,18 @@
-from langgraph.checkpoint.sqlite import SqliteSaver
 from langgraph.graph import END, StateGraph
 
 from agents.agent.graph import Graph
 from agents.rag_workflow.rag_agent import RAGAgent
 from agents.rag_workflow.rag_state import RAGState
 from configs.project_config import ProjectGraphs
-from utils.logs.logging_utils import logger
 
+import os
 
 class RAGWorkFlow(Graph[RAGAgent]):
 
     def __init__(self, llm, collection_name, persistance_db_path: str, persist_directory=None):
         super().__init__(
-            ProjectGraphs.rag.graph_name, 
             ProjectGraphs.rag.graph_id,
+            ProjectGraphs.rag.graph_name, 
             RAGAgent(llm, collection_name = collection_name, persist_directory=persist_directory),
             persistance_db_path
         )
@@ -82,7 +81,7 @@ if __name__=="__main__":
     # Currently only use this value for collection_name if you have embeded and saved vector into the db with a differnet name then you can use it here.
     collection_name = 'MISMO-version-3.6-docs'
 
-    persist_directory = "C:/Users/vkumar/Desktop/genpod-ai-backend/vector_collections"
+    persist_directory = os.path.join(os.getcwd(), "../../vector_collections")
 
     RAG_thread_id = "1"
     try:
@@ -91,7 +90,7 @@ if __name__=="__main__":
         rag_input = {"question": "Any question related to MISMO_Standards"}
 
         result = ''
-        for output in RAG.rag_app.stream(rag_input, thread_id= RAG.thread_id):
+        for output in RAG.workflow.stream(rag_input, thread_id= RAG.thread_id):
             for key, value in output.items():
                 # Node
                 pprint(f"Node '{key}':")

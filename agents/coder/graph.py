@@ -21,8 +21,8 @@ class CoderGraph(Graph[CoderAgent]):
     def __init__(self,  llm: Union[ChatOpenAI, ChatOllama], persistance_db_path: str) -> None:
         """"""
         super().__init__(
-            ProjectGraphs.coder.graph_name, 
             ProjectGraphs.coder.graph_id,
+            ProjectGraphs.coder.graph_name, 
             CoderAgent(llm),
             persistance_db_path
         )

@@ -12,8 +12,8 @@ from utils.logs.logging_utils import logger
 class PlannerWorkFlow(Graph[PlannerAgent]):
     def __init__(self, llm, persistance_db_path: str):
         super().__init__(
-            ProjectGraphs.planner.graph_name, 
             ProjectGraphs.planner.graph_id,
+            ProjectGraphs.planner.graph_name, 
             PlannerAgent(llm),
             persistance_db_path
         )

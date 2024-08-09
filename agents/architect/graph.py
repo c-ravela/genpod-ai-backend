@@ -33,8 +33,8 @@ class ArchitectGraph(Graph[ArchitectAgent]):
         and sets up the state graph.
         """
         super().__init__(
-            ProjectGraphs.architect.graph_name, 
             ProjectGraphs.architect.graph_id,
+            ProjectGraphs.architect.graph_name, 
             ArchitectAgent(llm),
             persistance_db_path
         )
