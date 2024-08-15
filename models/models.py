@@ -50,3 +50,20 @@ class Task(BaseModel):
         "abandoned, state the reason here.",
         default=""
     )
+
+class RequirementsDocument:
+    """
+    This class encapsulates the various requirements of a project. 
+    """
+
+    project_details: str # A brief description of the project
+    architecture: str # Details about the system's architecture
+    folder_structure: str # Description of the project's directory or folder structure
+    microservice_design: str # Design details of the microservices used in the project
+    task_description: str # Overview of the tasks involved in the project
+    standards: str # Coding standards and conventions followed in the project
+    implementation_details: str  # Detailed description of the implementation process
+    license_details: str # Information about the project's licensing
+
+    def test(self):
+        print("callable")
