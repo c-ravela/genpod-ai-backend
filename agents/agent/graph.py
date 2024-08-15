@@ -18,7 +18,7 @@ class Graph(Generic[GenericAgent]):
         name (str): Name of the graph.
         agent (GenericAgent): The agent associated with the graph.
         memory (SqliteSaver): The persistence mechanism for saving the graph state.
-        workflow (CompiledGraph): The compiled state graph.
+        app (CompiledGraph): The compiled state graph.
     """
 
     name: str
@@ -26,7 +26,7 @@ class Graph(Generic[GenericAgent]):
 
     agent: GenericAgent
     memory: SqliteSaver
-    workflow: CompiledGraph
+    app: CompiledGraph
 
     def __init__(self, id: str, name: str, agent: GenericAgent, persistence_db_path: str) -> None:
         """
@@ -42,14 +42,14 @@ class Graph(Generic[GenericAgent]):
         self.name = name
         self.agent = agent
         self.memory = SqliteSaver.from_conn_string(persistence_db_path)
-        self.workflow = None 
+        self.app = None 
 
     def compile_graph_with_persistence(self) -> None:
         """
         Compiles the graph defined by `define_graph` and persists it using `SqliteSaver`.
         """
-        if self.workflow is None:
-            self.workflow = self.define_graph().compile(checkpointer=self.memory)
+        if self.app is None:
+            self.app = self.define_graph().compile(checkpointer=self.memory)
         else:
             raise RuntimeError("Graph has already been compiled.")
 
@@ -57,11 +57,11 @@ class Graph(Generic[GenericAgent]):
         """
         Displays the graph visually. The graph is rendered as an image and shown.
         """
-        if self.workflow is None:
+        if self.app is None:
             raise RuntimeError("Graph has not been compiled yet.")
         
         try:
-            img = Image.open(io.BytesIO(self.workflow.get_graph().draw_mermaid_png()))
+            img = Image.open(io.BytesIO(self.app.get_graph().draw_mermaid_png()))
             img.show()
         except Exception as e:
             print(f"Failed to display graph: {e}")
