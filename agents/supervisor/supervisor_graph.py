@@ -1,7 +1,5 @@
-from typing import Dict, Union
+from typing import Dict
 
-from langchain_community.chat_models import ChatOllama
-from langchain_openai import ChatOpenAI
 from langgraph.graph import END, StateGraph
 
 from agents.agent.graph import Graph
@@ -12,16 +10,15 @@ from configs.project_config import AgentConfig, ProjectGraphs
 
 class SupervisorWorkflow(Graph[SupervisorAgent]):
     def __init__(self, 
-                llm: Union[ChatOpenAI, ChatOllama],
                 collections: dict[str, str], 
-                user_input: str, rag_try_limit: int, 
-                project_path: str, persistance_db_path: str,
+                rag_try_limit: int, 
+                persistance_db_path: str,
                 agents_config: Dict[str, AgentConfig]):
     
         super().__init__(
             ProjectGraphs.supervisor.graph_id,
             ProjectGraphs.supervisor.graph_name, 
-            SupervisorAgent(llm, collections, user_input, rag_try_limit, project_path, persistance_db_path, agents_config),
+            SupervisorAgent(collections, rag_try_limit, persistance_db_path, agents_config),
             persistance_db_path
         )
 

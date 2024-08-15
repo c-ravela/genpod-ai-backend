@@ -1,9 +1,7 @@
 import ast
 import json
-from typing import Dict, List, Tuple, Union
+from typing import Dict, List, Tuple
 
-from langchain_community.chat_models import ChatOllama
-from langchain_openai import ChatOpenAI
 from pydantic import ValidationError
 
 from agents.agent.agent import Agent
@@ -17,18 +15,17 @@ from agents.supervisor.supervisor_prompts import SupervisorPrompts
 from agents.supervisor.supervisor_state import SupervisorState
 from configs.project_config import AgentConfig, ProjectAgents
 from configs.supervisor_config import calling_map
-from models.constants import PStatus, Status
-from models.models import Task
+from models.constants import ChatRoles, PStatus, Status
+from models.models import RequirementsDocument, Task
 from utils.fuzzy_rag_cache import FuzzyRAGCache
 from utils.logs.logging_utils import logger
 
 
 class SupervisorAgent(Agent[SupervisorState, SupervisorPrompts]):
     def __init__(self, 
-                llm: Union[ChatOpenAI, ChatOllama], 
                 collections: dict[str, str], 
-                user_input: str, rag_try_limit: int, 
-                project_path: str, persistance_db_path: str,
+                rag_try_limit: int, 
+                persistance_db_path: str,
                 agents_config: Dict[str, AgentConfig]):
 
         super().__init__(
@@ -36,14 +33,13 @@ class SupervisorAgent(Agent[SupervisorState, SupervisorPrompts]):
             ProjectAgents.supervisor.agent_name,
             SupervisorState(),
             SupervisorPrompts(),
-            llm
+            agents_config[ProjectAgents.supervisor.agent_id].llm
         )
 
         self.agents_config = agents_config
         self.collections = collections
 
         self.rag_try_limit = rag_try_limit
-        self.project_path = project_path
         self.persistance_db_path = persistance_db_path
 
         self.rag_cache = FuzzyRAGCache()
@@ -59,57 +55,49 @@ class SupervisorAgent(Agent[SupervisorState, SupervisorPrompts]):
         #     'Planner': None
         # }
 
-        self.user_prompt = user_input
         self.responses: Dict[str, List[Tuple[str, Task]]] = {k: [] for k, v in self.agents_config.items()}
         self.tasks = []
    
         self.project_status: str = None
+
+        # prompts
         self.project_init_questionaire = self.prompts.init_rag_questionaire_prompt | self.llm
         self.evaluation_chain = self.prompts.follow_up_questions | self.llm
 
-    def build_rag_cache(self, query: str):
+    def build_rag_cache(self, query: str) -> tuple[list[str], str]:
+        """
+        returns list of queries and response to the queries.
+        """
         # I need to build a rag_cache during kick_off with answers to questions about requirements.
         context = ''
         count = 3
-        while(count>0):
+
+        # Prepare questionaire for rag cache
+        while(count > 0):
             try:
-                req_queries = self.project_init_questionaire.invoke({'user_prompt':query,'context':context})
+                req_queries = self.project_init_questionaire.invoke({'user_prompt': query,'context':context})
                 req_queries = ast.literal_eval(req_queries.content)
                 validated_requirements_queries = QueryList(req_queries=req_queries)
                 break
             except (ValidationError, ValueError, SyntaxError) as e:
                 context += str(e)
                 count = count-1
-        # if len(validated_requirements_queries.req_queries) is not None:
-        #     final_response = ''
-        #     for req_query in validated_requirements_queries.req_queries:
-        #         result = self.rag_cache.get(req_query)
-        #         if result is not None:
-        #             print(f"Cache hit for query, will not response to: {req_query}")
-        #         else:
-        #             print(f"Cache miss for query: {req_query}")
-        #             print(f'----------RAG Agent Called to Query----------\n{req_query}')
-        #             result = self.team_members[ProjectAgents.rag.agent_id].workflow.invoke({'question': req_query,'iteration_count':self.rag_try_limit}, {'configurable':{'thread_id':self.memberids['RAG']}})
-        #             self.rag_cache.add(req_query, result['generation'])
-        #             print(f'----------RAG Agent Response----------\n{result['generation']}')
-        #             if result['query_answered'] is True:
-        #                 final_response += f"Question: {req_query}\nAnswer: {result['generation']}"
-        #     return final_response
+
         if validated_requirements_queries.req_queries:
             final_response = ''
+
             for req_query in validated_requirements_queries.req_queries:
                 result = self.rag_cache.get(req_query)
+
                 if result is not None:
-                    # print(f"Cache hit for query: {req_query}")
                     logger.debug("Cache hit for query: %s", req_query)
                     rag_response = result
                 else:
-                    # print(f"Cache miss for query: {req_query}")
                     logger.debug("Cache miss for query: %s", req_query)
-                    # print(f'----------RAG Agent Called to Query----------\n{req_query}')
                     logger.info(f'----------{ProjectAgents.rag.agent_name} Agent Called to Query----------')
                     logger.info("Query: %s", req_query)
-                    result = self.team_members[ProjectAgents.rag.agent_id].workflow.invoke(
+
+                    result = self.team_members[ProjectAgents.rag.agent_id].app.invoke(
                         {  
                             'question': req_query, 
                             'iteration_count': self.rag_try_limit, 
@@ -121,13 +109,15 @@ class SupervisorAgent(Agent[SupervisorState, SupervisorPrompts]):
                             }
                         }
                     )
+
                     rag_response = result['generation']
                     self.rag_cache.add(req_query, rag_response)
-                    # print(f'----------RAG Agent Response----------\n{rag_response}')
+                    
                     logger.info(f"'----------{ProjectAgents.rag.agent_name} Agent Response----------")
                     logger.info(f"{ProjectAgents.rag.agent_name} Response: %s", rag_response)
+
                     if result['query_answered'] is True:
-                # Evaluate the RAG response
+                        # Evaluate the RAG response
                         evaluation_result = self.evaluation_chain.invoke({
                             'user_query':req_query,
                             'initial_rag_response':rag_response}
@@ -137,12 +127,12 @@ class SupervisorAgent(Agent[SupervisorState, SupervisorPrompts]):
                             final_response += f"Question: {req_query}\nAnswer: {rag_response}\n\n"
                         elif evaluation_result.content.startswith("INCOMPLETE"):
                             follow_up_query = evaluation_result.content.split("Follow-up Query:")[1].strip()
-                            # print(f"\n----------Follow-up query needed----------\n{follow_up_query}")
+                            
                             logger.info("----------Follow-up query needed----------")
                             logger.info("Follow-up: %s", follow_up_query)
                             
                             # Ask the follow-up query to the RAG agent
-                            follow_up_result = self.team_members[ProjectAgents.rag.agent_id].workflow.invoke(
+                            follow_up_result = self.team_members[ProjectAgents.rag.agent_id].app.invoke(
                                 {
                                     'question': follow_up_query, 
                                     'iteration_count': self.rag_try_limit, 
@@ -154,17 +144,19 @@ class SupervisorAgent(Agent[SupervisorState, SupervisorPrompts]):
                                     }
                                 }
                             )
+
                             follow_up_response = follow_up_result['generation']
                             self.rag_cache.add(follow_up_query, follow_up_response)
                             
                             final_response += f"Question: {req_query}\nInitial Answer: {rag_response}\nFollow-up Question: {follow_up_query}\nFollow-up Answer: {follow_up_response}\n\n"
                         else:
-                            # print("Unexpected evaluation result format.")
                             logger.info("Unexpected evaluation result format")
+
                             final_response += f"Question: {req_query}\nAnswer: {rag_response}\n\n"
-            return final_response
+
+            return (validated_requirements_queries.req_queries, final_response)
         else:
-            return 'Failed to initialize project'
+            return ([], 'Failed to initialize project')
 
     def instantiate_team_members(self, state: SupervisorState):
         for member,_ in self.team_members.items():
@@ -204,23 +196,44 @@ class SupervisorAgent(Agent[SupervisorState, SupervisorPrompts]):
 
             else:
                 continue
-
-        # state['team_members'] = {**self.team_members}
-        state['original_user_input'] = self.user_prompt
-        state['project_path'] = self.project_path
-        state['rag_retrieval'] = ''
-        state['current_task'] = Task(description='retrieve additional context from RAG system',
-                                     task_status = Status.NEW,
-                                     additional_info = '',
-                                     question=self.user_prompt)
-        # state['agents_status'] = 'New'
-        message = ('user','Start new Project')
-
-        state['messages'] += [message]
+        
+        # initialize supervisor state
+        state['project_name'] = ""
+        
         self.project_status = PStatus.NEW.value
-        self.rag_cache_building = self.build_rag_cache(state['original_user_input'])
+        state['project_status'] = PStatus.NEW.value
+
+        state['microservice_name'] = ""
+
+        state['tasks'] = []
+        state['current_task'] = Task(
+            description='retrieve additional context from RAG system',
+            task_status = Status.NEW,
+            additional_info = '',
+            question=state['original_user_input']
+        )
+
+        state['team_members'] = self.team_members
+        state['requirements_document'] = RequirementsDocument()
+
+        state['messages'] += [
+            (ChatRoles.SYSTEM.value, 'Start new Project')
+        ]        
+        state['human_feedback'] = []
+
+        state['rag_cache_queries'], self.rag_cache_building = self.build_rag_cache(state['original_user_input'])
+        
+        state['rag_query_answer'] = False
+        state['rag_retrieval'] = ''
+
+        state['planned_tasks'] = []
+        state['planned_task_map'] = {}
+        state['planned_task_requirements'] = {}
+        state['agents_status'] = ""
+
         logger.info("----All information gathered during project initiation phase----")
-        logger.info("RAG Collection: %s",self.rag_cache_building)
+        logger.info("RAG Collection: %s", self.rag_cache_building)
+
         return {**state}
 
     def call_rag(self, state: SupervisorState) -> SupervisorState:
@@ -244,7 +257,7 @@ class SupervisorAgent(Agent[SupervisorState, SupervisorPrompts]):
                 logger.debug("Cache miss for query: \n%s", question)
                 # result = your_rag_query_function(query)  # Replace with your actual RAG query function
             # return result
-                additional_info = self.team_members[rag_agent_config.agent_id].workflow.invoke(
+                additional_info = self.team_members[rag_agent_config.agent_id].app.invoke(
                     {
                         'question': question,
                         'iteration_count': self.rag_try_limit, 
@@ -297,12 +310,12 @@ class SupervisorAgent(Agent[SupervisorState, SupervisorPrompts]):
             state['messages'] += [message]
             # print("----------Calling Architect----------")
             logger.info("----------Calling Architect----------")
-            architect_result = self.team_members[architect_agent_config.agent_id].workflow.invoke(
+            architect_result = self.team_members[architect_agent_config.agent_id].app.invoke(
                 {
                     'current_task':state['current_task'],
                     'project_status':self.project_status,
                     'user_request': state['original_user_input'],
-                    'generated_project_path':state['project_path'],
+                    'generated_project_path': state['project_path'],
                     'user_requested_standards':state['current_task'].additional_info,
                     'license_text':state['license_text'],
                     'messages':[]
@@ -329,12 +342,13 @@ class SupervisorAgent(Agent[SupervisorState, SupervisorPrompts]):
                 state['agents_status'] = f'{architect_agent_config.agent_name} completed'
                 self.responses[architect_agent_config.agent_id].append(("Returned from Architect", architect_result['tasks']))
                 state['tasks'] = architect_result['tasks']
-                state['requirements_doc'] = architect_result['requirements_overview']
+                state['requirements_document'] = architect_result['requirements_document']
+        
                 state['project_path'] = architect_result['generated_project_path']
                 
                 # Lets extract the coder_inputs from the architect's final state
                 # TODO: We want to be able to ask each agent what they need as input to start working that way we don't need to hardcode it this way.
-                coder_inputs_needed = ['generated_project_path', 'license_text', 'license_url', 'project_name', 'project_folder_structure', 'requirements_overview']
+                coder_inputs_needed = ['generated_project_path', 'license_text', 'license_url', 'project_name', 'project_folder_structure', 'requirements_document', 'current_task']
                 state['coder_inputs'] = {}
                 for needed_input in coder_inputs_needed:
                     if needed_input in architect_result.keys():
@@ -359,7 +373,7 @@ class SupervisorAgent(Agent[SupervisorState, SupervisorPrompts]):
             # Need to query Architect to get additional information for another agent which will be present in called agent and that will never be updated when returning
             # print("----------Querying Architect----------")
             logger.info("----------Querying Architect----------")
-            architect_result = self.team_members[architect_agent_config.agent_id].workflow.invoke(
+            architect_result = self.team_members[architect_agent_config.agent_id].app.invoke(
                 {
                     'current_task':state['current_task'],
                     'project_status':self.project_status,
@@ -399,7 +413,7 @@ class SupervisorAgent(Agent[SupervisorState, SupervisorPrompts]):
         message = ('Assistant', 'Calling Architect Agent')
         state['messages'] += [message]
         logger.info("---------- Calling Coder ----------")
-        coder_result = self.team_members[coder_agent_config.agent_id].workflow.invoke(
+        coder_result = self.team_members[coder_agent_config.agent_id].app.invoke(
             {
                 **state['coder_inputs'],
                 'messages':[]
@@ -491,7 +505,7 @@ class SupervisorAgent(Agent[SupervisorState, SupervisorPrompts]):
                     self.project_status = PStatus.HALTED.value
                 else:
                     state['current_task'] = new_task
-                    requirements_doc = ' '.join(str(value) for value in state['requirements_doc'].values())
+                    requirements_doc = ' '.join(str(value) for value in state['requirements_document'].values())
                     state['current_task'].additional_info = requirements_doc + '\n' + state['rag_retrieval']
                     
                 self.called_agent = supervisor_agent_config.agent_id
@@ -506,7 +520,7 @@ class SupervisorAgent(Agent[SupervisorState, SupervisorPrompts]):
         # response = self.team_members[planner_agent_config.agent_id].update_task(state['current_task'])
         # print("----------Calling Planner----------")
         logger.info("----------Calling Planner----------")
-        planner_result = self.team_members[planner_agent_config.agent_id].workflow.invoke(
+        planner_result = self.team_members[planner_agent_config.agent_id].app.invoke(
             {
                 'current_task': state['current_task'],
                 'generated_project_path': state['project_path']
@@ -641,7 +655,7 @@ class SupervisorAgent(Agent[SupervisorState, SupervisorPrompts]):
         # elif self.project_status==PStatus.EXECUTING.value and self.called_agent=='Coder':
         #     return 'call_coder'
         elif self.project_status==PStatus.HALTED.value:
-            return 'Human'
+            return 'update_state' #'Human'
 
         # elif state['current_task'].task_status == Status.AWAITING.value:
         #     if self.called_agent == 'Architect':
