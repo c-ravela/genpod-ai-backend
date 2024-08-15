@@ -91,7 +91,7 @@ if __name__=="__main__":
         rag_input = {"question": "Any question related to MISMO_Standards"}
 
         result = ''
-        for output in RAG.workflow.stream(rag_input, thread_id= RAG.thread_id):
+        for output in RAG.app.stream(rag_input, thread_id= RAG.thread_id):
             for key, value in output.items():
                 # Node
                 pprint(f"Node '{key}':")
