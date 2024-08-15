@@ -215,7 +215,7 @@ class CoderAgent(Agent[CoderState, CoderPrompts]):
             llm_response = self.code_generation_chain.invoke({
                 "project_name": self.state['project_name'],
                 "project_path": os.path.join(self.state['generated_project_path'], self.state['project_name']),
-                "requirements_document": self.state['requirements_overview'],
+                "requirements_document": self.state['requirements_document'],
                 "folder_structure": self.state['project_folder_strucutre'],
                 "task": task.description,
                 "error_message": self.error_message,
