@@ -6,7 +6,7 @@ state.
 """
 from typing_extensions import Annotated, TypedDict
 
-from models.architect import RequirementsOverview
+from models.models import RequirementsDocument
 from models.models import Task
 
 
@@ -47,7 +47,7 @@ class ArchitectState(TypedDict):
         project_folder_structure (str): The organized layout of directories and subdirectories 
         that form the project's file system, adhering to best practices for project structure.
 
-        requirements_overview (str): A comprehensive, well-structured document in markdown 
+        requirements_document (str): A comprehensive, well-structured document in markdown 
         format that outlines the project's requirements derived from the user's request. 
         This serves as a guide for the development process.
 
@@ -122,8 +122,8 @@ class ArchitectState(TypedDict):
     ]
 
     # @out
-    requirements_overview: Annotated[
-        RequirementsOverview, 
+    requirements_document: Annotated[
+        RequirementsDocument, 
         "A comprehensive, well-structured document in markdown format that outlines "
         "the project's requirements derived from the user's request. This serves as a "
         "guide for the development process."
