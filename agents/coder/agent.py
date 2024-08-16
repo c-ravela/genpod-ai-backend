@@ -1,12 +1,11 @@
 """Coder Agent
 """
 import os
+from typing import Literal
 
-from langchain_community.chat_models import ChatOllama
 from langchain_core.output_parsers import JsonOutputParser
 from langchain_core.runnables.base import RunnableSequence
 from langchain_openai import ChatOpenAI
-from typing_extensions import Literal, Union
 
 from agents.agent.agent import Agent
 from agents.coder.state import CoderState
@@ -55,7 +54,7 @@ class CoderAgent(Agent[CoderState, CoderPrompts]):
     # chains
     code_generation_chain: RunnableSequence
 
-    def __init__(self, llm: Union[ChatOpenAI, ChatOllama]) -> None:
+    def __init__(self, llm: ChatOpenAI) -> None:
         """
         """
         
@@ -214,7 +213,7 @@ class CoderAgent(Agent[CoderState, CoderPrompts]):
         try:
             llm_response = self.code_generation_chain.invoke({
                 "project_name": self.state['project_name'],
-                "project_path": os.path.join(self.state['generated_project_path'], self.state['project_name']),
+                "project_path": os.path.join(self.state['project_path'], self.state['project_name']),
                 "requirements_document": self.state['requirements_document'],
                 "folder_structure": self.state['project_folder_strucutre'],
                 "task": task.description,
@@ -394,7 +393,7 @@ class CoderAgent(Agent[CoderState, CoderPrompts]):
 
         license_download_result=License.download_license_file.invoke({
             "url": self.state["license_url"], 
-            "file_path": os.path.join(self.state["generated_project_path"], self.state["project_name"], "license")
+            "file_path": os.path.join(self.state["project_path"], self.state["project_name"], "license")
         })
 
         self.add_message((
