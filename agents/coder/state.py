@@ -4,9 +4,9 @@ Agent graph state
 """
 from typing_extensions import Annotated, TypedDict
 
+from agents.agent.state import State
 from models.models import Task
 
-from agents.agent.state import State
 
 class CoderState(TypedDict):
     """
@@ -34,7 +34,7 @@ class CoderState(TypedDict):
     ]
 
     # @in
-    generated_project_path: Annotated[
+    project_path: Annotated[
         str,
         State.in_field("The absolute path in the file system where the project is being generated. "
         "This path is used to store all the project-related files and directories.")

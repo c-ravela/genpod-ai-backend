@@ -1,3 +1,4 @@
+from langchain_openai import ChatOpenAI
 from langgraph.graph import END, StateGraph
 
 from agents.agent.graph import Graph
@@ -8,7 +9,7 @@ from models.models import Task
 
 
 class PlannerWorkFlow(Graph[PlannerAgent]):
-    def __init__(self, llm, persistance_db_path: str):
+    def __init__(self, llm: ChatOpenAI, persistance_db_path: str):
         super().__init__(
             ProjectGraphs.planner.graph_id,
             ProjectGraphs.planner.graph_name, 
