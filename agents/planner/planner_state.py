@@ -1,8 +1,9 @@
 """ Graph State for Planner Agent """
 from typing import Dict, List
 
-from typing_extensions import TypedDict
+from typing_extensions import Annotated, TypedDict
 
+from agents.agent.state import State
 from models.models import Task
 
 
@@ -16,11 +17,44 @@ class PlannerState(TypedDict):
         response: list of Task packets to main all older responses.
     """
 
-    deliverable: List[str]
-    backlogs: List[str]
-    generation: List[str]
-    response: List[Task]
-    deliverable_backlog_map: Dict[str, List[str]]
-    current_task: Task
-    backlog_requirements: Dict[str,str]
-    generated_project_path: str
+    # @in
+    deliverable: Annotated[
+        List[str],
+        State.in_field()
+    ]
+
+    # @in
+    project_path: Annotated[
+        str,
+        State.in_field()
+    ]
+
+    # @inout
+    current_task: Annotated[
+        Task,
+        State.inout_field()
+    ]
+
+    # @out
+    response: Annotated[
+        List[Task],
+        State.out_field()
+    ]
+
+    # @out
+    backlogs: Annotated[
+        List[str],
+        State.out_field()
+    ]
+
+    # @out
+    planned_task_map: Annotated[
+        Dict[str, List[str]],
+        State.out_field()
+    ]
+
+    # @out
+    planned_task_requirements: Annotated[
+        Dict[str,str],
+        State.out_field()
+    ]
