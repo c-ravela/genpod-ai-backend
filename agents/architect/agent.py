@@ -6,11 +6,10 @@ generating appropriate responses.
 """
 import os
 
-from langchain_community.chat_models import ChatOllama
 from langchain_core.output_parsers import JsonOutputParser
 from langchain_core.runnables.base import RunnableSequence
 from langchain_openai import ChatOpenAI
-from typing_extensions import Literal, Union
+from typing_extensions import Literal
 
 from agents.agent.agent import Agent
 from agents.architect.state import ArchitectState
@@ -70,14 +69,14 @@ class ArchitectAgent(Agent[ArchitectState, ArchitectPrompts]):
     additional_information_chain: RunnableSequence
     task_seperation_chain: RunnableSequence
 
-    def __init__(self, llm: Union[ChatOpenAI, ChatOllama]) -> None:
+    def __init__(self, llm: ChatOpenAI) -> None:
         """
         This method initializes the ArchitectAgent with a given Language Learning Model (llm) 
         and sets up the architect chain. The architect chain is a sequence of operations 
         that the ArchitectAgent will perform to generate a solution architecture.
 
         Args:
-            llm (Union[ChatOpenAI, ChatOllama]): The Language Learning Model to be used by the ArchitectAgent.
+            llm (ChatOpenAI): The Language Learning Model to be used by the ArchitectAgent.
         """
         
         super().__init__(
@@ -407,7 +406,7 @@ class ArchitectAgent(Agent[ArchitectState, ArchitectPrompts]):
                 ))
 
                 response: TaskOutput = self.project_overview_chain.invoke({
-                    "user_request": f"{self.state['user_request']}",
+                    "user_request": f"{self.state['original_user_input']}",
                     "task_description": f"{self.state['current_task'].description}",
                     "additional_information": f"{self.state['current_task'].additional_info}"
                 })
@@ -483,7 +482,7 @@ class ArchitectAgent(Agent[ArchitectState, ArchitectPrompts]):
                 ))
 
                 response: TaskOutput = self.standards_chain.invoke({
-                    "user_request": f"{self.state['user_request']}\n",
+                    "user_request": f"{self.state['original_user_input']}\n",
                     "task_description": f"{self.state['requirements_document']['task_description']}",
                 })
 
@@ -514,7 +513,7 @@ class ArchitectAgent(Agent[ArchitectState, ArchitectPrompts]):
                 ))
 
                 response: TaskOutput = self.license_legal_chain.invoke({
-                    "user_request": f"{self.state['user_request']}",
+                    "user_request": f"{self.state['original_user_input']}",
                     "license_text": f"{self.state['license_text']}",
                 })
 
@@ -566,7 +565,7 @@ class ArchitectAgent(Agent[ArchitectState, ArchitectPrompts]):
             ))
         else:
             generated_code = document
-            file_path = os.path.join(self.state['generated_project_path'], "docs/requirements.md")
+            file_path = os.path.join(self.state['project_path'], "docs/requirements.md")
 
             self.has_error_occured, msg = CodeFileWriter.write_generated_code_to_file.invoke({"generated_code": generated_code, "file_path": file_path})
             
@@ -682,7 +681,7 @@ class ArchitectAgent(Agent[ArchitectState, ArchitectPrompts]):
 
         try:
             response: ProjectDetails = self.project_details_chain.invoke({
-                "user_request": f"{self.state['user_request']}\n",
+                "user_request": f"{self.state['original_user_input']}\n",
                 "folder_structure_document": f"{self.state['requirements_document']['folder_structure']}\n",
                 "error_message": f"{self.error_message}\n",
             })
