@@ -1,8 +1,7 @@
 from typing import Generic, TypeVar
 
-from langchain_community.chat_models import ChatOllama
 from langchain_openai import ChatOpenAI
-from typing_extensions import Any, Union
+from typing_extensions import Any
 
 GenericAgentState = TypeVar('GenericAgentState', bound=Any)
 GenericPrompts = TypeVar('GenericPrompts', bound=Any)
@@ -16,7 +15,7 @@ class Agent(Generic[GenericAgentState, GenericPrompts]):
         agent_name (str): The name of the agent.
         description (str): A brief description of the agent's purpose or functionality.
         state (Any): The current state of the agent, which can be of any type.
-        llm (Union[ChatOpenAI, ChatOllama]): The language learning model used by the agent, which can be either a ChatOpenAI or ChatOllama model.
+        llm (ChatOpenAI): The language learning model used by the agent, which can be ChatOpenAI model.
     """
 
     agent_id : str # Unique identifier for the agent
@@ -25,9 +24,9 @@ class Agent(Generic[GenericAgentState, GenericPrompts]):
 
     state: GenericAgentState # Current state of the agent
     prompts: GenericPrompts
-    llm: Union[ChatOpenAI, ChatOllama] # This is the language learning model (llm) for the agent.
+    llm: ChatOpenAI # This is the language learning model (llm) for the agent.
 
-    def __init__(self, agent_id: str, agent_name: str, state: GenericAgentState, prompts: GenericPrompts, llm: Union[ChatOpenAI, ChatOllama]) -> None:
+    def __init__(self, agent_id: str, agent_name: str, state: GenericAgentState, prompts: GenericPrompts, llm: ChatOpenAI) -> None:
         """
         Initializes the Agent with the specified parameters.
 
@@ -35,7 +34,7 @@ class Agent(Generic[GenericAgentState, GenericPrompts]):
             agent_id (str): The unique identifier for the agent.
             agent_name (str): The name of the agent.
             state (Any): The initial state of the agent.
-            llm (Union[ChatOpenAI, ChatOllama]): The language learning model used by the agent.
+            llm (ChatOpenAI): The language learning model used by the agent.
         """
 
         self.agent_id = agent_id

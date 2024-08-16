@@ -1,5 +1,9 @@
-from typing import Type, Dict, List
+from typing import Any, Dict, Generic, List, Type, TypeVar
+
 from typing_extensions import TypedDict
+
+GenericAgentState = TypeVar('GenericAgentState', bound=Any)
+
 
 class State:
     """
@@ -21,7 +25,7 @@ class State:
     _inout_fields: List[str]
     _fields: List[str]
 
-    def __init__(self, cls: Type[TypedDict]):
+    def __init__(self, cls: GenericAgentState):
         """
         Initialize with a TypedDict class to classify fields.
 
