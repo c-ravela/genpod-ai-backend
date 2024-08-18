@@ -67,7 +67,7 @@ class RAGAgent(Agent[RAGState, RAGPrompts]):
             self.max_hallucination = state['max_hallucination']
 
         # Retrieval
-        documents = self.retriever.get_relevant_documents(question)
+        documents = self.retriever.invoke(question)
         return {**state, "documents": documents, "question": question}
 
     def generate(self, state: RAGState):
