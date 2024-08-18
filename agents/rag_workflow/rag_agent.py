@@ -3,10 +3,10 @@ from langchain_core.output_parsers import JsonOutputParser, StrOutputParser
 from langchain_openai import ChatOpenAI, OpenAIEmbeddings
 
 from agents.agent.agent import Agent
-from agents.rag_workflow.rag_prompts import RAGPrompts
 from agents.rag_workflow.rag_state import RAGState
 from configs.project_config import ProjectAgents
 from configs.supervisor_config import RAG_TRY_LIMIT
+from prompts.rag import RAGPrompts
 from utils.logs.logging_utils import logger
 
 
