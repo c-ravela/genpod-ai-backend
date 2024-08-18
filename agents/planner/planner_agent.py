@@ -9,12 +9,12 @@ from langchain_openai import ChatOpenAI
 from pydantic import ValidationError
 
 from agents.agent.agent import Agent
-from agents.planner.planner_models import BacklogList
-from agents.planner.planner_prompt import PlannerPrompts
 from agents.planner.planner_state import PlannerState
 from configs.project_config import ProjectAgents
 from models.constants import Status
 from models.models import Task
+from models.planner import BacklogList
+from prompts.planner import PlannerPrompts
 from utils.logs.logging_utils import logger
 
 
