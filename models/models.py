@@ -6,6 +6,8 @@ capturing a specific set of information required for the project. These models
 are used to structure the data in a consistent and organized manner, enhancing 
 the readability and maintainability of the code.
 """
+from typing import Any
+
 from pydantic import BaseModel, Field
 
 from models.constants import Status
@@ -56,45 +58,95 @@ class RequirementsDocument(BaseModel):
     This class encapsulates the various requirements of a project. 
     """
 
-    project_details: str = Field(
-        description="A brief description of the project",
+    project_overview: str = Field(
+        description="A brief overview of the project.",
         default=""
     )
     
-    architecture: str = Field(
-        description="Details about the system's architecture",
+    project_architecture: str = Field(
+        description="Detailed information about the project's architecture.",
         default=""
     )
 
-    folder_structure: str = Field(
-        description="Description of the project's directory or folder structure",
+    directory_structure: str = Field(
+        description="A description of the project's directory and folder structure.",
         default=""
     )
 
-    microservice_design: str = Field(
-        description="Design details of the microservices used in the project",
+    microservices_architecture: str = Field(
+        description="Details about the design and architecture of the project's microservices.",
         default=""
     )
 
-    task_description: str = Field(
-        description="Overview of the tasks involved in the project",
+    tasks_overview: str = Field(
+        description="An overview of the tasks involved in the project.",
         default=""
     )
 
-    standards: str = Field(
-        description="Coding standards and conventions followed in the project",
+    coding_standards: str = Field(
+        description="The coding standards and conventions followed in the project.",
         default=""
     )
 
-    implementation_details: str  = Field(
-        description="Detailed description of the implementation process",
+    implementation_process: str = Field(
+        description="A detailed description of the implementation process.",
         default=""
     )
 
-    license_details: str = Field(
-        description="Information about the project's licensing",
+    project_license_information: str = Field(
+        description="Information about the project's licensing terms and conditions.",
         default=""
     )
 
-    def test(self):
-        print("callable")
+    def to_markdown(self) -> str:
+        """
+        Generates a Markdown-formatted requirements document for the project.
+
+        Returns:
+            str: A Markdown string representing the requirements document.
+        """
+
+        return f"""
+# Project Requirements Document
+
+## Project Overview
+{self.project_overview}
+
+## Project Architecture
+{self.project_architecture}
+
+## Directory Structure
+{self.directory_structure}
+
+## Microservices Architecture
+{self.microservices_architecture}
+
+## Tasks Overview
+{self.tasks_overview}
+
+## Coding Standards
+{self.coding_standards}
+
+## Implementation Process
+{self.implementation_process}
+
+## Project License Information
+{self.project_license_information}
+        """
+    
+    def __getitem__(self, key: str) -> Any:
+        """
+        Allows getting attributes using square bracket notation.
+        """
+        if hasattr(self, key):
+            return getattr(self, key)
+        raise KeyError(f"Key '{key}' not found in RequirementsDocument.")
+
+    def __setitem__(self, key: str, value: Any) -> None:
+        """
+        Allows setting attributes using square bracket notation.
+        """
+        if hasattr(self, key):
+            setattr(self, key, value)
+        else:
+            raise KeyError(f"Key '{key}' not found in RequirementsDocument.")
