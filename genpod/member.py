@@ -1,3 +1,4 @@
+from enum import Enum
 from typing import Any, Dict, Generic, TypeVar
 
 from langchain_openai import ChatOpenAI
@@ -14,8 +15,15 @@ class AgentMember(Generic[GenericAgentState, GenericAgentGraph]):
     Represents an individual agent with its configuration and state.
     """
 
+    class Role(Enum):
+        MANAGER = 'manager'
+        LEAD = 'lead'
+        MEMBER = 'member'
+
     member_id: str
     member_name: str
+    member_role: Role
+
     llm: ChatOpenAI
     thread_id: int
     fields: list[str]
@@ -44,7 +52,7 @@ class AgentMember(Generic[GenericAgentState, GenericAgentGraph]):
         self.graph = graph
         self.recursion_limit = -1 # means no limit set
 
-    def invoke(self, input: Dict[str, Any] | Any) -> (Dict[str, Any] | Any): 
+    def invoke(self, input: Dict[str, Any] | Any) -> GenericAgentState: 
         """
         """
         graph_config = {
@@ -64,12 +72,31 @@ class AgentMember(Generic[GenericAgentState, GenericAgentGraph]):
 
         self.recursion_limit = limit
 
+    def set_role_to_manager(self) -> None:
+        """
+        """
+
+        self.member_role = self.Role.MANAGER
+
+    def set_role_to_lead(self) -> None:
+        """
+        """
+
+        self.member_role = self.Role.LEAD
+    
+    def set_role_to_member(self) -> None:
+        """
+        """
+
+        self.member_role = self.Role.MEMBER
+
     def __str__(self) -> str:
         """
         Returns a user-friendly string representation of the object.
         """
         return (f"AgentMember(member_id={self.member_id!r}, "
                 f"member_name={self.member_name!r}, "
+                f"member_role={self.member_role!r}, "
                 f"llm_type={type(self.llm).__name__}, "
                 f"thread_id={self.thread_id}, "
                 f"fields={self.fields}, "
