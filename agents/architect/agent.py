@@ -185,36 +185,6 @@ class ArchitectAgent(Agent[ArchitectState, ArchitectPrompts]):
 
         self.state['messages'] += [message]
 
-    def generate_requirements_document(self) -> str:
-        """
-        This method generates a requirements document for the project.
-
-        Returns:
-            str: A string representing the requirements document.
-        """
-        
-        logger.info(f"----{self.agent_name}: Generating requirements document----")
-
-        return f"""
-# Project Requirements Document
-
-{self.state['requirements_document']['project_details']}
-
-{self.state['requirements_document']['architecture']}
-
-{self.state['requirements_document']['folder_structure']}
-
-{self.state['requirements_document']['microservice_design']}
-
-{self.state['requirements_document']['task_description']}
-
-{self.state['requirements_document']['standards']}
-
-{self.state['requirements_document']['implementation_details']}
-
-{self.state['requirements_document']['license_details']}
-        """
-    
     def create_tasks_list(self, tasks_description: list) -> list[Task]:
         """
         This method creates a list of Task objects from a given list of task descriptions
@@ -265,7 +235,6 @@ class ArchitectAgent(Agent[ArchitectState, ArchitectPrompts]):
         """
         logger.info(f"----{self.agent_name}: Modifying key: {key} in requirements overview----")
 
-        
         if not response['is_add_info_needed']:
             self.add_message((
                 ChatRoles.USER.value,
@@ -297,21 +266,21 @@ class ArchitectAgent(Agent[ArchitectState, ArchitectPrompts]):
         logger.info(f"----{self.agent_name}: Progressing with requirements overview. Current Step: {self.generation_step}----")
 
         if self.generation_step == 0: # Project Overview
-            self.update_requirements_overview("project_details", "Project Overview", response)
+            self.update_requirements_overview("project_overview", "Project Overview", response)
         elif self.generation_step == 1: # Architecture
-            self.update_requirements_overview("architecture", "Architecture", response)
+            self.update_requirements_overview("project_architecture", "Architecture", response)
         elif self.generation_step == 2: # Folder Structure
-            self.update_requirements_overview("folder_structure", "Folder Structure", response)
+            self.update_requirements_overview("directory_structure", "Folder Structure", response)
         elif self.generation_step == 3: # Microservice Design
-            self.update_requirements_overview("microservice_design", "Microservice Design", response)
+            self.update_requirements_overview("microservices_architecture", "Microservice Design", response)
         elif self.generation_step == 4: # Tasks Breakdown
-            self.update_requirements_overview("task_description", "Tasks Breakdown", response)
+            self.update_requirements_overview("tasks_overview", "Tasks Breakdown", response)
         elif self.generation_step == 5: # Standards
-            self.update_requirements_overview("standards", "Standards", response)
+            self.update_requirements_overview("coding_standards", "Standards", response)
         elif self.generation_step == 6: # Implementation Details
-            self.update_requirements_overview("implementation_details", "Implementation Details", response)
+            self.update_requirements_overview("implementation_process", "Implementation Details", response)
         elif self.generation_step == 7: # License Details
-            self.update_requirements_overview("license_details", "License Details", response)
+            self.update_requirements_overview("project_license_information", "License Details", response)
 
     def router(self, state: ArchitectState) -> str:
         """
@@ -386,7 +355,7 @@ class ArchitectAgent(Agent[ArchitectState, ArchitectPrompts]):
         logger.info(f"----{self.agent_name}: Commencing generation of Requirements Document----")
 
         if (not self.has_error_occured) and (not self.is_additional_info_requested):
-            state['requirements_document'] = {}
+            state['requirements_document'] = RequirementsDocument()
             self.generation_step = 0
             
         self.state={**state}
@@ -402,7 +371,7 @@ class ArchitectAgent(Agent[ArchitectState, ArchitectPrompts]):
             if self.generation_step == 0: #0. Project Overview
                 self.add_message((
                     ChatRoles.USER.value,
-                    f"{self.agent_name}: Progressing with Step 0 - Project Overview."
+                    f"{self.agent_name}: Progressing with Step 0 - project_overview."
                 ))
 
                 response: TaskOutput = self.project_overview_chain.invoke({
@@ -422,7 +391,7 @@ class ArchitectAgent(Agent[ArchitectState, ArchitectPrompts]):
                 ))
 
                 response: TaskOutput = self.architecture_chain.invoke({
-                    "project_overview": f"{self.state['requirements_document']['project_details']}",
+                    "project_overview": f"{self.state['requirements_document'].project_overview}",
                 })
 
                 self.has_error_occured = False
@@ -436,8 +405,8 @@ class ArchitectAgent(Agent[ArchitectState, ArchitectPrompts]):
                 ))
 
                 response: TaskOutput = self.folder_structure_chain.invoke({
-                    "project_overview": f"{self.state['requirements_document']['project_details']}",
-                    "architecture": f"{self.state['requirements_document']['architecture']}",
+                    "project_overview": f"{self.state['requirements_document'].project_overview}",
+                    "architecture": f"{self.state['requirements_document'].project_architecture}",
                 })
 
                 self.has_error_occured = False
@@ -451,8 +420,8 @@ class ArchitectAgent(Agent[ArchitectState, ArchitectPrompts]):
                 ))
 
                 response: TaskOutput = self.microservice_design_chain.invoke({
-                    "project_overview": f"{self.state['requirements_document']['project_details']}",
-                    "architecture": f"{self.state['requirements_document']['architecture']}",
+                    "project_overview": f"{self.state['requirements_document'].project_overview}",
+                    "architecture": f"{self.state['requirements_document'].project_architecture}",
                 })
 
                 self.has_error_occured = False
@@ -466,9 +435,9 @@ class ArchitectAgent(Agent[ArchitectState, ArchitectPrompts]):
                 ))
 
                 response: TaskOutput = self.tasks_breakdown_chain.invoke({
-                    "project_overview": f"{self.state['requirements_document']['project_details']}",
-                    "architecture": f"{self.state['requirements_document']['architecture']}",
-                    "microservice_design": f"{self.state['requirements_document']['microservice_design']}",
+                    "project_overview": f"{self.state['requirements_document'].project_overview}",
+                    "architecture": f"{self.state['requirements_document'].project_architecture}",
+                    "microservice_design": f"{self.state['requirements_document'].microservices_architecture}",
                 })
 
                 self.has_error_occured = False
@@ -483,7 +452,7 @@ class ArchitectAgent(Agent[ArchitectState, ArchitectPrompts]):
 
                 response: TaskOutput = self.standards_chain.invoke({
                     "user_request": f"{self.state['original_user_input']}\n",
-                    "task_description": f"{self.state['requirements_document']['task_description']}",
+                    "task_description": f"{self.state['requirements_document'].tasks_overview}",
                 })
 
                 self.has_error_occured = False
@@ -497,9 +466,9 @@ class ArchitectAgent(Agent[ArchitectState, ArchitectPrompts]):
                 ))
 
                 response: TaskOutput = self.implementation_details_chain.invoke({
-                "architecture": f"{self.state['requirements_document']['architecture']}\n",
-                "microservice_design": f"{self.state['requirements_document']['microservice_design']}",
-                "folder_structure": f"{self.state['requirements_document']['folder_structure']}",
+                "architecture": f"{self.state['requirements_document'].project_architecture}\n",
+                "microservice_design": f"{self.state['requirements_document'].microservices_architecture}",
+                "folder_structure": f"{self.state['requirements_document'].directory_structure}",
                 })
 
                 self.has_error_occured = False
@@ -535,7 +504,6 @@ class ArchitectAgent(Agent[ArchitectState, ArchitectPrompts]):
 
         return {**self.state}
 
-
     def write_requirements_node(self, state: ArchitectState) -> ArchitectState:
         """
         This method is used to write the requirements overview to a local file. It updates 
@@ -553,7 +521,7 @@ class ArchitectAgent(Agent[ArchitectState, ArchitectPrompts]):
 
         self.state={**state}
 
-        document = self.generate_requirements_document()
+        document = self.state['requirements_document'].to_markdown()
         if len(document) < 0:
             self.has_error_occured = True
             self.error_message = "ERROR: Found requirements document to be empty. Could not write it to file system."
@@ -604,7 +572,7 @@ class ArchitectAgent(Agent[ArchitectState, ArchitectPrompts]):
 
         try:
             task_seperation_solution = self.task_seperation_chain.invoke({
-                "tasks": self.state['requirements_document']['task_description'],
+                "tasks": self.state['requirements_document'].tasks_overview,
                 "error_message": self.error_message
             })
             
@@ -682,7 +650,7 @@ class ArchitectAgent(Agent[ArchitectState, ArchitectPrompts]):
         try:
             response: ProjectDetails = self.project_details_chain.invoke({
                 "user_request": f"{self.state['original_user_input']}\n",
-                "folder_structure_document": f"{self.state['requirements_document']['folder_structure']}\n",
+                "folder_structure_document": f"{self.state['requirements_document'].directory_structure}\n",
                 "error_message": f"{self.error_message}\n",
             })
 
@@ -743,7 +711,7 @@ class ArchitectAgent(Agent[ArchitectState, ArchitectPrompts]):
         
         try:
             llm_response: QueryResult = self.additional_information_chain.invoke({
-                "requirements_document": self.generate_requirements_document(),
+                "requirements_document": self.state['requirements_document'].to_markdown(),
                 "question": self.state['current_task'].question,
                 "error_message": self.error_message
             })
