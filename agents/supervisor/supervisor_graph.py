@@ -24,7 +24,7 @@ class SupervisorWorkflow(Graph[SupervisorAgent]):
         supervisor_workflow = StateGraph(SupervisorState)
         
         # Define the nodes
-        supervisor_workflow.add_node("kickoff", self.agent.instantiate_team_members)
+        supervisor_workflow.add_node("kickoff", self.agent.instantiate_state)
         supervisor_workflow.add_node("Architect", self.agent.call_architect)
         supervisor_workflow.add_node("Coder", self.agent.call_coder)
         supervisor_workflow.add_node("RAG", self.agent.call_rag)
