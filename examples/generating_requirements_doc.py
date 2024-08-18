@@ -81,7 +81,7 @@ if __name__=="__main__":
 
     # Run the chain
     req_document_in_parts = overall_chain.invoke(input={
-        "user_request": 'I want to develop a Title Requests Micro-service adhering to MISMO v3.6 standards to handle get_title service using GET REST API Call in .NET?',
+        "original_user_input": 'I want to develop a Title Requests Micro-service adhering to MISMO v3.6 standards to handle get_title service using GET REST API Call in .NET?',
         "task_description": 'This task is part of Project Initiation Phase and has two deliverables, a project requirements document and a list of project deliverables.\n\n            Do not assume anything and request for additional information if provided information is not sufficient to complete the task or something is missing.',
         "additional_information": 'any additional info goes here',
         "license_text": "Property of XYZ COMPANY"
