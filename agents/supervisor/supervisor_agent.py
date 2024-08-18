@@ -11,13 +11,13 @@ from agents.architect.graph import ArchitectGraph
 from agents.coder.graph import CoderGraph
 from agents.planner.planner_graph import PlannerWorkFlow
 from agents.rag_workflow.rag_graph import RAGWorkFlow
-from agents.supervisor.supervisor_models import QueryList
-from agents.supervisor.supervisor_prompts import SupervisorPrompts
 from agents.supervisor.supervisor_state import SupervisorState
 from configs.project_config import ProjectAgents
 from configs.supervisor_config import calling_map
 from models.constants import ChatRoles, PStatus, Status
 from models.models import RequirementsDocument, Task
+from models.supervisor import QueryList
+from prompts.supervisor import SupervisorPrompts
 from utils.fuzzy_rag_cache import FuzzyRAGCache
 from utils.logs.logging_utils import logger
 
