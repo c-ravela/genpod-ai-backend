@@ -52,21 +52,21 @@ if __name__=="__main__":
     llm = ChatOpenAI(model="gpt-4o-2024-05-13", temperature=0.3, max_retries=5, streaming=True, seed=4000, top_p=0.4)
 
     # Ensure each chain has the correct input_variables and output_key
-    project_overview_chain = architect_prompts.PROJECT_OVERVIEW_PROMPT | llm | (lambda x: x.content)  # This step extracts only the content part from the llm output AImessage
+    project_overview_chain = architect_prompts.project_overview_prompt | llm | (lambda x: x.content)  # This step extracts only the content part from the llm output AImessage
     
-    architecture_chain = architect_prompts.ARCHITECTURE_PROMPT | llm | (lambda x: x.content)
+    architecture_chain = architect_prompts.architecture_prompt | llm | (lambda x: x.content)
 
-    folder_structure_chain = architect_prompts.FOLDER_STRUCTURE_PROMPT | llm | (lambda x: x.content)
+    folder_structure_chain = architect_prompts.folder_structure_prompt | llm | (lambda x: x.content)
 
-    microservice_design_chain = architect_prompts.MICROSERVICE_DESIGN_PROMPT | llm | (lambda x: x.content)
+    microservice_design_chain = architect_prompts.microservice_design_prompt | llm | (lambda x: x.content)
 
-    tasks_breakdown_chain = architect_prompts.TASKS_BREAKDOWN_PROMPT | llm | (lambda x: x.content)
+    tasks_breakdown_chain = architect_prompts.tasks_breakdown_prompt | llm | (lambda x: x.content)
 
-    standards_chain = architect_prompts.STANDARDS_PROMPT | llm | (lambda x: x.content)
+    standards_chain = architect_prompts.standards_prompt | llm | (lambda x: x.content)
 
-    implementation_details_chain = architect_prompts.IMPLEMENTATION_DETAILS_PROMPT | llm | (lambda x: x.content)
+    implementation_details_chain = architect_prompts.implementation_details_prompt | llm | (lambda x: x.content)
 
-    license_legal_chain = architect_prompts.LICENSE_DETAILS_PROMPT | llm | (lambda x: x.content)
+    license_legal_chain = architect_prompts.license_details_prompt | llm | (lambda x: x.content)
 
     overall_chain = (
         RunnablePassthrough.assign(project_overview=project_overview_chain)

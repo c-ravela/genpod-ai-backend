@@ -64,6 +64,8 @@ class Table:
         """
         Updates a record in the table based on the provided ID and columns, and returns the updated record as a dictionary.
         """
+        columns['updated_at'] = datetime.now()
+        
         VALID_COLUMNS = self.__valid_columns__()
 
         if not VALID_COLUMNS:

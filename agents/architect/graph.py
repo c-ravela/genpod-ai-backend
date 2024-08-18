@@ -4,10 +4,8 @@ This module contains the Architect class which is responsible for defining
 the state graph for the Architect agent. The state graph determines the flow 
 of control between different states of the Architect agent.
 """
-from langchain_community.chat_models import ChatOllama
 from langchain_openai import ChatOpenAI
 from langgraph.graph import END, StateGraph
-from typing_extensions import Union
 
 from agents.agent.graph import Graph
 from agents.architect.agent import ArchitectAgent
@@ -25,7 +23,7 @@ class ArchitectGraph(Graph[ArchitectAgent]):
     and designate the entry point.
     """
 
-    def __init__(self, llm: Union[ChatOpenAI, ChatOllama], persistance_db_path: str) -> None:
+    def __init__(self, llm: ChatOpenAI, persistance_db_path: str) -> None:
         """
         Constructor for the ArchitectGraph class.
 

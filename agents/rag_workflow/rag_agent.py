@@ -1,16 +1,17 @@
 from langchain_community.vectorstores import Chroma
 from langchain_core.output_parsers import JsonOutputParser, StrOutputParser
-from langchain_openai import OpenAIEmbeddings
+from langchain_openai import ChatOpenAI, OpenAIEmbeddings
 
 from agents.agent.agent import Agent
-from agents.rag_workflow.rag_prompts import RAGPrompts
 from agents.rag_workflow.rag_state import RAGState
 from configs.project_config import ProjectAgents
+from configs.supervisor_config import RAG_TRY_LIMIT
+from prompts.rag import RAGPrompts
 from utils.logs.logging_utils import logger
 
 
 class RAGAgent(Agent[RAGState, RAGPrompts]):
-    def __init__(self, llm, collection_name, persist_directory=None):
+    def __init__(self, llm: ChatOpenAI, collection_name: str, persist_directory: str=None):
         assert persist_directory is not None, "Currently only Local Chroma VectorDB is supported"
         
         super().__init__(
@@ -20,6 +21,8 @@ class RAGAgent(Agent[RAGState, RAGPrompts]):
             RAGPrompts(),
             llm
         )
+
+        self.iteration_count = RAG_TRY_LIMIT
         self.mismo_vectorstore = Chroma(
                             collection_name = collection_name,
                             persist_directory = persist_directory,
@@ -64,7 +67,7 @@ class RAGAgent(Agent[RAGState, RAGPrompts]):
             self.max_hallucination = state['max_hallucination']
 
         # Retrieval
-        documents = self.retriever.get_relevant_documents(question)
+        documents = self.retriever.invoke(question)
         return {**state, "documents": documents, "question": question}
 
     def generate(self, state: RAGState):
@@ -132,7 +135,7 @@ class RAGAgent(Agent[RAGState, RAGPrompts]):
         Returns:
             state (dict): Updates question key with a re-phrased question
         """
-        if state['iteration_count'] <= 0:
+        if self.iteration_count <= 0:
             state['generation'] = "I don't have any additional information about the question."
             state['query_answered'] = False
             return {**state, "next":"update_state"}
@@ -147,7 +150,7 @@ class RAGAgent(Agent[RAGState, RAGPrompts]):
         logger.info("----TRANSFORM QUERY----")
         question = state["question"]
         documents = state["documents"]
-        state["iteration_count"] -= 1
+        self.iteration_count -= 1
 
         # Re-write question
         better_question = self.question_rewriter.invoke({"question": question})

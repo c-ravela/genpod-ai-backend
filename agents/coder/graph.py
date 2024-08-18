@@ -1,11 +1,9 @@
 """
 Coder Graph
 """
-from langchain_community.chat_models import ChatOllama
 from langchain_openai import ChatOpenAI
 from langgraph.graph import END, StateGraph
 from langgraph.graph.graph import CompiledGraph
-from typing_extensions import Union
 
 from agents.agent.graph import Graph
 from agents.coder.agent import CoderAgent
@@ -17,7 +15,7 @@ class CoderGraph(Graph[CoderAgent]):
     """
     """
 
-    def __init__(self,  llm: Union[ChatOpenAI, ChatOllama], persistance_db_path: str) -> None:
+    def __init__(self,  llm: ChatOpenAI, persistance_db_path: str) -> None:
         """"""
         super().__init__(
             ProjectGraphs.coder.graph_id,

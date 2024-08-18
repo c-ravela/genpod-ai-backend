@@ -1,9 +1,10 @@
 """ Graph State for PM Agent """
 from typing import List, Tuple
 
-from typing_extensions import TypedDict
+from typing_extensions import Annotated, TypedDict
 
-from models.models import Task
+from agents.agent.state import State
+from models.models import RequirementsDocument, Task
 
 
 class SupervisorState(TypedDict):
@@ -20,24 +21,179 @@ class SupervisorState(TypedDict):
         messages: List of messages between Project Manager and other agents
     """
 
-    original_user_input: str
-    project_path: str
-    license_url: str
-    license_text: str
-    team_members: dict
-    rag_retrieval: str
-    tasks: List[str]
-    current_task: Task
-    planned_tasks: List[Task] # This is list of work_packages created by the planner
-    planned_task_map: dict # This is the a map of deliverables to work_packages
-    planned_task_requirements: dict # This is the map of work_packages to json formatted requirements
-    agents_status: str
-    messages: List[Tuple[str, str]]
-    rag_query_answer : bool
-    requirements_doc : str
-    human_feedback: List[Tuple[str, str]]
-    coder_inputs: dict
+    # @in
+    project_id: Annotated[
+        int,
+        State.in_field("The id of the project being generated.")
+    ]
 
+    # @out
+    project_name: Annotated[
+        str,
+        State.out_field("The name of the project being generated.")
+    ]
+
+    # @out
+    project_status: Annotated[
+        str,
+        State.out_field("The status of the project being generated.")
+    ]
+
+    # @in
+    microservice_id: Annotated[
+        int, 
+        State.in_field("The id of the microservice being generated.")
+    ]
+
+    # @out
+    microservice_name: Annotated[
+        str,
+        State.out_field("The name of the microservice being generated.")
+    ]
+
+    # @in
+    original_user_input: Annotated[
+        str,
+        State.in_field("The prompt given by user.")
+    ]
+
+    # @in
+    project_path: Annotated[
+        str,
+        State.in_field("The path of the project where its being written.")
+    ]
+
+    # @in
+    license_url: Annotated[
+        str,
+        State.in_field("The license url to the project, given by the user.")
+    ]
+
+    # @in
+    license_text: Annotated[
+        str,
+        State.in_field("The license text for code base.")
+    ]
+
+    # @out
+    tasks: Annotated[
+        List[Task], 
+        State.out_field("The tasks create while generating the project.")
+    ]
+
+    # @out
+    current_task: Annotated[
+        Task,
+        State.out_field("The current task that is team is working on.")
+    ]
+
+    # @out
+    requirements_document: Annotated[
+        RequirementsDocument,
+        State.inout_field(
+            "A comprehensive, well-structured document in markdown format that outlines "
+            "the project's requirements derived from the user's request. This serves as a "
+            "guide for the development process."
+        )
+    ]
+
+    # @inout
+    messages: Annotated[
+        list[tuple[str, str]], 
+        State.inout_field(
+            "A chronological list of tuples representing the conversation history between the "
+            "system, user, and AI. Each tuple contains a role identifier (e.g., 'AI', 'tool', "
+            "'user', 'system') and the corresponding message."
+        )
+    ]
+
+    # @out
+    human_feedback:  Annotated[
+        list[tuple[str, str]], 
+        State.inout_field(
+            "A list human inputs given during human in the loop process"
+        )
+    ]
+
+    # @out
+    rag_cache_queries: Annotated[
+        List[str],
+        State.out_field("Queries generated for rag cache")
+    ]
+
+    # @out
+    rag_query_answer : Annotated[
+        bool,
+        State.out_field("is query answered by rag agent.")
+    ]
+
+    # @out
+    rag_retrieval: Annotated[
+        str,
+        State.out_field()
+    ]
+
+    # @out
+    agents_status: Annotated[
+        str,
+        State.out_field()
+    ]
+
+    # @out
+    planned_tasks: Annotated[
+        List[Task], # This is list of work_packages created by the planner,
+        State.out_field()
+    ]
+
+    # @out
+    planned_task_map: Annotated[
+        dict, # This is the a map of deliverables to work_packages
+        State.out_field()
+    ]
+
+    # @out
+    planned_task_requirements: Annotated[
+        dict,  # This is the map of work_packages to json formatted requirements
+        State.out_field()
+    ]
+
+    # @out - Architect 
+    project_folder_strucutre: Annotated[
+        str,
+        State.in_field("The organized layout of directories and subdirectories that form the project's "
+        "file system, adhering to best practices for project structure.")
+    ]
+
+    # @out
+    code: Annotated[
+        str, 
+        State.out_field("The complete, well-documented working code that adheres to all standards "
+        "requested with the programming language, framework user requested ")
+    ]
+
+    # @out
+    files_created: Annotated[
+        list[str], 
+        State.out_field("The absolute paths of file that were created for this project "
+        "so far.")
+    ]
+
+    # @out
+    infile_license_comments: Annotated[
+        dict[str, str],
+        State.out_field("A list of multiline license comments for each type of file.")
+    ]
+
+    # @out
+    commands_to_execute: Annotated[ 
+        dict[str, str],
+        State.out_field("This field represents a dictionary of commands intended to be "
+        "executed on a Linux terminal. Each key-value pair in the dictionary corresponds to an absolute path (the key) and a specific command (the value) to be executed at that path.")
+    ]
+
+    # TODO: remove this once agent requirements logic is implemented
+    coder_inputs: dict
+    
 def add_message(state: SupervisorState, message: tuple[str, str]) -> SupervisorState:
     """
     Adds a single message to the messages field in the state.

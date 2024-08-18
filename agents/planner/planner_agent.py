@@ -5,20 +5,21 @@ import os
 import re
 from typing import List
 
+from langchain_openai import ChatOpenAI
 from pydantic import ValidationError
 
 from agents.agent.agent import Agent
-from agents.planner.planner_models import BacklogList
-from agents.planner.planner_prompt import PlannerPrompts
 from agents.planner.planner_state import PlannerState
 from configs.project_config import ProjectAgents
 from models.constants import Status
 from models.models import Task
+from models.planner import BacklogList
+from prompts.planner import PlannerPrompts
 from utils.logs.logging_utils import logger
 
 
 class PlannerAgent(Agent[PlannerState, PlannerPrompts]):
-    def __init__(self, llm):
+    def __init__(self, llm: ChatOpenAI):
         
         super().__init__(
             ProjectAgents.planner.agent_id,
@@ -118,8 +119,8 @@ class PlannerAgent(Agent[PlannerState, PlannerPrompts]):
                 state['deliverable'] = state['current_task'].description
                 state['backlogs'] = validated_backlogs.backlogs
 
-                # Extend the deliverable_backlog_map with the new backlogs
-                state['deliverable_backlog_map'] = {state['deliverable']: [wp for wp in state['backlogs']]}
+                # Extend the planned_task_map with the new backlogs
+                state['planned_task_map'] = {state['deliverable']: [wp for wp in state['backlogs']]}
 
                 return {**state}
             
@@ -137,8 +138,8 @@ class PlannerAgent(Agent[PlannerState, PlannerPrompts]):
                     return {**state}
 
     def requirements_developer(self, state: PlannerState):
-        state['backlog_requirements'] = {}
-        for backlog in state['deliverable_backlog_map'][state['current_task'].description]:
+        state['planned_task_requirements'] = {}
+        for backlog in state['planned_task_map'][state['current_task'].description]:
             while(True):
                 try:
                     # print(f"----Now Working on Generating detailed requirements for the backlog----\n{backlog}")
@@ -175,7 +176,7 @@ class PlannerAgent(Agent[PlannerState, PlannerPrompts]):
                         # pprint(parsed_response)
                         logger.info("----Generated Detailed requirements in JSON format for the backlog----")
                         logger.info("Requirements in JSON: %r", parsed_response)
-                        state['backlog_requirements'][backlog] = parsed_response
+                        state['planned_task_requirements'][backlog] = parsed_response
                         self.error_count = 0
                         self.error_messages = []
                         break
@@ -197,7 +198,7 @@ class PlannerAgent(Agent[PlannerState, PlannerPrompts]):
         """Uncomment the below line to call coder on each workpackage created for the deliverable. Currently coder is not implemented yet so we will try to build workpackages for eacg deliverable using the Done mode."""
         # state['current_task'].task_status = Status.INPROGRESS
         state['current_task'].task_status = Status.DONE
-        files_written, total_files_written = self.write_workpackages_to_files(state['backlog_requirements'],state['generated_project_path'])
+        files_written, total_files_written = self.write_workpackages_to_files(state['planned_task_requirements'], state['project_path'])
         logger.info('Wrote down %d work packages into the project folder during the current session. Total files written during the current run %d', files_written, total_files_written)
         return {**state}
 

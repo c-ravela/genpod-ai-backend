@@ -7,7 +7,6 @@ from enum import Enum, EnumType
 from typing import Any, Dict, Union
 
 from dotenv import load_dotenv
-from langchain_community.chat_models import ChatOllama
 from langchain_openai import ChatOpenAI
 
 load_dotenv()
@@ -68,7 +67,7 @@ class LLMConfig:
         self.streaming = streaming
         self.model_kwargs = model_kwargs
 
-    def create_llm(self) -> Union[ChatOpenAI, ChatOllama]:
+    def create_llm(self) -> ChatOpenAI:
         """
         Creates and returns an instance of the configured LLM.
 
@@ -96,7 +95,7 @@ class AgentConfig(AgentInfo):
     Attributes:
         agent_name (str): The name of the agent.
         agent_id (str): The unique identifier of the agent.
-        llm (Union[ChatOpenAI, ChatOllama]): The LLM instance associated with the agent.
+        llm (ChatOpenAI): The LLM instance associated with the agent.
         thread_id (Union[int, None]): Optional thread ID for the agent.
     """
 
@@ -110,7 +109,7 @@ class AgentConfig(AgentInfo):
             llm_config (LLMConfig): The LLM configuration for this agent.
         """
         super().__init__(agent_name, agent_id)
-        self.llm: Union[ChatOpenAI, ChatOllama] = llm_config.create_llm()
+        self.llm: ChatOpenAI = llm_config.create_llm()
         self.thread_id: Union[int, None] = None
 
     def set_thread_id(self, thread_id: int) -> None:
@@ -129,18 +128,19 @@ class ProjectGraphs(Enum):
     Attributes:
         supervisor (GraphInfo): Information about the Supervisor Graph.
         architect (GraphInfo): Information about the Solution Architect Graph.
-        coder (GraphInfo): Information about the Software Programmer Graph.
-        rag (GraphInfo): Information about the RAG Graph.
-        planner (GraphInfo): Information about the Planner Graph.
-        tester (GraphInfo): Information about the Tester Graph.
+        coder (GraphInfo): Information about the Software Engineer Graph.
+        rag (GraphInfo): Information about the Standards Extractor Graph.
+        planner (GraphInfo): Information about the Project Planner Graph.
+        tester (GraphInfo): Information about the Unit Tester Graph.
+        modernizer (GraphInfo): Information about the AST Generator Graph.
     """
-    supervisor = GraphInfo("Supervisor Graph", "1_supervisor_graph")
-    architect = GraphInfo("Solution Architect Graph", "2_architect_graph")
-    coder = GraphInfo("Software Programmer Graph", "3_coder_graph")
-    rag = GraphInfo("RAG Graph", "4_rag_graph")
-    planner = GraphInfo("Planner Graph", "5_planner_graph")
-    tester = GraphInfo("Tester Graph", "6_tester_graph")
-    modernizer = GraphInfo("Modernizer Graph", "7_modernizer_graph")
+    supervisor = GraphInfo("Supervisor Graph", "GRPH_01_SUP")
+    architect = GraphInfo("Solution Architect Graph", "GRPH_02_ARC")
+    coder = GraphInfo("Software Engineer Graph", "GRPH_03_ENG")
+    rag = GraphInfo("Standards Extractor Graph", "GRPH_04_RAG")
+    planner = GraphInfo("Project Planner Graph", "GRPH_05_PLN")
+    tester = GraphInfo("Unit Tester Graph", "GRPH_06_TST")
+    modernizer = GraphInfo("AST Generator Graph", "GRPH_07_MOD")
 
     @property
     def graph_name(self) -> str:
@@ -167,21 +167,24 @@ class ProjectAgents(Enum):
     Enum that holds all the agents used by the project.
 
     Attributes:
-        supervisor (AgentInfo): Information about the Supervisor agent.
+        supervisor (AgentInfo): Information about the Project Supervisor agent.
         architect (AgentInfo): Information about the Solution Architect agent.
-        coder (AgentInfo): Information about the Software Programmer agent.
-        rag (AgentInfo): Information about the RAG agent.
-        planner (AgentInfo): Information about the Planner agent.
-        tester (AgentInfo): Information about the Tester agent.
+        coder (AgentInfo): Information about the Software Engineer agent.
+        rag (AgentInfo): Information about the Standards Extractor agent.
+        planner (AgentInfo): Information about the Project Planner agent.
+        tester (AgentInfo): Information about the Unit Tester agent.
+        modernizer (AgentInfo): Information about the AST Generator agent.
+        human (AgentInfo): Information about the Human In The Loop agent.
     """
-    supervisor = AgentInfo("Supervisor", "1_supervisor_agent")
-    architect = AgentInfo("Solution Architect", "2_architect_agent")
-    coder = AgentInfo("Software Programmer", "3_coder_agent")
-    rag = AgentInfo("RAG", "4_rag_agent")
-    planner = AgentInfo("Planner", "5_planner_agent")
-    tester = AgentInfo("Tester", "6_tester_agent")
-    modernizer = AgentInfo("Modernizer", "7_modernizer_agent")
-    human = AgentInfo("Human In Loop", "8_human_agent")
+
+    supervisor = AgentInfo("Project Supervisor", "SUP_01")
+    architect = AgentInfo("Solution Architect", "ARC_02")
+    coder = AgentInfo("Software Engineer", "ENG_03")
+    rag = AgentInfo("Standards Extractor", "RAG_04")
+    planner = AgentInfo("Project Planner", "PLN_05")
+    tester = AgentInfo("Unit Tester", "TST_06")
+    modernizer = AgentInfo("AST Generator", "MOD_07")
+    human = AgentInfo("Human Loop", "HUM_08")
 
     @property
     def agent_name(self) -> str:
@@ -312,6 +315,7 @@ class ProjectConfig:
         self.graphs = ProjectGraphs
         self.agents = ProjectAgents
         self.agents_config = AGENTS_CONFIG
+        self.collection_name = "MISMO-version-3.6-docs"
         self.vector_db_collections = {
             'MISMO-version-3.6-docs': os.path.join(os.getcwd(), "vector_collections")
         }

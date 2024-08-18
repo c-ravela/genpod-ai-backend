@@ -1,27 +1,19 @@
-from typing import Dict, Union
-
-from langchain_community.chat_models import ChatOllama
 from langchain_openai import ChatOpenAI
 from langgraph.graph import END, StateGraph
 
 from agents.agent.graph import Graph
 from agents.supervisor.supervisor_agent import SupervisorAgent
 from agents.supervisor.supervisor_state import SupervisorState
-from configs.project_config import AgentConfig, ProjectGraphs
+from configs.project_config import ProjectGraphs
 
 
 class SupervisorWorkflow(Graph[SupervisorAgent]):
-    def __init__(self, 
-                llm: Union[ChatOpenAI, ChatOllama],
-                collections: dict[str, str], 
-                user_input: str, rag_try_limit: int, 
-                project_path: str, persistance_db_path: str,
-                agents_config: Dict[str, AgentConfig]):
+    def __init__(self, llm: ChatOpenAI, persistance_db_path: str):
     
         super().__init__(
             ProjectGraphs.supervisor.graph_id,
             ProjectGraphs.supervisor.graph_name, 
-            SupervisorAgent(llm, collections, user_input, rag_try_limit, project_path, persistance_db_path, agents_config),
+            SupervisorAgent(llm),
             persistance_db_path
         )
 
@@ -32,7 +24,7 @@ class SupervisorWorkflow(Graph[SupervisorAgent]):
         supervisor_workflow = StateGraph(SupervisorState)
         
         # Define the nodes
-        supervisor_workflow.add_node("kickoff", self.agent.instantiate_team_members)
+        supervisor_workflow.add_node("kickoff", self.agent.instantiate_state)
         supervisor_workflow.add_node("Architect", self.agent.call_architect)
         supervisor_workflow.add_node("Coder", self.agent.call_coder)
         supervisor_workflow.add_node("RAG", self.agent.call_rag)
