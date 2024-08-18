@@ -83,14 +83,8 @@ class SupervisorState(TypedDict):
 
     # @out
     current_task: Annotated[
-        List[Task],
+        Task,
         State.out_field("The current task that is team is working on.")
-    ]
-
-    # @out
-    team_members: Annotated[
-        dict,
-        State.out_field("map of team members")
     ]
 
     # @out
@@ -197,6 +191,9 @@ class SupervisorState(TypedDict):
         "executed on a Linux terminal. Each key-value pair in the dictionary corresponds to an absolute path (the key) and a specific command (the value) to be executed at that path.")
     ]
 
+    # TODO: remove this once agent requirements logic is implemented
+    coder_inputs: dict
+    
 def add_message(state: SupervisorState, message: tuple[str, str]) -> SupervisorState:
     """
     Adds a single message to the messages field in the state.
