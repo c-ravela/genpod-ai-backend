@@ -51,19 +51,50 @@ class Task(BaseModel):
         default=""
     )
 
-class RequirementsDocument:
+class RequirementsDocument(BaseModel):
     """
     This class encapsulates the various requirements of a project. 
     """
 
-    project_details: str # A brief description of the project
-    architecture: str # Details about the system's architecture
-    folder_structure: str # Description of the project's directory or folder structure
-    microservice_design: str # Design details of the microservices used in the project
-    task_description: str # Overview of the tasks involved in the project
-    standards: str # Coding standards and conventions followed in the project
-    implementation_details: str  # Detailed description of the implementation process
-    license_details: str # Information about the project's licensing
+    project_details: str = Field(
+        description="A brief description of the project",
+        default=""
+    )
+    
+    architecture: str = Field(
+        description="Details about the system's architecture",
+        default=""
+    )
+
+    folder_structure: str = Field(
+        description="Description of the project's directory or folder structure",
+        default=""
+    )
+
+    microservice_design: str = Field(
+        description="Design details of the microservices used in the project",
+        default=""
+    )
+
+    task_description: str = Field(
+        description="Overview of the tasks involved in the project",
+        default=""
+    )
+
+    standards: str = Field(
+        description="Coding standards and conventions followed in the project",
+        default=""
+    )
+
+    implementation_details: str  = Field(
+        description="Detailed description of the implementation process",
+        default=""
+    )
+
+    license_details: str = Field(
+        description="Information about the project's licensing",
+        default=""
+    )
 
     def test(self):
         print("callable")
