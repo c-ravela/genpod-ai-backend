@@ -1,5 +1,6 @@
 import os
 
+from langchain_openai import ChatOpenAI
 from langgraph.graph import END, StateGraph
 
 from agents.agent.graph import Graph
@@ -10,7 +11,7 @@ from configs.project_config import ProjectGraphs
 
 class RAGWorkFlow(Graph[RAGAgent]):
 
-    def __init__(self, llm, collection_name, persistance_db_path: str, persist_directory=None):
+    def __init__(self, llm: ChatOpenAI, persistance_db_path: str, collection_name: str, persist_directory: str=None):
         super().__init__(
             ProjectGraphs.rag.graph_id,
             ProjectGraphs.rag.graph_name, 
