@@ -7,7 +7,6 @@ from enum import Enum, EnumType
 from typing import Any, Dict, Union
 
 from dotenv import load_dotenv
-from langchain_community.chat_models import ChatOllama
 from langchain_openai import ChatOpenAI
 
 load_dotenv()
@@ -68,7 +67,7 @@ class LLMConfig:
         self.streaming = streaming
         self.model_kwargs = model_kwargs
 
-    def create_llm(self) -> Union[ChatOpenAI, ChatOllama]:
+    def create_llm(self) -> ChatOpenAI:
         """
         Creates and returns an instance of the configured LLM.
 
@@ -96,7 +95,7 @@ class AgentConfig(AgentInfo):
     Attributes:
         agent_name (str): The name of the agent.
         agent_id (str): The unique identifier of the agent.
-        llm (Union[ChatOpenAI, ChatOllama]): The LLM instance associated with the agent.
+        llm (ChatOpenAI): The LLM instance associated with the agent.
         thread_id (Union[int, None]): Optional thread ID for the agent.
     """
 
@@ -110,7 +109,7 @@ class AgentConfig(AgentInfo):
             llm_config (LLMConfig): The LLM configuration for this agent.
         """
         super().__init__(agent_name, agent_id)
-        self.llm: Union[ChatOpenAI, ChatOllama] = llm_config.create_llm()
+        self.llm: ChatOpenAI = llm_config.create_llm()
         self.thread_id: Union[int, None] = None
 
     def set_thread_id(self, thread_id: int) -> None:
@@ -316,6 +315,7 @@ class ProjectConfig:
         self.graphs = ProjectGraphs
         self.agents = ProjectAgents
         self.agents_config = AGENTS_CONFIG
+        self.collection_name = "MISMO-version-3.6-docs"
         self.vector_db_collections = {
             'MISMO-version-3.6-docs': os.path.join(os.getcwd(), "vector_collections")
         }
