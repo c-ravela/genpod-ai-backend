@@ -133,6 +133,14 @@ class SupervisorAgent(Agent[SupervisorState, SupervisorPrompts]):
 
     def instantiate_state(self, state: SupervisorState) -> SupervisorState:
         """"""
+        if self.team is None:
+            raise ValueError(
+                f"Error: The team for '{self.agent_name}' has not been initialized. "
+                f"Current value of 'self.team': {self.team}. "
+                "Please ensure that the 'set_team' method has been called on the supervisor agent "
+                "to initialize the team before attempting this operation."
+            )
+
         # initialize supervisor state
         state['project_name'] = ""
         
@@ -194,10 +202,6 @@ class SupervisorAgent(Agent[SupervisorState, SupervisorPrompts]):
             result = self.rag_cache.get(question)
             if result is not None:
                 logger.debug("Cache hit for query: \n%s",question)
-                message = (
-                    ChatRoles.AI.value, 
-                    f'Response from {self.team.rag.member_name}: {result}'
-                )
 
                 state['rag_query_answer'] = True
             else:
@@ -211,12 +215,6 @@ class SupervisorAgent(Agent[SupervisorState, SupervisorPrompts]):
                 result = additional_info['generation']
                 state['rag_query_answer'] = additional_info['query_answered']
                 self.rag_cache.add(question, result)
-                message = (
-                    ChatRoles.AI.value, 
-                    f'Response from {self.team.rag.member_name}: {result}'
-                )
-
-            state['messages'] += [message]
             
             logger.info(f"----------Response from {self.team.rag.member_name} Agent----------")
             logger.info(f"{self.team.rag.member_name} Response: %s", result)
@@ -269,7 +267,7 @@ class SupervisorAgent(Agent[SupervisorState, SupervisorPrompts]):
 
             state['messages'] += [(
                 ChatRoles.AI.value,
-                f'Response from {self.team.architect.member_name}: {architect_result['tasks']}'
+                f'{self.team.architect.member_name} has prepared all the details required for project.'
             )]
 
             logger.info("----------Response from Architect Agent----------")
@@ -444,7 +442,7 @@ class SupervisorAgent(Agent[SupervisorState, SupervisorPrompts]):
                 else:
                     state['current_task'] = new_task
 
-                    requirements_doc = ' '.join(str(value) for value in state['requirements_document'].values())
+                    requirements_doc = state['requirements_document'].to_markdown()
                     state['current_task'].additional_info = requirements_doc + '\n' + state['rag_retrieval']
                     
                 self.called_agent = self.team.supervisor.member_id
