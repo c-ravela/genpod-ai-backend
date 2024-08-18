@@ -2,14 +2,14 @@
 Driving code file for this project.
 """
 import os
-from pprint import pprint
+from pprint import pformat, pprint
 
-from agents.supervisor.supervisor_graph import SupervisorWorkflow
 from configs.database import get_client_local_db_file_path
 from configs.project_config import ProjectConfig
 from configs.project_path import set_project_path
-from configs.supervisor_config import RAG_TRY_LIMIT
 from database.database import Database
+from genpod.team import TeamMembers
+from models.constants import ChatRoles, Status
 from utils.logs.logging_utils import logger
 from utils.time import get_timestamp
 
@@ -67,26 +67,32 @@ if __name__=="__main__":
     logger.info(f"Records for new session has been created in the database with ids: {", ".join(f"{value.agent_id}: {value.thread_id}" for key, value in config.agents_config.items())}")
     # Database insertion - END
     
-    supervisor_info = config.agents.supervisor
-    SUPERVISOR = SupervisorWorkflow(
-        config.agents_config[supervisor_info.agent_id].llm,
-        config.vector_db_collections, 
-        PROJECT_INPUT, 
-        RAG_TRY_LIMIT, 
-        PROJECT_PATH, 
-        DATABASE_PATH,
-        config.agents_config
-    )
+    genpod_team = TeamMembers(DATABASE_PATH, config.collection_name)
+    genpod_team.supervisor.set_recursion_limit(500)
+    genpod_team.supervisor.graph.agent.setup_team(genpod_team)
 
-    sup_config = {"configurable":{"thread_id": config.agents_config[supervisor_info.agent_id].thread_id}, "recursion_limit":500}
-    result = SUPERVISOR.workflow.invoke({
-        "messages": [("Human", PROJECT_INPUT)],
+    result = genpod_team.supervisor.invoke({
+        'project_id': project_details['id'],
+        'microservice_id': microservice_details['id'],
+        'original_user_input': PROJECT_INPUT,
+        'project_path': PROJECT_PATH,
         'license_url': LICENSE_URL,
-        'license_text':LICENSE_TEXT
-        }, 
-        sup_config
-    )
+        'license_text': LICENSE_TEXT,
+        'messages': [(ChatRoles.USER.value, PROJECT_INPUT)],
+    })
     
+    logger.info(f"result end: {pformat(result)}")
     pprint(result)
 
-    # TODO: once state is returned update db with returned value
+    db.projects_table.update(
+        project_details['id'], 
+        project_name="" if result.get('project_name') is None else result['project_name'],
+        status= Status.DONE.value,
+        updated_by=USER_ID
+    )
+    db.microservices_table.update(
+        microservice_details['id'],
+        microservice_name="" if result.get('microservice_name') is None else result['microservice_name'],
+        status= Status.DONE.value,
+        updated_by=USER_ID
+    )
