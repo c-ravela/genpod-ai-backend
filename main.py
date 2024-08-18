@@ -86,13 +86,13 @@ if __name__=="__main__":
 
     db.projects_table.update(
         project_details['id'], 
-        project_name="" if result.get('project_name') is None else result['project_name'],
-        status= Status.DONE.value,
+        project_name=result['project_name'],
+        status= result['project_status'],
         updated_by=USER_ID
     )
     db.microservices_table.update(
         microservice_details['id'],
-        microservice_name="" if result.get('microservice_name') is None else result['microservice_name'],
-        status= Status.DONE.value,
+        microservice_name=result['project_name'],
+        status= result['project_status'],
         updated_by=USER_ID
     )
