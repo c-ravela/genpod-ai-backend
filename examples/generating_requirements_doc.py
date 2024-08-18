@@ -52,21 +52,21 @@ if __name__=="__main__":
     llm = ChatOpenAI(model="gpt-4o-2024-05-13", temperature=0.3, max_retries=5, streaming=True, seed=4000, top_p=0.4)
 
     # Ensure each chain has the correct input_variables and output_key
-    project_overview_chain = architect_prompts.PROJECT_OVERVIEW_PROMPT | llm | (lambda x: x.content)  # This step extracts only the content part from the llm output AImessage
+    project_overview_chain = architect_prompts.project_overview_prompt | llm | (lambda x: x.content)  # This step extracts only the content part from the llm output AImessage
     
-    architecture_chain = architect_prompts.ARCHITECTURE_PROMPT | llm | (lambda x: x.content)
+    architecture_chain = architect_prompts.architecture_prompt | llm | (lambda x: x.content)
 
-    folder_structure_chain = architect_prompts.FOLDER_STRUCTURE_PROMPT | llm | (lambda x: x.content)
+    folder_structure_chain = architect_prompts.folder_structure_prompt | llm | (lambda x: x.content)
 
-    microservice_design_chain = architect_prompts.MICROSERVICE_DESIGN_PROMPT | llm | (lambda x: x.content)
+    microservice_design_chain = architect_prompts.microservice_design_prompt | llm | (lambda x: x.content)
 
-    tasks_breakdown_chain = architect_prompts.TASKS_BREAKDOWN_PROMPT | llm | (lambda x: x.content)
+    tasks_breakdown_chain = architect_prompts.tasks_breakdown_prompt | llm | (lambda x: x.content)
 
-    standards_chain = architect_prompts.STANDARDS_PROMPT | llm | (lambda x: x.content)
+    standards_chain = architect_prompts.standards_prompt | llm | (lambda x: x.content)
 
-    implementation_details_chain = architect_prompts.IMPLEMENTATION_DETAILS_PROMPT | llm | (lambda x: x.content)
+    implementation_details_chain = architect_prompts.implementation_details_prompt | llm | (lambda x: x.content)
 
-    license_legal_chain = architect_prompts.LICENSE_DETAILS_PROMPT | llm | (lambda x: x.content)
+    license_legal_chain = architect_prompts.license_details_prompt | llm | (lambda x: x.content)
 
     overall_chain = (
         RunnablePassthrough.assign(project_overview=project_overview_chain)
@@ -81,7 +81,7 @@ if __name__=="__main__":
 
     # Run the chain
     req_document_in_parts = overall_chain.invoke(input={
-        "original_user_input": 'I want to develop a Title Requests Micro-service adhering to MISMO v3.6 standards to handle get_title service using GET REST API Call in .NET?',
+        "user_request": 'I want to develop a Title Requests Micro-service adhering to MISMO v3.6 standards to handle get_title service using GET REST API Call in .NET?',
         "task_description": 'This task is part of Project Initiation Phase and has two deliverables, a project requirements document and a list of project deliverables.\n\n            Do not assume anything and request for additional information if provided information is not sufficient to complete the task or something is missing.',
         "additional_information": 'any additional info goes here',
         "license_text": "Property of XYZ COMPANY"
