@@ -1,7 +1,8 @@
 import ast
 import json
-from typing import Dict, List, Tuple
+from typing import TYPE_CHECKING, Dict, List, Tuple
 
+from langchain_openai import ChatOpenAI
 from pydantic import ValidationError
 
 from agents.agent.agent import Agent
@@ -13,41 +14,42 @@ from agents.rag_workflow.rag_graph import RAGWorkFlow
 from agents.supervisor.supervisor_models import QueryList
 from agents.supervisor.supervisor_prompts import SupervisorPrompts
 from agents.supervisor.supervisor_state import SupervisorState
-from configs.project_config import AgentConfig, ProjectAgents
+from configs.project_config import ProjectAgents
 from configs.supervisor_config import calling_map
 from models.constants import ChatRoles, PStatus, Status
 from models.models import RequirementsDocument, Task
 from utils.fuzzy_rag_cache import FuzzyRAGCache
 from utils.logs.logging_utils import logger
 
+# to avoid circular dependency
+if TYPE_CHECKING:
+    from genpod.team import TeamMembers  # Adjust import path as needed
 
 class SupervisorAgent(Agent[SupervisorState, SupervisorPrompts]):
-    def __init__(self, 
-                collections: dict[str, str], 
-                rag_try_limit: int, 
-                persistance_db_path: str,
-                agents_config: Dict[str, AgentConfig]):
+
+    team: 'TeamMembers' = None
+
+    def __init__(self, llm: ChatOpenAI):
 
         super().__init__(
             ProjectAgents.supervisor.agent_id,
             ProjectAgents.supervisor.agent_name,
             SupervisorState(),
             SupervisorPrompts(),
-            agents_config[ProjectAgents.supervisor.agent_id].llm
+            llm
         )
 
-        self.agents_config = agents_config
-        self.collections = collections
-
-        self.rag_try_limit = rag_try_limit
-        self.persistance_db_path = persistance_db_path
+        # remove below
+        self.agents_config = ""
+        self.collections = ""
+        self.persistance_db_path = ""
 
         self.rag_cache = FuzzyRAGCache()
         self.rag_cache_building = ''
 
         self.calling_agent = None
         self.called_agent = None
-        self.team_members: Dict[str, Graph] = {k: None for k, v in self.agents_config.items()}
+        # self.team_members: Dict[str, Graph] = {k: None for k, v in self.agents_config.items()}
         # {
         #     'Architect': None,
         #     'RAG': None,
@@ -55,7 +57,7 @@ class SupervisorAgent(Agent[SupervisorState, SupervisorPrompts]):
         #     'Planner': None
         # }
 
-        self.responses: Dict[str, List[Tuple[str, Task]]] = {k: [] for k, v in self.agents_config.items()}
+        # self.responses: Dict[str, List[Tuple[str, Task]]] = {k: [] for k, v in self.agents_config.items()}
         self.tasks = []
    
         self.project_status: str = None
@@ -63,6 +65,12 @@ class SupervisorAgent(Agent[SupervisorState, SupervisorPrompts]):
         # prompts
         self.project_init_questionaire = self.prompts.init_rag_questionaire_prompt | self.llm
         self.evaluation_chain = self.prompts.follow_up_questions | self.llm
+
+    def setup_team(self, team: 'TeamMembers') -> None:
+        """
+        """
+
+        self.team = team
 
     def build_rag_cache(self, query: str) -> tuple[list[str], str]:
         """
@@ -100,7 +108,6 @@ class SupervisorAgent(Agent[SupervisorState, SupervisorPrompts]):
                     result = self.team_members[ProjectAgents.rag.agent_id].app.invoke(
                         {  
                             'question': req_query, 
-                            'iteration_count': self.rag_try_limit, 
                             'max_hallucination': 3
                         }, 
                         {
@@ -135,7 +142,6 @@ class SupervisorAgent(Agent[SupervisorState, SupervisorPrompts]):
                             follow_up_result = self.team_members[ProjectAgents.rag.agent_id].app.invoke(
                                 {
                                     'question': follow_up_query, 
-                                    'iteration_count': self.rag_try_limit, 
                                     'max_hallucination': 3
                                 }, 
                                 {
@@ -260,7 +266,6 @@ class SupervisorAgent(Agent[SupervisorState, SupervisorPrompts]):
                 additional_info = self.team_members[rag_agent_config.agent_id].app.invoke(
                     {
                         'question': question,
-                        'iteration_count': self.rag_try_limit, 
                         'max_hallucination': 3
                     }, 
                     {
@@ -314,8 +319,8 @@ class SupervisorAgent(Agent[SupervisorState, SupervisorPrompts]):
                 {
                     'current_task':state['current_task'],
                     'project_status':self.project_status,
-                    'user_request': state['original_user_input'],
-                    'generated_project_path': state['project_path'],
+                    'original_user_input': state['original_user_input'],
+                    'project_path': state['project_path'],
                     'user_requested_standards':state['current_task'].additional_info,
                     'license_text':state['license_text'],
                     'messages':[]
@@ -344,11 +349,11 @@ class SupervisorAgent(Agent[SupervisorState, SupervisorPrompts]):
                 state['tasks'] = architect_result['tasks']
                 state['requirements_document'] = architect_result['requirements_document']
         
-                state['project_path'] = architect_result['generated_project_path']
+                state['project_path'] = architect_result['project_path']
                 
                 # Lets extract the coder_inputs from the architect's final state
                 # TODO: We want to be able to ask each agent what they need as input to start working that way we don't need to hardcode it this way.
-                coder_inputs_needed = ['generated_project_path', 'license_text', 'license_url', 'project_name', 'project_folder_structure', 'requirements_document', 'current_task']
+                coder_inputs_needed = ['project_path', 'license_text', 'license_url', 'project_name', 'project_folder_structure', 'requirements_document', 'current_task']
                 state['coder_inputs'] = {}
                 for needed_input in coder_inputs_needed:
                     if needed_input in architect_result.keys():
@@ -377,8 +382,8 @@ class SupervisorAgent(Agent[SupervisorState, SupervisorPrompts]):
                 {
                     'current_task':state['current_task'],
                     'project_status':self.project_status,
-                    'user_request': state['original_user_input'],
-                    'generated_project_path':state['project_path'],
+                    'original_user_input': state['original_user_input'],
+                    'project_path':state['project_path'],
                     'user_requested_standards':state['current_task'].additional_info,
                     'messages':[]
                 },
@@ -523,7 +528,7 @@ class SupervisorAgent(Agent[SupervisorState, SupervisorPrompts]):
         planner_result = self.team_members[planner_agent_config.agent_id].app.invoke(
             {
                 'current_task': state['current_task'],
-                'generated_project_path': state['project_path']
+                'project_path': state['project_path']
             },
             {
                 'configurable': {
@@ -534,16 +539,16 @@ class SupervisorAgent(Agent[SupervisorState, SupervisorPrompts]):
         # planner_state = self.team_members[planner_agent_config.agent_id].get_current_state()
         state['current_task'] = planner_result['response'][-1]
         if state['current_task'].task_status.value == Status.DONE.value:
-            # print(f"----------Response from Planner Agent----------\n{planner_result['deliverable_backlog_map']}")
+            # print(f"----------Response from Planner Agent----------\n{planner_result['planned_task_map']}")
             logger.info("----------Response from Planner Agent----------")
-            logger.info("Planner Response: %r",planner_result['deliverable_backlog_map'])
+            logger.info("Planner Response: %r",planner_result['planned_task_map'])
             state['agents_status'] = f'{planner_agent_config.agent_name} completed'
             self.called_agent = planner_agent_config.agent_id
             self.responses[planner_agent_config.agent_id].append(("Returned from Planner",state['current_task']))
             return {**state}
         elif state['current_task'].task_status.value == Status.INPROGRESS.value:
-            state['planned_task_map'] = {**planner_result['deliverable_backlog_map']}
-            state['planned_task_requirements'] = {**planner_result['backlog_requirements']}
+            state['planned_task_map'] = {**planner_result['planned_task_map']}
+            state['planned_task_requirements'] = {**planner_result['planned_task_requirements']}
             # TODO: use the response packet and build the planned tasks list
             # Get the workpackages created by planner for the current task a.k.a. deliverable
             for value in state['planned_task_map'][state['current_task'].description]:
@@ -555,7 +560,7 @@ class SupervisorAgent(Agent[SupervisorState, SupervisorPrompts]):
             state['agent_status'] = f"{planner_agent_config.agent_name} built the work packages"
             self.called_agent = planner_agent_config.agent_id
             logger.info("----------Response from Planner Agent----------")
-            logger.info("Planner Response: %r",planner_result['deliverable_backlog_map'])
+            logger.info("Planner Response: %r",planner_result['planned_task_map'])
             self.responses[planner_agent_config.agent_id].append(("Returned from Planner",state['current_task']))
             return {**state}
         else:

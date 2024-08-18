@@ -1,24 +1,19 @@
-from typing import Dict
-
+from langchain_openai import ChatOpenAI
 from langgraph.graph import END, StateGraph
 
 from agents.agent.graph import Graph
 from agents.supervisor.supervisor_agent import SupervisorAgent
 from agents.supervisor.supervisor_state import SupervisorState
-from configs.project_config import AgentConfig, ProjectGraphs
+from configs.project_config import ProjectGraphs
 
 
 class SupervisorWorkflow(Graph[SupervisorAgent]):
-    def __init__(self, 
-                collections: dict[str, str], 
-                rag_try_limit: int, 
-                persistance_db_path: str,
-                agents_config: Dict[str, AgentConfig]):
+    def __init__(self, llm: ChatOpenAI, persistance_db_path: str):
     
         super().__init__(
             ProjectGraphs.supervisor.graph_id,
             ProjectGraphs.supervisor.graph_name, 
-            SupervisorAgent(collections, rag_try_limit, persistance_db_path, agents_config),
+            SupervisorAgent(llm),
             persistance_db_path
         )
 

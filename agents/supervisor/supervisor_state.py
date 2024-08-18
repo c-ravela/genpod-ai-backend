@@ -3,10 +3,9 @@ from typing import List, Tuple
 
 from typing_extensions import Annotated, TypedDict
 
-from models.models import Task
 from agents.agent.state import State
+from models.models import RequirementsDocument, Task
 
-from models.models import RequirementsDocument
 
 class SupervisorState(TypedDict):
     """
@@ -134,12 +133,69 @@ class SupervisorState(TypedDict):
         State.out_field("is query answered by rag agent.")
     ]
 
-    rag_retrieval: str
+    # @out
+    rag_retrieval: Annotated[
+        str,
+        State.out_field()
+    ]
 
-    planned_tasks: List[Task] # This is list of work_packages created by the planner
-    planned_task_map: dict # This is the a map of deliverables to work_packages
-    planned_task_requirements: dict # This is the map of work_packages to json formatted requirements
-    agents_status: str
+    # @out
+    agents_status: Annotated[
+        str,
+        State.out_field()
+    ]
+
+    # @out
+    planned_tasks: Annotated[
+        List[Task], # This is list of work_packages created by the planner,
+        State.out_field()
+    ]
+
+    # @out
+    planned_task_map: Annotated[
+        dict, # This is the a map of deliverables to work_packages
+        State.out_field()
+    ]
+
+    # @out
+    planned_task_requirements: Annotated[
+        dict,  # This is the map of work_packages to json formatted requirements
+        State.out_field()
+    ]
+
+    # @out - Architect 
+    project_folder_strucutre: Annotated[
+        str,
+        State.in_field("The organized layout of directories and subdirectories that form the project's "
+        "file system, adhering to best practices for project structure.")
+    ]
+
+    # @out
+    code: Annotated[
+        str, 
+        State.out_field("The complete, well-documented working code that adheres to all standards "
+        "requested with the programming language, framework user requested ")
+    ]
+
+    # @out
+    files_created: Annotated[
+        list[str], 
+        State.out_field("The absolute paths of file that were created for this project "
+        "so far.")
+    ]
+
+    # @out
+    infile_license_comments: Annotated[
+        dict[str, str],
+        State.out_field("A list of multiline license comments for each type of file.")
+    ]
+
+    # @out
+    commands_to_execute: Annotated[ 
+        dict[str, str],
+        State.out_field("This field represents a dictionary of commands intended to be "
+        "executed on a Linux terminal. Each key-value pair in the dictionary corresponds to an absolute path (the key) and a specific command (the value) to be executed at that path.")
+    ]
 
 def add_message(state: SupervisorState, message: tuple[str, str]) -> SupervisorState:
     """
