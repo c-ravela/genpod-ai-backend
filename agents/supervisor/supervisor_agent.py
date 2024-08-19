@@ -1,0 +1,625 @@
+from agents.supervisor.supervisor_state import SupervisorState
+from agents.architect.graph import ArchitectGraph
+from agents.rag_workflow.rag_graph import RAGWorkFlow
+from agents.planner.planner_graph import PlannerWorkFlow
+from agents.tester.graph import TestCoderGraph
+from agents.coder.graph import CoderGraph
+from models.constants import Status, PStatus
+from models.models import Task
+from typing import Dict, List, Union, Tuple
+from configs.project_path import set_project_path
+from configs.supervisor_config import calling_map
+from utils.fuzzy_rag_cache import FuzzyRAGCache
+import ast, json
+from agents.supervisor.supervisor_prompts import SupervisorPrompts
+from agents.supervisor.supervisor_models import QueryList
+from pydantic import ValidationError
+from langchain_openai import ChatOpenAI
+from langchain_ollama import OllamaLLM
+from pprint import pprint
+from utils.logs.logging_utils import logger
+
+class SupervisorAgent():
+    def __init__(self, llm, collections, members, memberids, user_input, rag_try_limit, project_path):
+        self.llm = llm
+        self.collections = collections
+        self.members = members
+        self.memberids = memberids
+        self.rag_try_limit = rag_try_limit
+        self.project_path = project_path
+        self.rag_cache = FuzzyRAGCache()
+        self.rag_cache_building = ''
+        self.is_test_generator_agent_called=False
+        self.calling_agent = None
+        self.called_agent = None
+        self.team_members: Dict[str, Union[object, None]] = {x: None for x in self.members}
+        # {
+        #     'Architect': None,
+        #     'RAG': None,
+        #     'Coder': None,
+        #     'Planner': None
+        # }
+        self.state = {}
+        self.user_prompt = user_input
+        # self.project_status = None
+        self.responses: Dict[str, List[Tuple[str, Task]]] = {
+            'Architect': [],
+            'RAG': [],
+            'Coder': [],
+            'Planner': [],
+            'TestGenerator':[]
+        }
+        self.tasks = []
+        self.prompts = SupervisorPrompts()
+        self.project_status = None
+        self.project_init_questionaire = SupervisorPrompts.init_rag_questionaire_prompt | self.llm
+        self.evaluation_chain = SupervisorPrompts.follow_up_questions | self.llm
+
+    def build_rag_cache(self, query: str):
+        # I need to build a rag_cache during kick_off with answers to questions about requirements.
+        context = ''
+        count = 3
+        while(count>0):
+            try:
+                req_queries = self.project_init_questionaire.invoke({'user_prompt':query,'context':context})
+                req_queries = ast.literal_eval(req_queries.content)
+                validated_requirements_queries = QueryList(req_queries=req_queries)
+                break
+            except (ValidationError, ValueError, SyntaxError) as e:
+                context += str(e)
+                count = count-1
+        # if len(validated_requirements_queries.req_queries) is not None:
+        #     final_response = ''
+        #     for req_query in validated_requirements_queries.req_queries:
+        #         result = self.rag_cache.get(req_query)
+        #         if result is not None:
+        #             print(f"Cache hit for query, will not response to: {req_query}")
+        #         else:
+        #             print(f"Cache miss for query: {req_query}")
+        #             print(f'----------RAG Agent Called to Query----------\n{req_query}')
+        #             result = self.team_members['RAG'].rag_app.invoke({'question': req_query,'iteration_count':self.rag_try_limit}, {'configurable':{'thread_id':self.memberids['RAG']}})
+        #             self.rag_cache.add(req_query, result['generation'])
+        #             print(f'----------RAG Agent Response----------\n{result['generation']}')
+        #             if result['query_answered'] is True:
+        #                 final_response += f"Question: {req_query}\nAnswer: {result['generation']}"
+        #     return final_response
+        if validated_requirements_queries.req_queries:
+            final_response = ''
+            for req_query in validated_requirements_queries.req_queries:
+                result = self.rag_cache.get(req_query)
+                if result is not None:
+                    # print(f"Cache hit for query: {req_query}")
+                    logger.debug("Cache hit for query: %s", req_query)
+                    rag_response = result
+                else:
+                    # print(f"Cache miss for query: {req_query}")
+                    logger.debug("Cache miss for query: %s", req_query)
+                    # print(f'----------RAG Agent Called to Query----------\n{req_query}')
+                    logger.info('----------RAG Agent Called to Query----------')
+                    logger.info("Query: %s", req_query)
+                    result = self.team_members['RAG'].rag_app.invoke({'question': req_query, 'iteration_count': self.rag_try_limit, 'max_hallucination':3}, {'configurable': {'thread_id': self.memberids['RAG']}})
+                    rag_response = result['generation']
+                    self.rag_cache.add(req_query, rag_response)
+                    # print(f'----------RAG Agent Response----------\n{rag_response}')
+                    logger.info("'----------RAG Agent Response----------")
+                    logger.info("RAG Response: %s", rag_response)
+                    if result['query_answered'] is True:
+                # Evaluate the RAG response
+                        evaluation_result = self.evaluation_chain.invoke({
+                            'user_query':req_query,
+                            'initial_rag_response':rag_response}
+                        )
+                        
+                        if evaluation_result.content.startswith("COMPLETE"):
+                            final_response += f"Question: {req_query}\nAnswer: {rag_response}\n\n"
+                        elif evaluation_result.content.startswith("INCOMPLETE"):
+                            follow_up_query = evaluation_result.content.split("Follow-up Query:")[1].strip()
+                            # print(f"\n----------Follow-up query needed----------\n{follow_up_query}")
+                            logger.info("----------Follow-up query needed----------")
+                            logger.info("Follow-up: %s", follow_up_query)
+                            
+                            # Ask the follow-up query to the RAG agent
+                            follow_up_result = self.team_members['RAG'].rag_app.invoke({'question': follow_up_query, 'iteration_count': self.rag_try_limit, 'max_hallucination':3}, {'configurable': {'thread_id': self.memberids['RAG']}})
+                            follow_up_response = follow_up_result['generation']
+                            self.rag_cache.add(follow_up_query, follow_up_response)
+                            
+                            final_response += f"Question: {req_query}\nInitial Answer: {rag_response}\nFollow-up Question: {follow_up_query}\nFollow-up Answer: {follow_up_response}\n\n"
+                        else:
+                            # print("Unexpected evaluation result format.")
+                            logger.info("Unexpected evaluation result format")
+                            final_response += f"Question: {req_query}\nAnswer: {rag_response}\n\n"
+            return final_response
+        else:
+            return 'Failed to initialize project'
+
+    def instantiate_team_members(self, state: SupervisorState):
+        for member,_ in self.team_members.items():
+            if member=='Architect':
+                self.team_members[member] = ArchitectGraph(ChatOpenAI(model="gpt-4o-2024-05-13", temperature=0.3, max_retries=5, streaming=True, seed=4000, top_p=0.4))
+                # self.team_members[member] = ArchitectGraph(OllamaLLM(model="stablelm2:1.6b"))
+            elif member=='RAG':
+                # We can to implement a scenario where we are able to use appropriate collection_name from the list of collections based on the user_input
+                # This will probably mechanism should probably go inside ragworkflow implementation. For now lets keep it simple
+                self.team_members[member] = RAGWorkFlow(ChatOpenAI(model="gpt-4o-2024-05-13", temperature=0, max_retries=5, streaming=True, seed=4000, top_p=0.3),
+                                                        collection_name=list(self.collections.keys())[0],
+                                                        thread_id=self.memberids[member],
+                                                        persist_directory=self.collections[list(self.collections.keys())[0]])
+                # self.team_members[member] = RAGWorkFlow(OllamaLLM(model="stablelm2:1.6b"),
+                #                         collection_name=list(self.collections.keys())[0],
+                #                         thread_id=self.memberids[member],
+                #                         persist_directory=self.collections[list(self.collections.keys())[0]])
+            elif member=='Planner':
+                # self.team_members[member] = PlannerWorkFlow(ChatOpenAI(model="gpt-4o-2024-05-13", temperature=0.3, max_retries=5, streaming=True, seed=4000, top_p=0.6),
+                #                                             thread_id=self.memberids[member])
+                self.team_members[member] = PlannerWorkFlow(OllamaLLM(model="stablelm2:1.6b"),
+                                                            thread_id=self.memberids[member])
+            elif member=='Coder':
+                self.team_members[member] = CoderGraph(ChatOpenAI(model="gpt-4o-2024-05-13", temperature=0.3, max_retries=5, streaming=True, seed=4000, top_p=0.4))
+                # self.team_members[member] = CoderGraph(OllamaLLM(model="stablelm2:1.6b"))
+
+            elif member== 'TestGenerator':
+                self.team_members[member]= TestCoderGraph(ChatOpenAI(model="gpt-4o-2024-05-13", temperature=0.3, max_retries=5, streaming=True, seed=4000, top_p=0.4))
+                # self.team_members[member]= TestCoderGraph(OllamaLLM(model="stablelm2:1.6b"))
+
+            else:
+                continue
+
+        # state['team_members'] = {**self.team_members}
+        state['original_user_input'] = self.user_prompt
+        state['project_path'] = set_project_path(self.project_path)
+        state['rag_retrieval'] = ''
+        state['current_task'] = Task(description='retrieve additional context from RAG system',
+                                     task_status = Status.NEW.value,
+                                     additional_info = '',
+                                     question=self.user_prompt)
+        # state['agents_status'] = 'New'
+        message = ('user','Start new Project')
+
+        state['messages'] += [message]
+        self.project_status = PStatus.NEW.value
+        self.rag_cache_building = self.build_rag_cache(state['original_user_input'])
+        logger.info("----All information gathered during project initiation phase----")
+        logger.info("RAG Collection: %s",self.rag_cache_building)
+        return {**state}
+
+    def call_rag(self, state: SupervisorState) -> SupervisorState:
+        question = state['current_task'].question
+        try:
+            message = ('Assistant', 'Calling RAG Agent')
+            state['messages'] += [message]
+            # print("----------Getting Additional information from RAG Agent----------")
+            logger.info("----------Getting Additional information from RAG Agent----------")
+            # Check in cache first
+            result = self.rag_cache.get(question)
+            if result is not None:
+                # print(f"Cache hit for query: \n{question}")
+                logger.debug("Cache hit for query: \n%s",question)
+                message = ('Assistant', f'Response from RAG: {result}')
+                state['rag_query_answer'] = True
+                # return result
+            else:
+                # print(f"Cache miss for query: \n{question}")
+                logger.debug("Cache miss for query: \n%s", question)
+                # result = your_rag_query_function(query)  # Replace with your actual RAG query function
+            # return result
+                additional_info = self.team_members['RAG'].rag_app.invoke({'question': question,'iteration_count':self.rag_try_limit, 'max_hallucination':3},{'configurable':{'thread_id':self.memberids['RAG']}})
+                result = additional_info['generation']
+                state['rag_query_answer'] = additional_info['query_answered']
+                self.rag_cache.add(question, result)
+                message = ('Assistant', f'Response from RAG: {result}')
+            state['messages'] += [message]
+            # print(f"----------Response from RAG Agent----------\n{result}")
+            logger.info("----------Response from RAG Agent----------")
+            logger.info("RAG Response: %s", result)
+        except Exception as e:
+            raise(e)
+        if state['current_task'].task_status.value == Status.NEW.value:
+            state['current_task'].additional_info = result + "\n" + self.rag_cache_building
+            state['current_task'].task_status = Status.DONE
+            state['rag_retrieval'] = result + "\n" + self.rag_cache_building
+            state['agents_status'] = 'RAG completed'
+            self.called_agent = 'RAG'
+            self.responses['RAG'].append(("Returned from RAG database",state['current_task']))
+            return {**state}
+
+        elif state['current_task'].task_status.value == Status.AWAITING.value:
+            #  This mean the query RAG Agent to get additional information for another agent which wikk be present in called agent and that will and should never be updated when returning
+            # if additional_info['generation'] != "I don't have any additional information about the question.":
+            state['current_task'].additional_info += "\nRAG_Response:\n" + result
+            state['rag_retrieval'] += result
+            state['agents_status'] = 'RAG completed'
+            self.called_agent = 'RAG'
+            self.responses['RAG'].append(("Returned from RAG database serving a query",state['current_task']))
+            # state['rag_query_answer'] = additional_info['query_answered']
+            return {**state}
+        
+        return {**state}
+            
+    def call_architect(self, state: SupervisorState) -> SupervisorState:
+        # Implement the logic to call the Architect agent
+        if self.project_status == PStatus.INITIAL.value:
+            message = ('Assistant', 'Calling Architect Agent')
+            state['messages'] += [message]
+            # print("----------Calling Architect----------")
+            logger.info("----------Calling Architect----------")
+            architect_result = self.team_members['Architect'].app.invoke({'current_task':state['current_task'],
+                                                                          'project_status':self.project_status,
+                                                                          'user_request': state['original_user_input'],
+                                                                          'generated_project_path':state['project_path'],
+                                                                          'user_requested_standards':state['current_task'].additional_info,
+                                                                          'license_text':state['license_text'],
+                                                                          'messages':[]},
+                                                                         {'configurable':{'thread_id':self.memberids['Architect']}})
+
+            # architect_state = self.team_members['Architect'].app.get_current_state()
+            message = ('Assistant', f'Response from Architect: {architect_result['tasks']}')
+            state['messages'] += [message]
+            # print(f"----------Response from Architect Agent----------\n{architect_result['tasks']}")
+            logger.info("----------Response from Architect Agent----------")
+            logger.info("Archtect Response: %r", architect_result['tasks'])
+            # Temporary validation this needs to be done by architect. Remove it once architect has implemented this.
+            # if len(architect_result['tasks']) is not None:
+            #     architect_result['current_task'].task_status = Status.DONE
+            if architect_result['current_task'].task_status.value == Status.DONE.value:
+                self.project_status = PStatus.EXECUTING.value
+                state['current_task'] = architect_result['current_task']
+                state['agents_status'] = 'Architect completed'
+                self.responses['Architect'].append(("Returned from Architect", architect_result['tasks']))
+                state['tasks'] = architect_result['tasks']
+                state['requirements_doc'] = architect_result['requirements_overview']
+                state['project_path'] = architect_result['generated_project_path']
+                
+                # Lets extract the coder_inputs from the architect's final state
+                # TODO: We want to be able to ask each agent what they need as input to start working that way we don't need to hardcode it this way.
+                coder_inputs_needed = ['generated_project_path', 'license_text', 'license_url', 'project_name', 'project_folder_structure', 'requirements_overview']
+                state['coder_inputs'] = {}
+                for needed_input in coder_inputs_needed:
+                    if needed_input in architect_result.keys():
+                        state['coder_inputs'][needed_input] = architect_result[needed_input]
+                    else:
+                        # Check in supervisor_state for user provided value, such as license_url
+                        state['coder_inputs'][needed_input] = state[needed_input]
+
+                self.called_agent = 'Architect'
+
+                return {**state}
+            else:
+                #  TODO: if task_status=='AWAITING', that means Current task could not be completed by architect call supervisor to deal with the same task
+                # self.project_status = PStatus.MONITORING.value
+                state['current_task'] = architect_result['current_task']
+                state['agents_status'] = 'Architect Awaiting'
+                self.responses['Architect'].append(("Returned from Architect with a question:", architect_result['current_task'].question))
+                self.called_agent = 'Architect'
+                return {**state}
+            
+        elif self.project_status == PStatus.MONITORING.value:
+            # Need to query Architect to get additional information for another agent which will be present in called agent and that will never be updated when returning
+            # print("----------Querying Architect----------")
+            logger.info("----------Querying Architect----------")
+            architect_result = self.team_members['Architect'].app.invoke({'current_task':state['current_task'],
+                                                                          'project_status':self.project_status,
+                                                                          'user_request': state['original_user_input'],
+                                                                          'generated_project_path':state['project_path'],
+                                                                          'user_requested_standards':state['current_task'].additional_info,
+                                                                          'messages':[]},
+                                                                         {'configurable':{'thread_id':self.memberids['Architect']}})
+            # print(f"----------Response from Architect Agent----------\n{architect_result['current_task']}")
+            logger.info("----------Response from Architect Agent----------")
+            logger.info("Architect Response: %r", architect_result['current_task'])
+            # architect_state = self.team_members['Architect'].app.get_current_state()
+            if architect_result['query_answered'] is True:
+                # self.project_status = PStatus.EXECUTING.value
+                # state['current_task'].additional_info += "\nArchitect_Response:\n" + architect_state['current_task'].additional_info
+                state['agents_status'] = 'Architect completed'
+                self.responses['Architect'].append(("Returned from Architect serving a Query", architect_result['current_task']))
+                self.called_agent = 'Architect'
+                state['current_task'] = architect_result['current_task']
+                return {**state}
+            elif state['rag_query_answer'] is False and architect_result['query_answered'] is False:
+                # Additional Human input is needed
+                state['current_task'] = architect_result['current_task']
+                self.project_status = PStatus.HALTED.value
+        
+        return {**state}
+
+    def call_coder(self, state: SupervisorState) -> SupervisorState:
+        self.is_test_generator_agent_called=False
+        # Implement the logic to call the Coder agent
+        message = ('Coder', 'Calling Coder Agent')
+        state['messages'] += [message]
+        logger.info("---------- Calling Coder ----------")
+        coder_result = self.team_members['Coder'].app.invoke({**state['coder_inputs'],'messages':[]},
+                                                                     {'configurable':{'thread_id':self.memberids['Coder'],"recursion_limit": 5}})
+        # coder_state = self.team_members['Coder'].get_state()
+
+        if coder_result['current_task'].task_status.value == Status.DONE.value:
+            logger.info("Coder completed work package")
+            state['agents_status'] = 'Coder Completed'
+
+        elif coder_result['current_task'].task_status.value == Status.ABANDONED.value:
+            logger.info("Coder unable to complete the work package due to : %s", coder_result['current_task'].additional_info)
+            state['agent_status'] = "Coder Completed With Abandonment"
+        else:
+            logger.info("Coder awaiting for additional information\nCoder Query: %s", coder_result['current_task'].question)
+            state['agents_status'] = 'Coder Awaiting'
+
+        self.called_agent = 'Coder'
+        self.responses['Coder'].append(("Returned from Coder",state['current_task']))
+        return {**state}
+
+# print(type(state['coder_inputs']['current_task'].description))
+
+# classifier= json.loads(state['coder_inputs']['current_task'].description)
+# print(classifier['is_function_generation_required'])
+    def call_test_code_generator(self, state: SupervisorState) -> SupervisorState:
+        # Implement the logic to call the Test code generator  agent
+        message = ('Test_code_generator', 'Calling Test Code Generator Agent')
+        state['messages'] += [message]
+        logger.info("---------- Calling Test Code Generator ----------")
+        test_coder_result = self.team_members['TestGenerator'].app.invoke({**state['coder_inputs'],'messages':[]},
+                                                                     {'configurable':{'thread_id':self.memberids['TestGenerator']}})
+        # coder_state = self.team_members['Coder'].get_state()
+        # 
+        state['coder_inputs']['test_code']=test_coder_result['test_code']
+        state['coder_inputs']['functions_skeleton']=test_coder_result['functions_skeleton']
+        if test_coder_result['current_task'].task_status.value == Status.DONE.value:
+            logger.info("Test Code Generator completed work package")
+            state['agents_status'] = 'Test Coder Generator Completed'
+
+        elif test_coder_result['current_task'].task_status.value == Status.ABANDONED.value:
+            logger.info("Test Coder Generator unable to complete the work package due to : %s", test_coder_result['current_task'].additional_info)
+            state['agent_status'] = "Coder Completed With Abandonment"
+        else:
+            logger.info("Test Coder Generator awaiting for additional information\nCoder Query: %s", test_coder_result['current_task'].question)
+            state['agents_status'] = 'Test Coder Generator Awaiting'
+
+        self.called_agent = 'TestGenerator'
+        self.responses['TestGenerator'].append(("Returned from Test Coder Generator",state['current_task']))
+        self.is_test_generator_agent_called=True
+        return {**state}
+    
+    def call_supervisor(self, state: SupervisorState):
+        # Handling new requests vs pending requests
+        if self.project_status == PStatus.NEW.value:
+            if state['current_task'].task_status.value == Status.DONE.value:
+                # Update the project status to initial
+                self.project_status = PStatus.INITIAL.value
+                # Create new task to be passed to architect
+                _description = self.prompts.architect_call_prompt.format()
+                _task_status = Status.NEW.value
+                _additional_info = state['rag_retrieval']
+                _question=''
+                # Assign new task as the current task
+                state['current_task'] = Task(description=_description,task_status=_task_status,additional_info=_additional_info,question=_question)            
+            self.calling_agent = 'Supervisor'
+            return {**state}
+        elif self.project_status == PStatus.INITIAL.value:
+            # If Architect has any queries during project Initial Stage which is common then we only want to call rag and send that response to architect
+            if state['current_task'].task_status.value == Status.AWAITING.value and "RAG_Response" not in state['current_task'].additional_info:
+                self.calling_agent = self.called_agent
+            else:
+                self.calling_agent = 'Supervisor'
+            return {**state}
+        elif self.project_status == PStatus.EXECUTING.value and state['current_task'].task_status.value==Status.AWAITING.value:
+            self.project_status = PStatus.MONITORING.value
+            self.calling_agent = self.called_agent
+            return {**state}
+        elif self.project_status == PStatus.MONITORING.value:
+            if "RAG_Response" in state['current_task'].additional_info and "Architect_Response" in state['current_task'].additional_info:
+                # state['current_task'].question = ''
+                self.project_status = PStatus.EXECUTING.value
+            # else:
+            #     self.project_status = PStatus.HALTED.value
+            return {**state}
+
+        elif self.project_status == PStatus.EXECUTING.value and (state['current_task'].task_status.value == Status.DONE.value or state['current_task'].task_status.value == Status.INPROGRESS.value):
+            # self.tasks = state['tasks']
+            # new_task = None
+            if state['current_task'].task_status.value == Status.INPROGRESS.value:
+                # We need to work on calling coder on planned tasks
+                # We will be calling coder, so we need to pick tasks from the planned task now and add it to coder_inputs item of the state
+                if len(state['planned_tasks']) > 0:
+                    state['coder_inputs']['current_task'] = state['planned_tasks'].pop(0)
+                    # we can return here because we have a work_package to call the coder with
+                    self.calling_agent = 'Supervisor'
+                    return {**state}
+                else:
+                    # all work_packages are provided to coder so we can now move to next deliverable
+                    state['current_task'].task_status = Status.DONE
+
+            if state['current_task'].task_status.value == Status.DONE.value:
+                # We need to work on calling planner on deliverables provided by architect
+                if len(state['tasks']) is None:
+                    new_task = None
+                else:
+                    # next_task = Task(description=self.tasks.pop(), task_status=Status.NEW.value, additional_info='', question='')
+                    new_task = state['tasks'].pop(0)
+                # new_task = self.pick_next_task(state)
+                if new_task is None:
+                    self.project_status = PStatus.HALTED.value
+                state['current_task'] = new_task
+                requirements_doc = ' '.join(str(value) for value in state['requirements_doc'].values())
+                state['current_task'].additional_info = requirements_doc + '\n' + state['rag_retrieval']
+                self.called_agent = 'Supervisor'
+                return {**state}
+        else:
+            return {**state}
+
+    def call_planner(self, state: SupervisorState):
+        # TODO: Implement Planner Agent
+        # Implement the logic to call the Coder agent
+        # response = self.team_members['Planner'].update_task(state['current_task'])
+        # print("----------Calling Planner----------")
+        logger.info("----------Calling Planner----------")
+        planner_result = self.team_members['Planner'].planner_app.invoke({'current_task':state['current_task'],
+                                                                          'generated_project_path':state['project_path']},
+                                                                          {'configurable':{'thread_id':self.memberids['Planner']}})
+        # planner_state = self.team_members['Planner'].planner_app.get_state()
+        state['current_task'] = planner_result['response'][-1]
+        if state['current_task'].task_status.value == Status.DONE.value:
+            # print(f"----------Response from Planner Agent----------\n{planner_result['deliverable_backlog_map']}")
+            logger.info("----------Response from Planner Agent----------")
+            logger.info("Planner Response: %r",planner_result['deliverable_backlog_map'])
+            state['agents_status'] = 'Planner completed'
+            self.called_agent = 'Planner'
+            self.responses['Planner'].append(("Returned from Planner",state['current_task']))
+            return {**state}
+        elif state['current_task'].task_status.value == Status.INPROGRESS.value:
+            state['planned_task_map'] = {**planner_result['deliverable_backlog_map']}
+            state['planned_task_requirements'] = {**planner_result['backlog_requirements']}
+            # TODO: use the response packet and build the planned tasks list
+            # Get the workpackages created by planner for the current task a.k.a. deliverable
+            for value in state['planned_task_map'][state['current_task'].description]:
+                # for each workpackage we need to create a planned_task
+                if state['planned_tasks'] is None:
+                    state['planned_tasks'] = [Task(description=json.dumps({"work_package_name": value, **state['planned_task_requirements'][value]}), task_status=Status.NEW.value, additional_info='',question='')]
+                else:
+                    state['planned_tasks'].append(Task(description=json.dumps({"work_package_name": value, **state['planned_task_requirements'][value]}), task_status=Status.NEW.value, additional_info='',question=''))
+            state['agent_status'] = "Planner built the work packages"
+            self.called_agent = 'Planner'
+            logger.info("----------Response from Planner Agent----------")
+            logger.info("Planner Response: %r",planner_result['deliverable_backlog_map'])
+            self.responses['Planner'].append(("Returned from Planner",state['current_task']))
+            return {**state}
+        else:
+            # print(f"----------Response from Planner Agent----------\n{state['current_task'].question}")
+            logger.info("----------Response from Planner Agent----------")
+            logger.info("Planner Response: %s", state['current_task'].question)
+            state['agents_status'] = 'Planner Awaiting'
+            self.called_agent = 'Planner'
+            self.responses['Planner'].append(("Returned from Planner with a question",state['current_task'].question))
+            return {**state}
+
+
+    def call_human(self, state: SupervisorState):
+        # Display relevant information to the human
+        # pprint(f"----------Supervisor current state----------\n{state}")
+        # Prompt for input
+        if state['current_task'].question != '':
+            # Display the current task being performed to the user
+            # pprint(f"----------Current Task that needs your assistance to proceed----------\n{state['current_task']}")
+            logger.info("----------Current Task that needs your assistance to proceed----------")
+            logger.info("Current Task: %r", state['current_task'])
+            # Get human input
+            human_input = input(f"Please provide additional input for the question:\n{state['current_task'].question}")
+
+            # Append the human input to current_task additional_info
+            state['current_task'].additional_info += '\nHuman_Response:\n' + human_input
+
+            # Update the project status back to executing
+            self.project_status = PStatus.EXECUTING.value
+
+            # Add the human responses to the rag cache for future queries and maintain a copy in state too
+            human_feedback = (state['current_task'].question, f'Response from Human: {human_input}')
+            state['human_feedback'] += [human_feedback]
+            self.rag_cache.add(state['current_task'].question, human_input)
+
+        else:
+            # print("----------Unable to handle Human Feedback currently so ending execution----------")
+            logger.info("----------Unable to handle Human Feedback currently so ending execution----------")
+            # exit()
+
+        # Process the input and update the state
+        state.human_feedback = human_input
+        return {**state}
+
+    def update_state(self, state: SupervisorState):
+        # TODO: Imple Update_state_mechanism
+        pass
+    
+    def pick_next_task(self, state):
+        if len(state['tasks']) is None:
+            return None
+        else:
+            # next_task = Task(description=self.tasks.pop(), task_status=Status.NEW.value, additional_info='', question='')
+            next_task = state['tasks'].pop(0)
+            return next_task
+
+    # def call_planner(self, state: SupervisorState) -> SupervisorState:
+    #     # Implement the logic to call the Planner agent
+    #     planner_result = self.team_members['Planner'].invoke(state['current_task'])
+    #     state['current_task'] = planner_result
+    #     state['agents_status'] = 'Planner completed'
+    #     return state
+
+    # def update_state(self, state: SupervisorState) -> SupervisorState:
+    #     # Update the overall state based on the current task and agent status
+    #     state['tasks'].append(state['current_task'])
+    #     if all(task.task_status == ProgressState.DONE for task in state['tasks']):
+    #         return END
+    #     return state
+
+    def delegator(self, state: SupervisorState) -> str:
+        # Decide which agent to call next based on the current state
+        if self.project_status == PStatus.NEW.value:
+            # self.calling_agent = 'Supervisor'
+            # self.project_status = PStatus.INITIAL.value
+            return 'call_rag'
+        elif self.project_status == PStatus.INITIAL.value:
+            if self.calling_agent=='Supervisor':
+                return 'call_architect'
+            # self.calling_agent = 'Supervisor'
+            else:
+                return 'call_rag'
+        elif self.project_status==PStatus.MONITORING.value and "RAG_Response" not in state['current_task'].additional_info:
+            return 'call_rag'
+        elif self.project_status==PStatus.MONITORING.value and 'Architect_Response' not in state['current_task'].additional_info:
+            return 'call_architect'
+        elif self.project_status==PStatus.EXECUTING.value and self.calling_agent!='Supervisor':
+            return calling_map[self.calling_agent]
+        elif self.project_status==PStatus.EXECUTING.value and (self.called_agent=='Architect' or self.called_agent=='Supervisor'):
+            return 'call_planner'
+        elif self.project_status== PStatus.EXECUTING.value and (self.called_agent=='Planner' or self.called_agent=='Coder') and ((classifier := json.loads(state['coder_inputs']['current_task'].description))['is_function_generation_required']) and not(self.is_test_generator_agent_called) :
+            return 'call_test_code_generator' 
+        elif self.project_status==PStatus.EXECUTING.value and (self.called_agent=='Planner' or self.called_agent=='Coder' or self.called_agent =='TestGenerator') and (((classifier := json.loads(state['coder_inputs']['current_task'].description))['is_function_generation_required'] and self.is_test_generator_agent_called) or not ((classifier := json.loads(state['coder_inputs']['current_task'].description))['is_function_generation_required'])) :
+            return 'call_coder'
+        # elif self.project_status==PStatus.EXECUTING.value and self.called_agent=='Coder':
+        #     return 'call_coder'
+        elif self.project_status==PStatus.HALTED.value:
+            return 'Human'
+
+        # elif state['current_task'].task_status == Status.AWAITING.value:
+        #     if self.called_agent == 'Architect':
+        #         return 'call_rag'
+        #     else:
+        #         return 'call_architect'
+        # elif self.called_agent != 'Architect' and state['current_task'].task_status == Status.NEW.value:
+        #     self.calling_agent = 'Supervisor'
+        #     return 'call_architect'
+        # elif (self.called_agent == 'Architect' and state['current_task'].task_status == Status.DONE.value and len(self.tasks) is not None) or self.calling_agent == 'Planner':
+        #     self.calling_agent = 'Supervisor'
+        #     return 'call_planner'
+        # elif (self.called_agent == 'Planner' and state['current_task'].task_status == Status.DONE.value) or self.calling_agent == 'Coder':
+        #     self.calling_agent = 'Supervisor'
+        #     return 'call_coder'
+        # else:
+        #     return 'Human'
+
+        # elif state['current_task'].task_status == Status.AWAITING.value:
+        #     self.calling_agent
+        # elif state['current_task'].task_status == Status.AWAITING.value:
+        #     return 'call_rag'
+        # if state['current_task'].task_status == Status.NEW:
+        #     return "call_architect"
+        # elif state['current_task'].task_status == Status.AWAITING:
+        #     return "Planner"
+        # elif state['current_task'].task_status == Status.INPROGRESS:
+        #     if "design" in state['current_task'].task.lower():
+        #         return "Architect"
+        #     elif "code" in state['current_task'].task.lower():
+        #         return "Coder"
+        # return "update_state"
+
+    # def get_additional_info(self, state: SupervisorState):
+    #     question = state['current_task']['additional_info']
+    #     additional_info = self.team_members['RAG'].invoke({'question':question})
+    #     state['current_task']['additional_info'] = additional_info
+    #     state['rag_retrieval'] = additional_info
+    #     return {**state}
+    #     architect_state = self.team_members['RAG'].agent.state
+
+    # def delegate_task(self, state: SupervisorState):
+    #     pass
+
+    # def call_architect(self, state: SupervisorState):
+    #     pass
