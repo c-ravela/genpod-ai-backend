@@ -9,7 +9,7 @@ from configs.project_config import ProjectConfig
 from configs.project_path import set_project_path
 from database.database import Database
 from genpod.team import TeamMembers
-from models.constants import ChatRoles, Status
+from models.constants import ChatRoles
 from utils.logs.logging_utils import logger
 from utils.time import get_timestamp
 
@@ -35,17 +35,14 @@ if __name__=="__main__":
     db.setup_db()
 
     PROJECT_INPUT = """
-        Project Overview:
-        I want to develop a Title Requests Micro-service adhering to MISMO v3.6 standards to handle get_title service using GET REST API Call in .NET
-        Utilize a MongoDB database (using the provided connection details: \"mongodb://localhost:27017/titlerequest\").
-        Host the application at "https://crbe.com".
-        """
+    Project Overview:
+    I want to develop a Title Requests Micro-service adhering to MISMO v3.6 standards to handle get_title service using GET REST API Call in .NET
+    Utilize a MongoDB database (using the provided connection details: \"mongodb://localhost:27017/titlerequest\").
+    Host the application at "https://crbe.com".
+    """
     
     LICENSE_URL = "https://raw.githubusercontent.com/intelops/tarian-detector/8a4ff75fe31c4ffcef2db077e67a36a067f1437b/LICENSE"
-    LICENSE_TEXT = """
-        SPDX-License-Identifier: Apache-2.0
-    Copyright 2024 Authors of CRBE & the Organization created CRBE
-    """
+    LICENSE_TEXT = "SPDX-License-Identifier: Apache-2.0\nCopyright 2024 Authors of CRBE & the Organization created CRBE"
 
     PROJECT_PATH = set_project_path(timestamp=TIME_STAMP)
 
@@ -85,13 +82,13 @@ if __name__=="__main__":
     pprint(result)
 
     db.projects_table.update(
-        project_details['id'], 
+        result['project_id'], 
         project_name=result['project_name'],
         status= result['project_status'],
         updated_by=USER_ID
     )
     db.microservices_table.update(
-        microservice_details['id'],
+        result['microservice_id'],
         microservice_name=result['project_name'],
         status= result['project_status'],
         updated_by=USER_ID

@@ -3,7 +3,7 @@
 from langchain.output_parsers import PydanticOutputParser
 from langchain_core.prompts import PromptTemplate
 
-from models.coder import CodeGeneration
+from models.coder import CodeGenerationPlan
 
 
 class CoderPrompts:
@@ -48,7 +48,7 @@ class CoderPrompts:
         """,
         input_variables=['project_name', 'project_path', 'requirements_document', 'folder_structure', 'error_message', 'task'],
         partial_variables={
-            "format_instructions": PydanticOutputParser(pydantic_object=CodeGeneration).get_format_instructions()
+            "format_instructions": PydanticOutputParser(pydantic_object=CodeGenerationPlan).get_format_instructions()
         }
     )
     

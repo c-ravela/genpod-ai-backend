@@ -1,11 +1,9 @@
-from typing import Any, Dict, Generic, List, Type, TypeVar
-
-from typing_extensions import TypedDict
+from typing import Any, Dict, Generic, List, TypeVar
 
 GenericAgentState = TypeVar('GenericAgentState', bound=Any)
 
 
-class State:
+class State(Generic[GenericAgentState]):
     """
     Base class to handle field classifications and provide utility methods.
     

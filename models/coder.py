@@ -7,7 +7,7 @@ the files to be created, the location of the code, the actual code.
 """
 from pydantic import BaseModel, Field
 from typing_extensions import ClassVar
-
+from typing import Dict
 
 class ToolCall(BaseModel):
     """
@@ -77,7 +77,122 @@ class CoderModel(BaseModel):
     description: ClassVar[str] = "Schema representing the output from the "
     "Coder agent upon task completion."
 
-class CodeGeneration(BaseModel):
+class FileSetupPlan(BaseModel):
+    """
+    Represents the setup plan for files, including file creation details and terminal commands to be executed.
+    """
+
+    files_to_create: dict[str, str] = Field(
+        description="""
+        A dictionary where each key is an absolute file path and the corresponding
+        value is a detailed description of the file. The description should specify
+        what the file should contain or its purpose, providing enough information
+        to understand its role in the project.
+
+        Example:
+            {
+                '/absolute/path/to/file1.py': 'Main script for data processing. This file should include the core logic for processing data inputs and outputs.',
+                '/absolute/path/to/file2.md': 'README file with project information. Include project overview, installation instructions, and usage examples.'
+            }
+        """,
+        default={},
+        title="Files to Create with Detailed Descriptions",
+        example={
+            '/home/user/project/main.py': 'Main script for data processing. This file should include the core logic for processing data inputs and outputs.',
+            '/home/user/project/README.md': 'README file with project information. Include project overview, installation instructions, and usage examples.'
+        }
+    )
+
+    terminal_commands: dict[str, Dict[str, Dict[str, str]]] = Field(
+        description="""
+        A dictionary where each key is an absolute file path, and each value is another dictionary
+        specifying commands to be executed before or after the file creation. The inner dictionary has
+        two keys: 'before' and 'after', each mapping to another dictionary. This nested dictionary maps
+        each directory path where the command should be executed to the command itself. Commands must come
+        from the approved list and should avoid restricted symbols like '&&', '||', '|', and ';'. The
+        allowed commands are: 'docker', 'python', 'python3', 'pip', 'virtualenv', 'mv', 'pytest',
+        'touch', and 'git'.
+
+        Example:
+            {
+                '/absolute/path/to/file1.py': {
+                    'before': {
+                        '/home/user/project': 'mkdir new_directory',
+                        '/home/user/project/scripts': 'python3 setup.py'
+                    },
+                    'after': {
+                        '/home/user/project': 'echo "File creation completed"'
+                    }
+                },
+                '/absolute/path/to/file2.md': {
+                    'before': {
+                        '/home/user/project': 'touch new_file.md'
+                    },
+                    'after': {}
+                }
+            }
+        """,
+        default={},
+        title="Terminal Commands with Before and After Execution",
+        example={
+            '/home/user/project/main.py': {
+                'before': {
+                    '/home/user/project': 'mkdir new_directory',
+                    '/home/user/project/scripts': 'python3 setup.py'
+                },
+                'after': {
+                    '/home/user/project': 'echo "File creation completed"'
+                }
+            },
+            '/home/user/project/README.md': {
+                'before': {
+                    '/home/user/project': 'touch new_file.md'
+                },
+                'after': {}
+            }
+        }
+    )
+
+class FileContent(BaseModel):
+    """
+    Represents the content plan for files, including the code to be included in each file and license comments.
+    This simplified version assumes a single code snippet and license comment for all files.
+    """
+
+    file_code: str = Field(
+        description="""
+        The code content to be included in all files. This single string will be used as the content for each file.
+        Ensure the code adheres to the required standards and includes necessary documentation.
+
+        Example:
+            'print("Hello, world!")'
+        """,
+        default='',
+        title="File Code Content",
+        example='print("Hello, World!")'
+    )
+
+    license_comments: Dict[str, str] = Field(
+        description="""
+        A dictionary where the key is the file extension (including the dot) and the value is the license comment
+        to be added at the top of files with that extension. This allows for different comment formats for different
+        types of files.
+
+        Example:
+            {
+                ".py": "''' \nSPDX-License-Identifier: Apache-2.0\nCopyright 2024 Authors of [Your Organization] & [Your Project]\n'''",
+                ".md": "<!-- SPDX-License-Identifier: Apache-2.0\nCopyright 2024 Authors of [Your Organization] & [Your Project] -->"
+            }
+        """,
+        default={},
+        title="License Comments by File Extension",
+        example={
+            ".py": "''' \nSPDX-License-Identifier: Apache-2.0\nCopyright 2024 Authors of [Your Organization] & [Your Project]\n'''",
+            ".md": "<!-- SPDX-License-Identifier: Apache-2.0\nCopyright 2024 Authors of [Your Organization] & [Your Project] -->"
+        }
+    )
+
+class CodeGenerationPlan(BaseModel):
     """
     """
 
@@ -96,6 +211,7 @@ class CodeGeneration(BaseModel):
             'absolute_file_pathN'
         ]        
         """, 
+        default=[],
         required=True
     )
 
@@ -106,6 +222,7 @@ class CodeGeneration(BaseModel):
         code for that particular file. The code should adhere to all the requirements and standards 
         provided.
         """, 
+        default={},
         required=True
     )
 
@@ -121,6 +238,7 @@ class CodeGeneration(BaseModel):
             }
         "
         """,
+        default={},
         required=True
     )
 
@@ -135,5 +253,6 @@ class CodeGeneration(BaseModel):
 
         Please ensure that the commands and their parameters are correctly formatted to prevent any execution errors.
         """,
+        default={},
         required=True
     )
