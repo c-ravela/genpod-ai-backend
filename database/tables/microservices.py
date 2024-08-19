@@ -1,6 +1,6 @@
 import sqlite3
 from datetime import datetime
-from typing import Any, Dict, Self
+from typing import Any, Dict
 
 from database.tables.table import Table
 from models.constants import Status
