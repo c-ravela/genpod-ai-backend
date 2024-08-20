@@ -5,9 +5,9 @@ import os
 import re
 from typing import List
 
+from langchain_core.output_parsers.json import JsonOutputParser
 from langchain_openai import ChatOpenAI
 from pydantic import ValidationError
-from langchain_core.output_parsers.json import JsonOutputParser
 
 from agents.agent.agent import Agent
 from agents.planner.planner_state import PlannerState
@@ -16,8 +16,8 @@ from models.constants import Status
 from models.models import Task
 from models.planner import BacklogList
 from prompts.planner import PlannerPrompts
-from utils.logs.logging_utils import logger
 from prompts.segregation import SegregatorPrompts
+from utils.logs.logging_utils import logger
 
 
 class PlannerAgent(Agent[PlannerState, PlannerPrompts]):

@@ -6,8 +6,8 @@ from typing_extensions import Annotated, TypedDict
 
 from agents.agent.state import State
 from models.models import Task
-
 from models.skeleton import FunctionSkeleton
+
 
 class CoderState(TypedDict):
     """

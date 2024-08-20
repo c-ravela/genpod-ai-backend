@@ -1,5 +1,6 @@
 """Coder Agent
 """
+import json
 import os
 from typing import Literal
 
@@ -18,7 +19,6 @@ from tools.license import License
 from tools.shell import Shell
 from utils.logs.logging_utils import logger
 
-import json
 
 class CoderAgent(Agent[CoderState, CoderPrompts]):
     """
