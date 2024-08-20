@@ -3,11 +3,11 @@
 Agent graph state
 """
 
-from models.models import Task
+from typing_extensions import Annotated, TypedDict
 
-from typing_extensions import TypedDict
-from typing_extensions import Annotated
+from models.models import Task
 from models.skeleton import FunctionSkeleton
+
 
 class TestCoderState(TypedDict):
     """
@@ -27,7 +27,7 @@ class TestCoderState(TypedDict):
     ]
 
     # @in 
-    requirements_overview: Annotated[
+    requirements_document: Annotated[
         str, 
         "A comprehensive, well-structured document in markdown format that outlines "
         "the project's requirements derived from the user's request. This serves as a "
@@ -35,7 +35,7 @@ class TestCoderState(TypedDict):
     ]
 
     # @in
-    generated_project_path: Annotated[
+    project_path: Annotated[
         str,
         "The absolute path in the file system where the project is being generated. "
         "This path is used to store all the project-related files and directories."

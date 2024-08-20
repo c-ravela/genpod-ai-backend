@@ -1,46 +1,20 @@
 """Test Coder Agent
 """
-
-import os
-from langchain_openai import ChatOpenAI
-from langchain_community.chat_models import ChatOllama
-
-from langgraph.prebuilt import ToolExecutor
-from langgraph.prebuilt import ToolInvocation
-
-from langchain_core.tools import StructuredTool
-
 from langchain_core.output_parsers import JsonOutputParser
-
 from langchain_core.runnables.base import RunnableSequence
+from langchain_openai import ChatOpenAI
+from typing_extensions import Literal
 
 from agents.tester.state import TestCoderState
-
-from models.constants import Status
-from models.constants import ChatRoles
-
-from models.coder import CodeGeneration
-from models.test_generator import TestCodeGeneration
-
-from prompts.test_generator import TestGeneratorPrompts
-
-from prompts.skeleton_generator import SkeletonGeneratorPrompts
-
-from models.coder import CoderModel
-
-from tools.git import Git
-from tools.shell import Shell
-from tools.license import License
-from tools.code import CodeFileWriter
-
-from typing_extensions import Union
-from typing_extensions import Literal
+from models.constants import ChatRoles, Status
 from models.skeleton import FunctionSkeleton
-
+from models.test_generator import TestCodeGeneration
+from prompts.skeleton_generator import SkeletonGeneratorPrompts
+from prompts.test_generator import TestGeneratorPrompts
+from tools.code import CodeFileWriter
+from tools.shell import Shell
 from utils.logs.logging_utils import logger
 
-import pprint as pp
-import time
 
 class TestCoderAgent:
     """
@@ -87,14 +61,14 @@ class TestCoderAgent:
     skeleton_prompt: SkeletonGeneratorPrompts
     current_code_generation: TestCodeGeneration
 
-    llm: Union[ChatOpenAI, ChatOllama] # This is the language learning model (llm) for the Architect agent. It can be either a ChatOpenAI model or a ChatOllama model
+    llm: ChatOpenAI # This is the language learning model (llm) for the Architect agent. It can be ChatOpenAI model
 
     # chains
     test_code_generation_chain: RunnableSequence
     skeleton_generation_chain: RunnableSequence
     # task_segregation_chain: RunnableSequence
 
-    def __init__(self, llm: Union[ChatOpenAI, ChatOllama]) -> None:
+    def __init__(self, llm: ChatOpenAI) -> None:
         """
         """
         
@@ -308,8 +282,8 @@ class TestCoderAgent:
         try:
             llm_response = self.test_code_generation_chain.invoke({
                 "project_name": self.state['project_name'],
-                "project_path": self.state['generated_project_path'],
-                "requirements_document": self.state['requirements_overview'],
+                "project_path": self.state['project_path'],
+                "requirements_document": self.state['requirements_document'],
                 "folder_structure": self.state['project_folder_strucutre'],
                 "task": task.description,
                 "error_message": self.error_message,
@@ -375,8 +349,8 @@ class TestCoderAgent:
         try:
             llm_response = self.skeleton_generation_chain.invoke({
                 "project_name": self.state['project_name'],
-                "project_path": self.state['generated_project_path'],
-                "requirements_document": self.state['requirements_overview'],
+                "project_path": self.state['project_path'],
+                "requirements_document": self.state['requirements_document'],
                 "folder_structure": self.state['project_folder_strucutre'],
                 "task": task.description,
                 "error_message": self.error_message,
@@ -453,7 +427,7 @@ class TestCoderAgent:
     #         time.sleep(20)
     #         # self.update_state_skeleton_generation(llm_response)
 
-    #         # TODO: maintian class variable (local to class) to hold the current task's CodeGeneration object so that we are not gonna pass any extra
+    #         # TODO: maintian class variable (local to class) to hold the current task's CodeGenerationPlan object so that we are not gonna pass any extra
     #         # details to the code generation prompt - look self.current_code_generation
         
     #         self.current_code_generation["taskType"] = llm_response['taskType']

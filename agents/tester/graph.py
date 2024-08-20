@@ -2,15 +2,12 @@
 TestCoder Graph
 """
 
-from langgraph.graph import END
-from langgraph.graph import StateGraph
-from langgraph.graph.graph import CompiledGraph 
 from langgraph.checkpoint.sqlite import SqliteSaver
+from langgraph.graph import END, StateGraph
+from langgraph.graph.graph import CompiledGraph
 
 from agents.tester.agent import TestCoderAgent
 from agents.tester.state import TestCoderState
-
-from configs.persistence_db import PERSISTANCE_DB_PATH
 
 class TestCoderGraph:
     """
