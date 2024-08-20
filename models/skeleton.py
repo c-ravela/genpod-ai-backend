@@ -6,10 +6,8 @@ the TestGenerator agent includes information about the steps to complete a task,
 the files to be created, the location of the code, the actual code.
 """
 
-from typing_extensions import ClassVar
+from pydantic import BaseModel, Field
 
-from pydantic import Field
-from pydantic import BaseModel
 
 class FunctionSkeletonFields(BaseModel):
     """
