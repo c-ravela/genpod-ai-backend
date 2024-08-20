@@ -10,7 +10,7 @@ from langchain_openai import ChatOpenAI
 from agents.agent.agent import Agent
 from agents.coder.state import CoderState
 from configs.project_config import ProjectAgents
-from models.coder import CodeGeneration
+from models.coder import CodeGenerationPlan
 from models.constants import ChatRoles, Status
 from prompts.coder import CoderPrompts
 from tools.code import CodeFileWriter
@@ -49,7 +49,7 @@ class CoderAgent(Agent[CoderState, CoderPrompts]):
     
     track_add_license_txt: list[str]
 
-    current_code_generation: CodeGeneration
+    current_code_generation: CodeGenerationPlan
 
     # chains
     code_generation_chain: RunnableSequence
@@ -87,7 +87,7 @@ class CoderAgent(Agent[CoderState, CoderPrompts]):
         self.last_visited_node = self.code_generation_node_name
         self.error_message = ""
 
-        self.current_code_generation = {}
+        self.current_code_generation = CodeGenerationPlan()
 
         self.track_add_license_txt = []
         self.code_generation_chain = (
@@ -128,7 +128,7 @@ class CoderAgent(Agent[CoderState, CoderPrompts]):
         
         return self.update_state_node_name
 
-    def update_state_code_generation(self, current_cg: CodeGeneration) -> None:
+    def update_state_code_generation(self, current_cg: CodeGenerationPlan) -> None:
         """
         """
 
@@ -189,7 +189,7 @@ class CoderAgent(Agent[CoderState, CoderPrompts]):
             self.has_code_been_written_locally = False
             self.is_license_text_added_to_files = False
 
-            self.current_code_generation = {}
+            self.current_code_generation = CodeGenerationPlan()
 
         return {**self.state}
     
@@ -235,7 +235,7 @@ class CoderAgent(Agent[CoderState, CoderPrompts]):
           
             self.update_state_code_generation(llm_response)
 
-            # TODO: maintian class variable (local to class) to hold the current task's CodeGeneration object so that we are not gonna pass any extra
+            # TODO: maintian class variable (local to class) to hold the current task's CodeGenerationPlan object so that we are not gonna pass any extra
             # details to the code generation prompt - look self.current_code_generation
 
             self.current_code_generation["code"] = llm_response['code']
