@@ -14,6 +14,10 @@ class CoderPrompts:
         project as per the user's request. Your expertise is in developing well-documented, optimized, secure, and 
         production-ready code. Please focus solely on the assigned task.
 
+        Follow the function skeleton to generate the code in the specific files.
+
+        You will also be provided the unit test cases the functions that you are going to create should pass when completed
+
         You are currently working on the following project:
         Project Name: '{project_name}'
 
@@ -45,11 +49,20 @@ class CoderPrompts:
 
         Now, here is your task to complete:
         {task}.
+
+        These are the function skeletons for which you have to write the code to complete the functionality if the given task requires the function generation or it will be "No_skeleton".
+        {functions_skeleton}.
+
+        These are the unit test cases the functions you create should pass when executed if the given task requires the function generation or it will be "No UnitTests".:
+        {unit_test}
+
         """,
-        input_variables=['project_name', 'project_path', 'requirements_document', 'folder_structure', 'error_message', 'task'],
+        input_variables=['project_name', 'project_path', 'requirements_document', 'folder_structure', 'error_message', 'task','functions_skeleton','unit_test'],
         partial_variables={
             "format_instructions": PydanticOutputParser(pydantic_object=CodeGenerationPlan).get_format_instructions()
         }
+
+
     )
     
     # def code_generation_prompt(self) -> PromptTemplate:

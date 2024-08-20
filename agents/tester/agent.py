@@ -23,7 +23,7 @@ class TestCoderAgent:
 
     # names of the graph node
     entry_node_name: str # The entry point of the graph
-    code_generation_node_name: str 
+    test_code_generation_node_name: str 
     skeleton_generation_node_name: str
     segregation_node_name:str
     run_commands_node_name: str
@@ -72,10 +72,10 @@ class TestCoderAgent:
         """
         """
         
-        self.agent_name = "Test code Programmer"
+        self.agent_name = "Test Code Generator"
 
         self.entry_node_name = "entry"
-        self.code_generation_node_name = "testcode_generation"
+        self.test_code_generation_node_name = "testcode_generation"
         self.run_commands_node_name = "run_commands"
         self.write_generated_code_node_name = "write_code"
         self.write_skeleton_node_name="write_skeleton"
@@ -99,7 +99,7 @@ class TestCoderAgent:
         self.is_license_text_added_to_files = False
         self.hasPendingToolCalls = False
 
-        self.last_visited_node = self.code_generation_node_name
+        self.last_visited_node = self.test_code_generation_node_name
         self.error_message = ""
         
         self.state = TestCoderState()
@@ -154,7 +154,7 @@ class TestCoderAgent:
             elif not self.has_skeleton_been_written_locally:
                 return self.write_skeleton_node_name
             elif not self.is_code_generated:
-               return self.code_generation_node_name
+               return self.test_code_generation_node_name
             
             elif not self.has_code_been_written_locally:
                 return self.write_generated_code_node_name
@@ -204,14 +204,14 @@ class TestCoderAgent:
 
             self.state['files_created'] += new_list
         
-        if self.state['code'] is None:
-            self.state["code"] = current_cg['code']
+        if self.state['test_code'] is None:
+            self.state["test_code"] = current_cg['test_code']
         else:
-            state_ifc = current_cg['code'].copy()
+            state_ifc = current_cg['test_code'].copy()
 
             for key in state_ifc:
-                if key in self.state['code']:
-                    del current_cg['code'][key]   
+                if key in self.state['test_code']:
+                    del current_cg['test_code'][key]   
         if self.state['infile_license_comments'] is None:
             self.state['infile_license_comments'] = current_cg['infile_license_comments']
         else:
@@ -268,7 +268,7 @@ class TestCoderAgent:
         logger.info(f"----{self.agent_name}: Initiating Unit test code Generation----")
 
         self.update_state(state)
-        self.last_visited_node = self.code_generation_node_name
+        self.last_visited_node = self.test_code_generation_node_name
 
         task = self.state["current_task"]
 
@@ -295,14 +295,14 @@ class TestCoderAgent:
             self.hasError = False
             self.error_message = ""
 
-            required_keys = ["files_to_create", "code", "infile_license_comments", "commands_to_execute"]
+            required_keys = ["files_to_create", "test_code", "infile_license_comments", "commands_to_execute"]
             missing_keys = [key for key in required_keys if key not in llm_response]
 
             if missing_keys:
                 raise KeyError(f"Missing keys: {missing_keys} in the response. Try Again!")
 
             self.update_state_test_code_generation(llm_response)
-            self.current_code_generation["code"] = llm_response['code']
+            self.current_code_generation["test_code"] = llm_response['test_code']
             self.current_code_generation["files_created"] = llm_response['files_to_create']
             self.current_code_generation['infile_license_comments'] = llm_response['infile_license_comments']
             self.current_code_generation['commands_to_execute'] = llm_response['commands_to_execute']
@@ -525,9 +525,10 @@ class TestCoderAgent:
                     ChatRoles.USER.value,
                     f"Started writing the skeleton to the file in the path: {path}."
                 ))
-                execution_result=CodeFileWriter.write_generated_code_to_file.invoke({
+                execution_result=CodeFileWriter.write_generated_skeleton_to_file.invoke({
                     "generated_code": str(function_skeleton),
-                    "file_path": path
+                    "file_path": path,
+                    "generated_project_path":self.state['generated_project_path']
                 })
 
                 #if the code successfully stored in the specifies path, write the next code in the file
@@ -573,7 +574,7 @@ class TestCoderAgent:
         self.last_visited_node = self.write_generated_code_node_name
 
         try:
-            for path, code in self.current_code_generation['code'].items():
+            for path, code in self.current_code_generation['test_code'].items():
                 
                 logger.info(f"----{self.agent_name}: Started writing the code to the file at the path: {path}.----")
     
@@ -598,7 +599,7 @@ class TestCoderAgent:
                 elif execution_result[0]==True:
                     
                     self.hasError=True
-                    self.last_visited_node = self.code_generation_node_name
+                    self.last_visited_node = self.test_code_generation_node_name
                     self.error_message= f"Error Occured while writing the code in the path: {path}. The output of writing the code to the file is {execution_result[1]}."
                     self.add_message((
                     ChatRoles.USER.value,
@@ -607,6 +608,7 @@ class TestCoderAgent:
                 # logger.error(self.error_message)
 
             self.has_code_been_written_locally = True
+            self.state['current_task'].task_status = Status.DONE
         except Exception as e:
             logger.error(f"----{self.agent_name}: Error Occured while writing the code to the respective files : {str(e)}.----")
 

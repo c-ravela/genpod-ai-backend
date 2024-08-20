@@ -66,9 +66,9 @@ class TestCoderState(TypedDict):
     ]
 
     # @out
-    code: Annotated[
+    test_code: Annotated[
         str, 
-        "The complete, well-documented working code that adheres to all standards "
+        "The complete, well-documented working unit test code that adheres to all standards "
         "requested with the programming language, framework user requested ",
     ]
 

@@ -18,6 +18,7 @@ from tools.license import License
 from tools.shell import Shell
 from utils.logs.logging_utils import logger
 
+import json
 
 class CoderAgent(Agent[CoderState, CoderPrompts]):
     """
@@ -211,14 +212,29 @@ class CoderAgent(Agent[CoderState, CoderPrompts]):
         ))
 
         try:
-            llm_response = self.code_generation_chain.invoke({
-                "project_name": self.state['project_name'],
-                "project_path": os.path.join(self.state['project_path'], self.state['project_name']),
-                "requirements_document": self.state['requirements_document'],
-                "folder_structure": self.state['project_folder_strucutre'],
-                "task": task.description,
-                "error_message": self.error_message,
-            })
+
+            if ((classifier := json.loads(task.description))['is_function_generation_required']):
+                llm_response = self.code_generation_chain.invoke({
+                    "project_name": self.state['project_name'],
+                    "project_path": self.state['generated_project_path'],
+                    "requirements_document": self.state['requirements_overview'],
+                    "folder_structure": self.state['project_folder_strucutre'],
+                    "task": task.description,
+                    "error_message": self.error_message,
+                    "unit_test":self.state['test_code'],
+                    "functions_skeleton":self.state['functions_skeleton']
+                })
+            else:
+                 llm_response = self.code_generation_chain.invoke({
+                    "project_name": self.state['project_name'],
+                    "project_path": os.path.join(self.state['project_path'], self.state['project_name']),
+                    "requirements_document": self.state['requirements_document'],
+                    "folder_structure": self.state['project_folder_strucutre'],
+                    "task": task.description,
+                    "error_message": self.error_message,
+                    "unit_test":"No UnitTests",
+                    "functions_skeleton":"No_skeleton"
+                })
 
             self.hasError = False
             self.error_message = ""

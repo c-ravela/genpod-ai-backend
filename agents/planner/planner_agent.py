@@ -7,6 +7,7 @@ from typing import List
 
 from langchain_openai import ChatOpenAI
 from pydantic import ValidationError
+from langchain_core.output_parsers.json import JsonOutputParser
 
 from agents.agent.agent import Agent
 from agents.planner.planner_state import PlannerState
@@ -16,6 +17,7 @@ from models.models import Task
 from models.planner import BacklogList
 from prompts.planner import PlannerPrompts
 from utils.logs.logging_utils import logger
+from prompts.segregation import SegregatorPrompts
 
 
 class PlannerAgent(Agent[PlannerState, PlannerPrompts]):
@@ -37,6 +39,8 @@ class PlannerAgent(Agent[PlannerState, PlannerPrompts]):
         
         # detailed requirements generator chain
         self.detailed_requirements = self.prompts.detailed_requirements_prompt | self.llm
+
+        self.segregaion_chain= SegregatorPrompts.segregation_prompt| self.llm | JsonOutputParser()
 
         self.current_task : Task = None
 
@@ -140,7 +144,7 @@ class PlannerAgent(Agent[PlannerState, PlannerPrompts]):
                     self.error_count = 0
                     return {**state}
 
-    def requirements_developer(self, state: PlannerState):
+    def requirements_developer(self, state: PlannerState):        
         state['planned_task_requirements'] = {}
         for backlog in state['planned_task_map'][state['current_task'].description]:
             while(True):
@@ -167,6 +171,7 @@ class PlannerAgent(Agent[PlannerState, PlannerPrompts]):
                         cleaned_json = cleaned_response
                     parsed_response = json.loads(cleaned_json)
 
+                    logger.info("response from planner ", parsed_response)
                     if "question" in parsed_response.keys():
                         # print(f"----Awaiting for additional information on----\n{parsed_response['question']}")
                         logger.info("----Awaiting for additional information on----")
@@ -178,6 +183,10 @@ class PlannerAgent(Agent[PlannerState, PlannerPrompts]):
                         # print("----Generated Detailed requirements in JSON format for the backlog----\n")
                         # pprint(parsed_response)
                         logger.info("----Generated Detailed requirements in JSON format for the backlog----")
+                        # logger.info("Requirements in JSON: %r", parsed_response)
+                        # adding the segregation node to  check if the generated requirements require to 
+                        is_function_generation_required=self.task_segregation(backlog, parsed_response)
+                        parsed_response['is_function_generation_required']=is_function_generation_required
                         logger.info("Requirements in JSON: %r", parsed_response)
                         state['planned_task_requirements'][backlog] = parsed_response
                         self.error_count = 0
@@ -237,3 +246,33 @@ class PlannerAgent(Agent[PlannerState, PlannerPrompts]):
                 tasks.append(task)
         
         return tasks
+    
+    def task_segregation(self, workpackage_name:str, requirements:str) -> bool:
+        """
+        """
+        logger.info(f"---- Initiating segregation ----")
+
+        try:
+            llm_response = self.segregaion_chain.invoke({
+                "work_package": workpackage_name +"/n" + str(requirements)
+            })
+
+            self.hasError = False
+            self.error_message = ""
+            required_keys = ["taskType"]
+            missing_keys = [key for key in required_keys if key not in llm_response]
+
+            if missing_keys:
+                raise KeyError(f"Missing keys: {missing_keys} in the response. Try Again!")
+            
+            # Checking if the segregation agent generated tasktype
+
+            logger.info(f" task type  : {llm_response['taskType']} ; {llm_response['reason_for_classification']}")
+            # logger.info(f"after state",{llm_response})
+        except Exception as e:
+            logger.error(f"---- Error Occured at segregation: {str(e)}.----")
+
+            self.hasError = True
+            self.error_message = f"An error occurred while processing the request: {str(e)}"
+        
+        return llm_response['taskType']

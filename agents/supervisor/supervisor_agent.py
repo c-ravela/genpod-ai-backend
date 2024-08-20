@@ -37,6 +37,8 @@ class SupervisorAgent(Agent[SupervisorState, SupervisorPrompts]):
         self.rag_cache = FuzzyRAGCache()
         self.rag_cache_building = ''
 
+        self.is_test_generator_agent_called=False
+
         self.calling_agent: str = ""
         self.called_agent: str = ""
 
@@ -346,6 +348,8 @@ class SupervisorAgent(Agent[SupervisorState, SupervisorPrompts]):
     def call_coder(self, state: SupervisorState) -> SupervisorState:
         """
         """
+        self.is_test_generator_agent_called=False
+
         state['messages'] += [(
             ChatRoles.AI.value,
             'Calling Architect Agent'
@@ -376,6 +380,37 @@ class SupervisorAgent(Agent[SupervisorState, SupervisorPrompts]):
 
         return {**state}
 
+
+    def call_test_code_generator(self, state: SupervisorState) -> SupervisorState:
+        """
+        """
+
+        # Implement the logic to call the Test code generator  agent
+        message = ('Test_code_generator', 'Calling Test Code Generator Agent')
+        state['messages'] += [message]
+        logger.info("---------- Calling Test Code Generator ----------")
+        test_coder_result = self.team_members['TestGenerator'].app.invoke({**state['coder_inputs'],'messages':[]},
+                                                                     {'configurable':{'thread_id':self.memberids['TestGenerator']}})
+        # coder_state = self.team_members['Coder'].get_state()
+        # 
+        state['coder_inputs']['test_code']=test_coder_result['test_code']
+        state['coder_inputs']['functions_skeleton']=test_coder_result['functions_skeleton']
+        if test_coder_result['current_task'].task_status.value == Status.DONE.value:
+            logger.info("Test Code Generator completed work package")
+            state['agents_status'] = 'Test Coder Generator Completed'
+
+        elif test_coder_result['current_task'].task_status.value == Status.ABANDONED.value:
+            logger.info("Test Coder Generator unable to complete the work package due to : %s", test_coder_result['current_task'].additional_info)
+            state['agent_status'] = "Coder Completed With Abandonment"
+        else:
+            logger.info("Test Coder Generator awaiting for additional information\nCoder Query: %s", test_coder_result['current_task'].question)
+            state['agents_status'] = 'Test Coder Generator Awaiting'
+
+        self.called_agent = 'TestGenerator'
+        self.responses['TestGenerator'].append(("Returned from Test Coder Generator",state['current_task']))
+        self.is_test_generator_agent_called=True
+        return {**state}
+    
     def call_supervisor(self, state: SupervisorState) -> SupervisorState:
         """"""
         # Handling new requests vs pending requests
@@ -565,7 +600,9 @@ class SupervisorAgent(Agent[SupervisorState, SupervisorPrompts]):
             return calling_map[self.calling_agent]
         elif state['project_status']==PStatus.EXECUTING.value and (self.called_agent==self.team.architect.member_id or self.called_agent==self.team.supervisor.member_id):
             return 'call_planner'
-        elif state['project_status']==PStatus.EXECUTING.value and (self.called_agent==self.team.planner.member_id or self.called_agent==self.team.coder.member_id):
+        elif state['project_status']==PStatus.EXECUTING.value and (self.called_agent==self.team.planner.member_id or self.called_agent==self.team.coder.member_id) and ((classifier := json.loads(state['coder_inputs']['current_task'].description))['is_function_generation_required']) and not(self.is_test_generator_agent_called) :
+            return 'call_test_code_generator' 
+        elif state['project_status']==PStatus.EXECUTING.value and (self.called_agent==self.team.planner.member_id or self.called_agent==self.team.coder.member_id or self.called_agent =='TestGenerator') and (((classifier := json.loads(state['coder_inputs']['current_task'].description))['is_function_generation_required'] and self.is_test_generator_agent_called) or not ((classifier := json.loads(state['coder_inputs']['current_task'].description))['is_function_generation_required'])) :
             return 'call_coder'
         elif state['project_status']==PStatus.HALTED.value:
             return 'update_state' #'Human'
