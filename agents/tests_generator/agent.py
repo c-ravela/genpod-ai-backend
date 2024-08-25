@@ -5,22 +5,20 @@ from langchain_core.runnables.base import RunnableSequence
 from langchain_openai import ChatOpenAI
 from typing_extensions import Literal
 
-from agents.tester.state import TestCoderState
+from agents.tests_generator.state import TestCoderState
+from configs.project_config import ProjectAgents
 from models.constants import ChatRoles, Status
 from models.skeleton import FunctionSkeleton
-from models.test_generator import TestCodeGeneration
-from prompts.skeleton_generator import SkeletonGeneratorPrompts
-from prompts.test_generator import TestGeneratorPrompts
+from models.tests_generator import TestCodeGeneration
+from prompts.tests_generator import TestGeneratorPrompts
 from tools.code import CodeFileWriter
 from tools.shell import Shell
 from utils.logs.logging_utils import logger
+from agents.agent.agent import Agent
 
-
-class TestCoderAgent:
+class TestCoderAgent(Agent[TestCoderState, TestGeneratorPrompts]):
     """
     """
-    agent_name: str # The name of the agent
-
     # names of the graph node
     entry_node_name: str # The entry point of the graph
     test_code_generation_node_name: str 
@@ -55,24 +53,23 @@ class TestCoderAgent:
     
     track_add_license_txt: list[str]
 
-    state: TestCoderState
-    prompts: TestGeneratorPrompts
-    # segregation_prompt: SegregatorPrompts
-    skeleton_prompt: SkeletonGeneratorPrompts
     current_code_generation: TestCodeGeneration
-
-    llm: ChatOpenAI # This is the language learning model (llm) for the Architect agent. It can be ChatOpenAI model
 
     # chains
     test_code_generation_chain: RunnableSequence
     skeleton_generation_chain: RunnableSequence
-    # task_segregation_chain: RunnableSequence
 
     def __init__(self, llm: ChatOpenAI) -> None:
         """
         """
-        
-        self.agent_name = "Test Code Generator"
+
+        super().__init__(
+            ProjectAgents.tests_generator.agent_id,
+            ProjectAgents.tests_generator.agent_name,
+            TestCoderState(),
+            TestGeneratorPrompts(),
+            llm
+        )
 
         self.entry_node_name = "entry"
         self.test_code_generation_node_name = "testcode_generation"
@@ -83,14 +80,13 @@ class TestCoderAgent:
         self.add_license_node_name = "add_license_text"
         self.update_state_node_name = "state_update"
         self.skeleton_generation_node_name="skeleton_generation"
-        # self.segregation_node_name="segregation"
 
         self.mode = ""
 
         self.hasError = False
         self.is_code_generated = False
         self.is_skeleton_generated=False
-        # self.is_segregated=False
+
         self.has_command_execution_finished = False
         self.has_code_been_written_locally = False
         self.is_skeleton_written_to_local= False
@@ -101,16 +97,8 @@ class TestCoderAgent:
 
         self.last_visited_node = self.test_code_generation_node_name
         self.error_message = ""
-        
-        self.state = TestCoderState()
-        self.prompts = TestGeneratorPrompts()
-        self.skeleton_prompt= SkeletonGeneratorPrompts()
-        # self.segregation_prompt =SegregatorPrompts()
 
-
-        self.current_code_generation = {}
-
-        self.llm = llm
+        self.current_code_generation = TestCodeGeneration()
 
         self.track_add_license_txt = []
         self.test_code_generation_chain = (
@@ -119,16 +107,10 @@ class TestCoderAgent:
             | JsonOutputParser()
         )
         self.skeleton_generation_chain = (
-            self.skeleton_prompt.skeleton_generation_prompt
+            self.prompts.skeleton_generation_prompt
             | self.llm
             | JsonOutputParser()
         )
-
-        # self.segregaion_chain=(
-        #     self.segregation_prompt.segregation_prompt
-        #     | self.llm
-        #     | JsonOutputParser()
-        # )
 
     def add_message(self, message: tuple[str, str]) -> None:
         """
@@ -161,23 +143,6 @@ class TestCoderAgent:
         
         return self.update_state_node_name
     
-    def update_state(self, state: TestCoderState) -> TestCoderState:
-        """
-        This method updates the current state of the Architect agent with the provided state. 
-
-        Args:
-            state (ArchitectState): The new state to update the current state of the agent with.
-
-        Returns:
-            ArchitectState: The updated state of the agent.
-        """
-        logger.info(f"----{self.agent_name}: Proceeding with state update----")
-        
-        self.state = {**state}
-
-        return {**self.state}
-    
-
     def update_state_skeleton_generation(self,current_sg:FunctionSkeleton)-> None:
         try:
     
@@ -192,7 +157,6 @@ class TestCoderAgent:
         except Exception as e:
             logger.info("error",e)
 
-    
     def update_state_test_code_generation(self, current_cg: TestCodeGeneration) -> None:
         """
         """
@@ -256,11 +220,9 @@ class TestCoderAgent:
             self.is_license_file_downloaded = False
             self.is_license_text_added_to_files = False
 
-            self.current_code_generation = {}
+            self.current_code_generation = TestCodeGeneration()
 
         return {**self.state}
-    
-
     
     def test_code_generation_node(self, state: TestCoderState) -> TestCoderState:
         """
@@ -328,7 +290,6 @@ class TestCoderAgent:
         
         return {**self.state}
 
-
     def skeleton_generation_node(self, state: TestCoderState) -> TestCoderState:
         """
         """
@@ -389,7 +350,6 @@ class TestCoderAgent:
         
         return {**self.state}
     
-
     # def task_segregation_node(self, state: TestCoderState) -> TestCoderState:
     #     """
     #     """
@@ -450,9 +410,6 @@ class TestCoderAgent:
     #         ))
         
     #     return {**self.state}
-    
-    
-
 
     def run_commands_node(self, state: TestCoderState) -> TestCoderState:
         """
@@ -528,7 +485,7 @@ class TestCoderAgent:
                 execution_result=CodeFileWriter.write_generated_skeleton_to_file.invoke({
                     "generated_code": str(function_skeleton),
                     "file_path": path,
-                    "generated_project_path":self.state['generated_project_path']
+                    "generated_project_path":self.state['project_path']
                 })
 
                 #if the code successfully stored in the specifies path, write the next code in the file
