@@ -212,12 +212,13 @@ class CoderAgent(Agent[CoderState, CoderPrompts]):
         ))
 
         try:
-
-            if ((classifier := json.loads(task.description))['is_function_generation_required']):
+            
+            # TODO: Figure out a proper way to write the condition(if condition)
+            if ((json.loads(task.description))['is_function_generation_required']):
                 llm_response = self.code_generation_chain.invoke({
                     "project_name": self.state['project_name'],
-                    "project_path": self.state['generated_project_path'],
-                    "requirements_document": self.state['requirements_overview'],
+                    "project_path": os.path.join(self.state['project_path'], self.state['project_name']),
+                    "requirements_document": self.state['requirements_document'],
                     "folder_structure": self.state['project_folder_strucutre'],
                     "task": task.description,
                     "error_message": self.error_message,
