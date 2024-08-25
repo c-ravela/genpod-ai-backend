@@ -7,6 +7,7 @@ the files to be created, the location of the code, the actual code.
 """
 
 from pydantic import BaseModel, Field
+from typing import Any
 
 
 class ToolCall(BaseModel):
@@ -43,6 +44,7 @@ class TestCodeGeneration(BaseModel):
             'absolute_file_pathN'
         ]        
         """, 
+        default=[],
         required=True
     )
 
@@ -53,6 +55,7 @@ class TestCodeGeneration(BaseModel):
         unit test code for that particular file. The code should adhere to all the requirements and standards 
         provided.
         """, 
+        default={},
         required=True
     )
 
@@ -68,6 +71,7 @@ class TestCodeGeneration(BaseModel):
             }
         "
         """,
+        default={},
         required=True
     )
 
@@ -82,6 +86,24 @@ class TestCodeGeneration(BaseModel):
 
         Please ensure that the commands and their parameters are correctly formatted to prevent any execution errors.
         """,
+        default={},
         required=True
     )
+
+    def __getitem__(self, key: str) -> Any:
+        """
+        Allows getting attributes using square bracket notation.
+        """
+        if hasattr(self, key):
+            return getattr(self, key)
+        raise KeyError(f"Key '{key}' not found in TestCodeGeneration.")
+
+    def __setitem__(self, key: str, value: Any) -> None:
+        """
+        Allows setting attributes using square bracket notation.
+        """
+        if hasattr(self, key):
+            setattr(self, key, value)
+        else:
+            raise KeyError(f"Key '{key}' not found in TestCodeGeneration.")
 
