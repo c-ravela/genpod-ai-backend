@@ -16,6 +16,8 @@ from models.constants import Status
 from models.models import Task
 from models.planner import BacklogList
 from prompts.planner import PlannerPrompts
+
+# TODO: move these prompts planner prompts
 from prompts.segregation import SegregatorPrompts
 from utils.logs.logging_utils import logger
 
