@@ -135,7 +135,7 @@ class ProjectGraphs(Enum):
         coder (GraphInfo): Information about the Software Engineer Graph.
         rag (GraphInfo): Information about the Standards Extractor Graph.
         planner (GraphInfo): Information about the Project Planner Graph.
-        tester (GraphInfo): Information about the Unit Tester Graph.
+        tests_generator (GraphInfo): Information about the Unit Tester Graph.
         modernizer (GraphInfo): Information about the Knowledge Graph Generator Graph.
         reviewer (GraphInfo): Information about the Code Reviewer Graph.
     """
@@ -144,7 +144,7 @@ class ProjectGraphs(Enum):
     coder = GraphInfo("Software Engineer Graph", "GRPH_03_ENG")
     rag = GraphInfo("Document Repository Manager Graph", "GRPH_04_RAG")
     planner = GraphInfo("Project Planner Graph", "GRPH_05_PLN")
-    tester = GraphInfo("Unit Tester Graph", "GRPH_06_TST")
+    tests_generator = GraphInfo("Unit Tester Graph", "GRPH_06_TST")
     modernizer = GraphInfo("Knowledge Graph Generator Graph", "GRPH_07_MOD")
     reviewer = GraphInfo("Code Reviewer Graph", "GRPH_08_REV")
 
