@@ -1,5 +1,5 @@
 from enum import Enum
-from typing import Any, Dict, Generic, TypeVar
+from typing import Any, Dict, Generic, TypeVar, Iterator
 
 from langchain_openai import ChatOpenAI
 
@@ -51,6 +51,20 @@ class AgentMember(Generic[GenericAgentState, GenericAgentGraph]):
 
         self.graph = graph
         self.recursion_limit = -1 # means no limit set
+
+    def stream(self, input: Dict[str, Any] | Any) -> Iterator[GenericAgentState]:
+        """
+        """
+        graph_config = {
+            "configurable": {
+                "thread_id": self.thread_id
+            }
+        }
+
+        if self.recursion_limit != -1:
+            graph_config['recursion_limit'] = self.recursion_limit
+
+        return self.graph.app.stream(input, graph_config)
 
     def invoke(self, input: Dict[str, Any] | Any) -> GenericAgentState: 
         """
