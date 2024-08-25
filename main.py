@@ -2,8 +2,9 @@
 Driving code file for this project.
 """
 import os
-from pprint import pformat, pprint
+from pprint import pprint
 
+from agents.supervisor.supervisor_state import SupervisorState
 from configs.database import get_client_local_db_file_path
 from configs.project_config import ProjectConfig
 from configs.project_path import set_project_path
@@ -48,10 +49,10 @@ if __name__=="__main__":
 
     # Database insertion - START
     # insert the record for the project being generated in database
-    project_details = db.projects_table.insert("", PROJECT_INPUT, PROJECT_PATH, USER_ID, LICENSE_TEXT, LICENSE_URL)
+    project_details = db.projects_table.insert("", PROJECT_INPUT, "", PROJECT_PATH, USER_ID, LICENSE_TEXT, LICENSE_URL)
     logger.info(f"Records for new project has been created in the database with id: {project_details['id']}")
 
-    microservice_details = db.microservices_table.insert("", project_details['id'], USER_ID)
+    microservice_details = db.microservices_table.insert("", project_details['id'], "", USER_ID)
     logger.info(f"Records for new microservice has been created in the database with id: {microservice_details['id']}")
 
     sessions_details = []
@@ -67,8 +68,8 @@ if __name__=="__main__":
     genpod_team = TeamMembers(DATABASE_PATH, config.collection_name)
     genpod_team.supervisor.set_recursion_limit(500)
     genpod_team.supervisor.graph.agent.setup_team(genpod_team)
-
-    result = genpod_team.supervisor.invoke({
+    
+    supervisor_response = genpod_team.supervisor.stream({
         'project_id': project_details['id'],
         'microservice_id': microservice_details['id'],
         'original_user_input': PROJECT_INPUT,
@@ -78,18 +79,25 @@ if __name__=="__main__":
         'messages': [(ChatRoles.USER.value, PROJECT_INPUT)],
     })
     
-    logger.info(f"result end: {pformat(result)}")
-    pprint(result)
+    result: SupervisorState = None
+    for res in supervisor_response:
+        result = res
+        # pprint(res)
 
+    # TODO: DB update should happen at for every iteration in the above for loop
+    # write a logic to identify changes in the state.
+    # NOTE: db doesnt store all the value from the state, it only stores few fields
+    # from the state. so, logic should identify the changes to the fields that db stores
+    # If there is a change in state then only update the db.
     db.projects_table.update(
         result['project_id'], 
         project_name=result['project_name'],
-        status= result['project_status'],
+        status=str(result['project_status']),
         updated_by=USER_ID
     )
     db.microservices_table.update(
         result['microservice_id'],
         microservice_name=result['project_name'],
-        status= result['project_status'],
+        status=str(result['project_status']),
         updated_by=USER_ID
     )
