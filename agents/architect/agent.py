@@ -335,9 +335,11 @@ class ArchitectAgent(Agent[ArchitectState, ArchitectPrompts]):
         self.last_visited_node = self.entry_node_name
         self.is_additional_info_requested = False
         
-        if self.state['project_status'] == PStatus.INITIAL.value:
+        # TODO: Improvise conditional check with more details its too hard realize why its like that
+        # add detailed comments as well
+        if self.state['project_status'] == PStatus.INITIAL:
             self.mode = "document_generation"
-        elif self.state["current_task"].task_status.value == Status.AWAITING.value:
+        elif self.state["current_task"].task_status == Status.AWAITING:
             self.mode = "information_gathering"
 
         return {**self.state}
