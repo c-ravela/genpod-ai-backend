@@ -4,6 +4,7 @@ from typing import List
 from typing_extensions import Annotated, TypedDict
 
 from agents.agent.state import State
+from models.constants import PStatus
 from models.models import RequirementsDocument, Task
 
 
@@ -35,7 +36,7 @@ class SupervisorState(TypedDict):
 
     # @out
     project_status: Annotated[
-        str,
+        PStatus,
         State.out_field("The status of the project being generated.")
     ]
 
@@ -122,7 +123,7 @@ class SupervisorState(TypedDict):
     ]
 
     # @out
-    rag_query_answer : Annotated[
+    is_rag_query_answered : Annotated[
         bool,
         State.out_field("is query answered by rag agent.")
     ]
