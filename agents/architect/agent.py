@@ -175,7 +175,7 @@ class ArchitectAgent(Agent[ArchitectState, ArchitectPrompts]):
             | JsonOutputParser()
         )
 
-    def add_message(self, message: tuple[str, str]) -> None:
+    def add_message(self, message: tuple[ChatRoles, str]) -> None:
         """
         Adds a single message to the messages field in the state.
 
@@ -237,7 +237,7 @@ class ArchitectAgent(Agent[ArchitectState, ArchitectPrompts]):
 
         if not response['is_add_info_needed']:
             self.add_message((
-                ChatRoles.USER.value,
+                ChatRoles.USER,
                 f"{self.agent_name}: {phase} is now ready and prepared."
             ))
             self.state['requirements_document'][key] = response['content']
@@ -246,7 +246,7 @@ class ArchitectAgent(Agent[ArchitectState, ArchitectPrompts]):
             self.generation_step += 1
         else:
             self.add_message((
-                ChatRoles.USER.value,
+                ChatRoles.USER,
                 f"{self.agent_name}: Additional information has been requested by {phase}."
             ))
             self.request_for_additional_info(response)
@@ -365,14 +365,14 @@ class ArchitectAgent(Agent[ArchitectState, ArchitectPrompts]):
         self.is_additional_info_requested = False
 
         self.add_message((
-            ChatRoles.USER.value,
+            ChatRoles.USER,
             f"{self.agent_name}: Initiating the process of preparing the requirements overview."
         ))
 
         try:
             if self.generation_step == 0: #0. Project Overview
                 self.add_message((
-                    ChatRoles.USER.value,
+                    ChatRoles.USER,
                     f"{self.agent_name}: Progressing with Step 0 - project_overview."
                 ))
 
@@ -388,7 +388,7 @@ class ArchitectAgent(Agent[ArchitectState, ArchitectPrompts]):
 
             if self.generation_step == 1: # 1. Architecture
                 self.add_message((
-                    ChatRoles.USER.value,
+                    ChatRoles.USER,
                     f"{self.agent_name}: Progressing with Step 1 - Architecture."
                 ))
 
@@ -402,7 +402,7 @@ class ArchitectAgent(Agent[ArchitectState, ArchitectPrompts]):
 
             if self.generation_step == 2: # 2. Folder Structure
                 self.add_message((
-                    ChatRoles.USER.value,
+                    ChatRoles.USER,
                     f"{self.agent_name}: Progressing with Step 2 - Folder Structure."
                 ))
 
@@ -417,7 +417,7 @@ class ArchitectAgent(Agent[ArchitectState, ArchitectPrompts]):
 
             if self.generation_step == 3: # 3. Micro service Design
                 self.add_message((
-                    ChatRoles.USER.value,
+                    ChatRoles.USER,
                     f"{self.agent_name}: Progressing with Step 3 - Microservice Design."
                 ))
 
@@ -432,7 +432,7 @@ class ArchitectAgent(Agent[ArchitectState, ArchitectPrompts]):
 
             if self.generation_step == 4: # 4. Tasks Breakdown
                 self.add_message((
-                    ChatRoles.USER.value,
+                    ChatRoles.USER,
                     f"{self.agent_name}: Progressing with Step 4 - Tasks Breakdown."
                 ))
 
@@ -448,7 +448,7 @@ class ArchitectAgent(Agent[ArchitectState, ArchitectPrompts]):
 
             if self.generation_step == 5: # 5. Standards
                 self.add_message((
-                    ChatRoles.USER.value,
+                    ChatRoles.USER,
                     f"{self.agent_name}: Progressing with Step 5 - Standards."
                 ))
 
@@ -463,7 +463,7 @@ class ArchitectAgent(Agent[ArchitectState, ArchitectPrompts]):
 
             if self.generation_step == 6: # 6. Implementation Details
                 self.add_message((
-                    ChatRoles.USER.value,
+                    ChatRoles.USER,
                     f"{self.agent_name}: Progressing with Step 6 - Implementation Details."
                 ))
 
@@ -479,7 +479,7 @@ class ArchitectAgent(Agent[ArchitectState, ArchitectPrompts]):
 
             if self.generation_step == 7: # 7. License Details
                 self.add_message((
-                    ChatRoles.USER.value,
+                    ChatRoles.USER,
                     f"{self.agent_name}: Progressing with Step 7 - License Details."
                 ))
 
@@ -499,7 +499,7 @@ class ArchitectAgent(Agent[ArchitectState, ArchitectPrompts]):
             self.error_message = f"An error occurred while processing the request: {str(e)}"
 
             self.add_message((
-                ChatRoles.USER.value,
+                ChatRoles.USER,
                 f"{self.agent_name}: {self.error_message}"
             ))
             logger.error(f"Exception: {type(e)} --> {self.agent_name}: {self.error_message}")
@@ -530,7 +530,7 @@ class ArchitectAgent(Agent[ArchitectState, ArchitectPrompts]):
             self.last_visited_node = self.requirements_node_name
             
             self.add_message((
-                ChatRoles.USER.value,
+                ChatRoles.USER,
                 self.error_message,
             ))
         else:
@@ -549,7 +549,7 @@ class ArchitectAgent(Agent[ArchitectState, ArchitectPrompts]):
             self.is_requirements_document_saved = True
 
             self.add_message((
-                ChatRoles.USER.value,
+                ChatRoles.USER,
                 msg
             ))
 
@@ -593,7 +593,7 @@ class ArchitectAgent(Agent[ArchitectState, ArchitectPrompts]):
 
             self.are_tasks_seperated = True
             self.add_message((
-                ChatRoles.USER.value,
+                ChatRoles.USER,
                f"{self.agent_name}: Task list has been successfully created. You can now proceed with your tasks."
             ))
 
@@ -602,7 +602,7 @@ class ArchitectAgent(Agent[ArchitectState, ArchitectPrompts]):
             self.error_message = f"ValueError occurred: {ve}"
 
             self.add_message((
-                ChatRoles.USER.value,
+                ChatRoles.USER,
                 f"{self.agent_name}: {self.error_message}"
             ))
             logger.error(f"Exception: {type(ve)} --> {self.agent_name}: {self.error_message}")
@@ -611,7 +611,7 @@ class ArchitectAgent(Agent[ArchitectState, ArchitectPrompts]):
             self.error_message = f"TypeError occurred: {te}"
 
             self.add_message((
-                ChatRoles.USER.value,
+                ChatRoles.USER,
                 f"{self.agent_name}: {self.error_message}"
             ))
             logger.error(f"Exception: {type(te)} --> {self.agent_name}: {self.error_message}")
@@ -620,7 +620,7 @@ class ArchitectAgent(Agent[ArchitectState, ArchitectPrompts]):
             self.error_message = f"An unexpected error occurred: {e}"
 
             self.add_message((
-                ChatRoles.USER.value,
+                ChatRoles.USER,
                 f"{self.agent_name}: {self.error_message}" 
             ))           
             logger.error(f"Exception: {type(e)} --> {self.agent_name}: {self.error_message}")
@@ -645,7 +645,7 @@ class ArchitectAgent(Agent[ArchitectState, ArchitectPrompts]):
         self.last_visited_node = self.project_details_node_name
 
         self.add_message((
-            ChatRoles.USER.value,
+            ChatRoles.USER,
             f"{self.agent_name}: Initiating the process of gathering project details."
         ))
 
@@ -669,7 +669,7 @@ class ArchitectAgent(Agent[ArchitectState, ArchitectPrompts]):
             self.state['project_folder_structure'] = response['project_folder_structure']
           
             self.add_message((
-                ChatRoles.USER.value,
+                ChatRoles.USER,
                 f"{self.agent_name}: Project details have been successfully gathered!"
             ))
 
@@ -680,7 +680,7 @@ class ArchitectAgent(Agent[ArchitectState, ArchitectPrompts]):
             self.error_message = f"An error occurred while processing the request: {str(e)}"
 
             self.add_message((
-                ChatRoles.USER.value,
+                ChatRoles.USER,
                 f"{self.agent_name}: {self.error_message}"
             ))
 
@@ -707,7 +707,7 @@ class ArchitectAgent(Agent[ArchitectState, ArchitectPrompts]):
         self.last_visited_node = self.additional_info_node_name
 
         self.add_message((
-            ChatRoles.USER.value,
+            ChatRoles.USER,
             f"{self.agent_name}: Started working on gathering the additional information."
         ))
         
@@ -735,7 +735,7 @@ class ArchitectAgent(Agent[ArchitectState, ArchitectPrompts]):
             message_text = "Additional information has been successfully provided." if self.state["query_answered"] else "Unfortunately, I couldn't provide the additional information requested."
 
             self.add_message((
-                ChatRoles.USER.value,
+                ChatRoles.USER,
                 f"{self.agent_name}: {message_text}"
             ))
 
@@ -745,7 +745,7 @@ class ArchitectAgent(Agent[ArchitectState, ArchitectPrompts]):
             self.error_message = f"An error occurred while processing the request: {str(e)}"
 
             self.add_message((
-                ChatRoles.USER.value,
+                ChatRoles.USER,
                 f"{self.agent_name}: {self.error_message}"
             ))
 
