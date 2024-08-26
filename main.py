@@ -76,13 +76,13 @@ if __name__=="__main__":
         'project_path': PROJECT_PATH,
         'license_url': LICENSE_URL,
         'license_text': LICENSE_TEXT,
-        'messages': [(ChatRoles.USER.value, PROJECT_INPUT)],
+        'messages': [(ChatRoles.USER, PROJECT_INPUT)],
     })
     
     result: SupervisorState = None
     for res in supervisor_response:
         result = res
-        # pprint(res)
+        pprint(res)
 
     # TODO: DB update should happen at for every iteration in the above for loop
     # write a logic to identify changes in the state.
