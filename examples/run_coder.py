@@ -3,11 +3,11 @@ import json
 import time
 from pprint import pprint
 
+from agents.tester.graph import TestCoderGraph
 from dotenv import load_dotenv
 from langchain_ollama import OllamaLLM
 from langchain_openai import ChatOpenAI
 
-from agents.tester.graph import TestCoderGraph
 from models.models import Status, Task
 
 load_dotenv()

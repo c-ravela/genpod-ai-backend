@@ -1,5 +1,5 @@
 from enum import Enum
-from typing import Any, Dict, Generic, TypeVar, Iterator
+from typing import Any, Dict, Generic, Iterator, TypeVar
 
 from langchain_openai import ChatOpenAI
 

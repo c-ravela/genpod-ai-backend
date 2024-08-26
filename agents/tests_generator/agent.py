@@ -5,6 +5,7 @@ from langchain_core.runnables.base import RunnableSequence
 from langchain_openai import ChatOpenAI
 from typing_extensions import Literal
 
+from agents.agent.agent import Agent
 from agents.tests_generator.state import TestCoderState
 from configs.project_config import ProjectAgents
 from models.constants import ChatRoles, Status
@@ -14,7 +15,7 @@ from prompts.tests_generator import TestGeneratorPrompts
 from tools.code import CodeFileWriter
 from tools.shell import Shell
 from utils.logs.logging_utils import logger
-from agents.agent.agent import Agent
+
 
 class TestCoderAgent(Agent[TestCoderState, TestGeneratorPrompts]):
     """

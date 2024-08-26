@@ -6,10 +6,10 @@ from langchain_openai import ChatOpenAI
 from langgraph.graph import END, StateGraph
 
 from agents.agent.graph import Graph
-
 from agents.tests_generator.agent import TestCoderAgent
 from agents.tests_generator.state import TestCoderState
 from configs.project_config import ProjectGraphs
+
 
 class TestCoderGraph(Graph[TestCoderAgent]):
     """

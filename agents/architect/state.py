@@ -7,8 +7,9 @@ state.
 from typing_extensions import Annotated, TypedDict
 
 from agents.agent.state import State
-from models.models import RequirementsDocument, Task
 from models.constants import ChatRoles
+from models.models import RequirementsDocument, Task
+
 
 class ArchitectState(TypedDict): 
     """
