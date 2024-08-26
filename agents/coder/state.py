@@ -7,7 +7,7 @@ from typing_extensions import Annotated, TypedDict
 from agents.agent.state import State
 from models.models import Task
 from models.skeleton import FunctionSkeleton
-
+from models.constants import ChatRoles
 
 class CoderState(TypedDict):
     """
@@ -89,7 +89,7 @@ class CoderState(TypedDict):
     
     # @inout
     messages: Annotated[
-        list[tuple[str, str]], 
+        list[tuple[ChatRoles, str]], 
         State.inout_field(
             "A chronological list of tuples representing the conversation history between the "
             "system, user, and AI. Each tuple contains a role identifier (e.g., 'AI', 'tool', "
