@@ -97,7 +97,7 @@ class CoderAgent(Agent[CoderState, CoderPrompts]):
             | JsonOutputParser()
         )
 
-    def add_message(self, message: tuple[str, str]) -> None:
+    def add_message(self, message: tuple[ChatRoles, str]) -> None:
         """
         Adds a single message to the messages field in the state.
 
@@ -207,7 +207,7 @@ class CoderAgent(Agent[CoderState, CoderPrompts]):
         logger.info(f"----{self.agent_name}: Started working on the task: {task.description}.----")
   
         self.add_message((
-            ChatRoles.USER.value,
+            ChatRoles.USER,
             f"Started working on the task: {task.description}."
         ))
 
@@ -261,7 +261,7 @@ class CoderAgent(Agent[CoderState, CoderPrompts]):
             # self.current_code_generation['commands_to_execute'] = llm_response['commands_to_execute']
 
             self.add_message((
-                ChatRoles.USER.value,
+                ChatRoles.USER,
                 f"{self.agent_name}: Code Generation completed!"
             ))
 
@@ -273,7 +273,7 @@ class CoderAgent(Agent[CoderState, CoderPrompts]):
             self.error_message = f"An error occurred while processing the request: {str(e)}"
 
             self.add_message((
-                ChatRoles.USER.value,
+                ChatRoles.USER,
                 f"{self.agent_name}: {self.error_message}"
             ))
         
@@ -300,7 +300,7 @@ class CoderAgent(Agent[CoderState, CoderPrompts]):
                 logger.info(f"----{self.agent_name}: Started executing the command: {command}, at the path: {path}.----")
     
                 self.add_message((
-                    ChatRoles.USER.value,
+                    ChatRoles.USER,
                     f"Started executing the command: {command}, in the path: {path}."
                 ))
                 execution_result=Shell.execute_command.invoke({
@@ -310,7 +310,7 @@ class CoderAgent(Agent[CoderState, CoderPrompts]):
                 #if the command is successfully executed, run the next command 
                 if execution_result[0]==False:
                     self.add_message((
-                    ChatRoles.USER.value,
+                    ChatRoles.USER,
                     f"Successfully executed the command: {command}, in the path: {path}. The output of the command execution is {execution_result[1]}"
                 ))
                     #if there is any error in the command execution log the error in the error_message and return the state to router by marking the has error as true and 
@@ -321,7 +321,7 @@ class CoderAgent(Agent[CoderState, CoderPrompts]):
                     self.last_visited_node = self.code_generation_node_name
                     self.error_message= f"Error Occured while executing the command: {command}, in the path: {path}. The output of the command execution is {execution_result[1]}. This is the dictionary of commands and the paths where the respective command are supposed to be executed you have generated in previous run: {self.current_code_generation['commands_to_execute']}"
                     self.add_message((
-                        ChatRoles.USER.value,
+                        ChatRoles.USER,
                         f"{self.agent_name}: {self.error_message}"
                     ))
 
@@ -335,7 +335,7 @@ class CoderAgent(Agent[CoderState, CoderPrompts]):
             self.error_message = f"An error occurred while processing the request: {str(e)}"
 
             self.add_message((
-                ChatRoles.USER.value,
+                ChatRoles.USER,
                 f"{self.agent_name}: {self.error_message}"
             ))
         return {**self.state}
@@ -359,7 +359,7 @@ class CoderAgent(Agent[CoderState, CoderPrompts]):
                 logger.info(f"----{self.agent_name}: Started writing the code to the file at the path: {path}.----")
     
                 self.add_message((
-                    ChatRoles.USER.value,
+                    ChatRoles.USER,
                     f"Started writing the code to the file in the path: {path}."
                 ))
                 execution_result=CodeFileWriter.write_generated_code_to_file.invoke({
@@ -370,7 +370,7 @@ class CoderAgent(Agent[CoderState, CoderPrompts]):
                 #if the code successfully stored in the specifies path, write the next code in the file
                 if execution_result[0]==False:
                     self.add_message((
-                    ChatRoles.USER.value,
+                    ChatRoles.USER,
                     f"Successfully executed the command: , in the path: {path}. The output of the command execution is {execution_result[1]}"
                 ))
                     
@@ -382,7 +382,7 @@ class CoderAgent(Agent[CoderState, CoderPrompts]):
                     self.last_visited_node = self.code_generation_node_name
                     self.error_message= f"Error Occured while writing the code in the path: {path}. The output of writing the code to the file is {execution_result[1]}."
                     self.add_message((
-                    ChatRoles.USER.value,
+                    ChatRoles.USER,
                     f"{self.agent_name}: {self.error_message}"
                 ))
 
@@ -394,7 +394,7 @@ class CoderAgent(Agent[CoderState, CoderPrompts]):
             self.error_message = f"An error occurred while processing the request: {str(e)}"
 
             self.add_message((
-                ChatRoles.USER.value,
+                ChatRoles.USER,
                 f"{self.agent_name}: {self.error_message}"
             ))
 
@@ -414,7 +414,7 @@ class CoderAgent(Agent[CoderState, CoderPrompts]):
         })
 
         self.add_message((
-                    ChatRoles.USER.value,
+                    ChatRoles.USER,
                     f"Downloaded the license from the {self.state["license_url"]}. The output of the command execution is {license_download_result[1]}"
                 ))
 
