@@ -8,7 +8,7 @@ from typing_extensions import Annotated, TypedDict
 
 from agents.agent.state import State
 from models.models import RequirementsDocument, Task
-
+from models.constants import ChatRoles
 
 class ArchitectState(TypedDict): 
     """
@@ -35,7 +35,7 @@ class ArchitectState(TypedDict):
         license_text (str): The text of the license provided by the user. This text outlines 
         the terms and conditions under which the project can be used, modified, and distributed.
 
-        messages (list[tuple[str, str]]): A chronological list of tuples representing the 
+        messages (list[tuple[ChatRoles, str]]): A chronological list of tuples representing the 
         conversation history between the system, user, and AI. Each tuple contains a role 
         identifier (e.g., 'AI', 'tool', 'user', 'system') and the corresponding message.
         
@@ -105,7 +105,7 @@ class ArchitectState(TypedDict):
 
     # @inout
     messages: Annotated[
-        list[tuple[str, str]], 
+        list[tuple[ChatRoles, str]], 
         State.inout_field(
             "A chronological list of tuples representing the conversation history between the "
             "system, user, and AI. Each tuple contains a role identifier (e.g., 'AI', 'tool', "
