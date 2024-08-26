@@ -112,7 +112,7 @@ class TestCoderAgent(Agent[TestCoderState, TestGeneratorPrompts]):
             | JsonOutputParser()
         )
 
-    def add_message(self, message: tuple[str, str]) -> None:
+    def add_message(self, message: tuple[ChatRoles, str]) -> None:
         """
         Adds a single message to the messages field in the state.
 
@@ -237,7 +237,7 @@ class TestCoderAgent(Agent[TestCoderState, TestGeneratorPrompts]):
         logger.info(f"----{self.agent_name}: Started working on the task: {task.description}.----")
   
         self.add_message((
-            ChatRoles.USER.value,
+            ChatRoles.USER,
             f"Started working on the task: {task.description}."
         ))
         logger.info("llm callinig ")
@@ -270,7 +270,7 @@ class TestCoderAgent(Agent[TestCoderState, TestGeneratorPrompts]):
             self.current_code_generation['commands_to_execute'] = llm_response['commands_to_execute']
 
             self.add_message((
-                ChatRoles.USER.value,
+                ChatRoles.USER,
                 f"{self.agent_name}: Test Code Generation completed!"
             ))
 
@@ -284,7 +284,7 @@ class TestCoderAgent(Agent[TestCoderState, TestGeneratorPrompts]):
             self.error_message = f"An error occurred while processing the request: {str(e)}"
 
             self.add_message((
-                ChatRoles.USER.value,
+                ChatRoles.USER,
                 f"{self.agent_name}: {self.error_message}"
             ))
         
@@ -303,7 +303,7 @@ class TestCoderAgent(Agent[TestCoderState, TestGeneratorPrompts]):
         logger.info(f"----{self.agent_name}: Started working on the task: {task.description}.----")
   
         self.add_message((
-            ChatRoles.USER.value,
+            ChatRoles.USER,
             f"Started working on the task: {task.description}."
         ))
 
@@ -332,7 +332,7 @@ class TestCoderAgent(Agent[TestCoderState, TestGeneratorPrompts]):
             self.current_code_generation["functions_skeleton"] = llm_response['skeletons_to_create']
             logger.info("after state",llm_response)
             self.add_message((
-                ChatRoles.USER.value,
+                ChatRoles.USER,
                 f"{self.agent_name}: skeleton generation completed!"
             ))
 
@@ -344,7 +344,7 @@ class TestCoderAgent(Agent[TestCoderState, TestGeneratorPrompts]):
             self.error_message = f"An error occurred while processing the request: {str(e)}"
 
             self.add_message((
-                ChatRoles.USER.value,
+                ChatRoles.USER,
                 f"{self.agent_name}: {self.error_message}"
             ))
         
@@ -363,7 +363,7 @@ class TestCoderAgent(Agent[TestCoderState, TestGeneratorPrompts]):
     #     logger.info(f"----{self.agent_name}: Started working on the task: {task.description}.----")
   
     #     self.add_message((
-    #         ChatRoles.USER.value,
+    #         ChatRoles.USER,
     #         f"Started working on the task: {task.description}."
     #     ))
 
@@ -393,7 +393,7 @@ class TestCoderAgent(Agent[TestCoderState, TestGeneratorPrompts]):
     #         self.current_code_generation["taskType"] = llm_response['taskType']
     #         logger.info("after state",llm_response)
     #         self.add_message((
-    #             ChatRoles.USER.value,
+    #             ChatRoles.USER,
     #             f"{self.agent_name}: segregation completed!"
     #         ))
 
@@ -405,7 +405,7 @@ class TestCoderAgent(Agent[TestCoderState, TestGeneratorPrompts]):
     #         self.error_message = f"An error occurred while processing the request: {str(e)}"
 
     #         self.add_message((
-    #             ChatRoles.USER.value,
+    #             ChatRoles.USER,
     #             f"{self.agent_name}: {self.error_message}"
     #         ))
         
@@ -424,7 +424,7 @@ class TestCoderAgent(Agent[TestCoderState, TestGeneratorPrompts]):
                 logger.info(f"----{self.agent_name}: Started executing the command: {command}, at the path: {path}.----")
     
                 self.add_message((
-                    ChatRoles.USER.value,
+                    ChatRoles.USER,
                     f"Started executing the command: {command}, in the path: {path}."
                 ))
                 execution_result=Shell.execute_command.invoke({
@@ -434,7 +434,7 @@ class TestCoderAgent(Agent[TestCoderState, TestGeneratorPrompts]):
                 #if the command is successfully executed, run the next command 
                 if execution_result[0]==False:
                     self.add_message((
-                    ChatRoles.USER.value,
+                    ChatRoles.USER,
                     f"Successfully executed the command: {command}, in the path: {path}. The output of the command execution is {execution_result[1]}"
                 ))
                     #if there is any error in the command execution log the error in the error_message and return the state to router by marking the has error as true and 
@@ -445,7 +445,7 @@ class TestCoderAgent(Agent[TestCoderState, TestGeneratorPrompts]):
                     self.last_visited_node = self.code_generation_node_name
                     self.error_message= f"Error Occured while executing the command: {command}, in the path: {path}. The output of the command execution is {execution_result[1]}. This is the dictionary of commands and the paths where the respective command are supposed to be executed you have generated in previous run: {self.current_code_generation['commands_to_execute']}"
                     self.add_message((
-                    ChatRoles.USER.value,
+                    ChatRoles.USER,
                     f"{self.agent_name}: {self.error_message}"
                 ))
                     logger.error(self.error_message)
@@ -459,7 +459,7 @@ class TestCoderAgent(Agent[TestCoderState, TestGeneratorPrompts]):
             self.error_message = f"An error occurred while processing the request: {str(e)}"
 
             self.add_message((
-                ChatRoles.USER.value,
+                ChatRoles.USER,
                 f"{self.agent_name}: {self.error_message}"
             ))
         return {**self.state}
@@ -479,7 +479,7 @@ class TestCoderAgent(Agent[TestCoderState, TestGeneratorPrompts]):
                 logger.info(f"----{self.agent_name}: Started writing the skeleton to the file at the path: {path}.----")
     
                 self.add_message((
-                    ChatRoles.USER.value,
+                    ChatRoles.USER,
                     f"Started writing the skeleton to the file in the path: {path}."
                 ))
                 execution_result=CodeFileWriter.write_generated_skeleton_to_file.invoke({
@@ -491,7 +491,7 @@ class TestCoderAgent(Agent[TestCoderState, TestGeneratorPrompts]):
                 #if the code successfully stored in the specifies path, write the next code in the file
                 if execution_result[0]==False:
                     self.add_message((
-                    ChatRoles.USER.value,
+                    ChatRoles.USER,
                     f"Successfully executed the command: , in the path: {path}. The output of the command execution is {execution_result[1]}"
                 ))
                     
@@ -502,7 +502,7 @@ class TestCoderAgent(Agent[TestCoderState, TestGeneratorPrompts]):
                     self.last_visited_node = self.code_generation_node_name
                     self.error_message= f"Error Occured while writing the skeleton in the path: {path}. The output of writing the skeleton to the file is {execution_result[1]}."
                     self.add_message((
-                    ChatRoles.USER.value,
+                    ChatRoles.USER,
                     f"{self.agent_name}: {self.error_message}"
                 ))
                 # logger.error(self.error_message)
@@ -515,7 +515,7 @@ class TestCoderAgent(Agent[TestCoderState, TestGeneratorPrompts]):
             self.error_message = f"An error occurred while processing the request: {str(e)}"
 
             self.add_message((
-                ChatRoles.USER.value,
+                ChatRoles.USER,
                 f"{self.agent_name}: {self.error_message}"
             ))
 
@@ -536,7 +536,7 @@ class TestCoderAgent(Agent[TestCoderState, TestGeneratorPrompts]):
                 logger.info(f"----{self.agent_name}: Started writing the code to the file at the path: {path}.----")
     
                 self.add_message((
-                    ChatRoles.USER.value,
+                    ChatRoles.USER,
                     f"Started writing the code to the file in the path: {path}."
                 ))
                 execution_result=CodeFileWriter.write_generated_code_to_file.invoke({
@@ -547,7 +547,7 @@ class TestCoderAgent(Agent[TestCoderState, TestGeneratorPrompts]):
                 #if the code successfully stored in the specifies path, write the next code in the file
                 if execution_result[0]==False:
                     self.add_message((
-                    ChatRoles.USER.value,
+                    ChatRoles.USER,
                     f"Successfully executed the command: , in the path: {path}. The output of the command execution is {execution_result[1]}"
                 ))
                     
@@ -559,7 +559,7 @@ class TestCoderAgent(Agent[TestCoderState, TestGeneratorPrompts]):
                     self.last_visited_node = self.test_code_generation_node_name
                     self.error_message= f"Error Occured while writing the code in the path: {path}. The output of writing the code to the file is {execution_result[1]}."
                     self.add_message((
-                    ChatRoles.USER.value,
+                    ChatRoles.USER,
                     f"{self.agent_name}: {self.error_message}"
                 ))
                 # logger.error(self.error_message)
@@ -573,7 +573,7 @@ class TestCoderAgent(Agent[TestCoderState, TestGeneratorPrompts]):
             self.error_message = f"An error occurred while processing the request: {str(e)}"
 
             self.add_message((
-                ChatRoles.USER.value,
+                ChatRoles.USER,
                 f"{self.agent_name}: {self.error_message}"
             ))
 

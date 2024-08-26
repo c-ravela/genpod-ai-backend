@@ -6,6 +6,7 @@ Agent graph state
 from typing_extensions import Annotated, TypedDict
 
 from models.models import Task
+from models.constants import ChatRoles
 from models.skeleton import FunctionSkeleton
 from agents.agent.state import State
 
@@ -73,7 +74,7 @@ class TestCoderState(TypedDict):
     
     # @inout
     messages: Annotated[
-        list[tuple[str, str]],
+        list[tuple[ChatRoles, str]],
         State.inout_field(
             "A chronological list of tuples representing the conversation history between the "
             "system, user, and AI. Each tuple contains a role identifier (e.g., 'AI', 'tool', "
