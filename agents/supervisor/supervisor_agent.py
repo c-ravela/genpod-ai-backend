@@ -35,13 +35,16 @@ class SupervisorAgent(Agent[SupervisorState, SupervisorPrompts]):
         )
         self.team = None
 
+        # TODO - LOW: has to be moved to RAG agent
         self.rag_cache = FuzzyRAGCache()
         self.rag_cache_building = ''
 
         # TODO: NEED to check when this field has to be updated back and forth
         self.is_test_generator_agent_called: bool = False
 
+        # TODO - LOW: has to be moved to RAG agent
         self.is_rag_cache_created: bool = False # Represents whether rag cache was created or not. single time update
+        
         self.is_initial_additional_info_ready: bool = False # single time update. set once 
         self.are_requirements_prepared: bool = False # single time update
 
@@ -61,6 +64,7 @@ class SupervisorAgent(Agent[SupervisorState, SupervisorPrompts]):
 
         self.team = team
 
+    # TODO - LOW: has to be moved to RAG agent
     def build_rag_cache(self, query: str) -> tuple[list[str], str]:
         """
         takes the user requirements as an input and prepares a set of queries(anticipates the questions) 
@@ -167,7 +171,7 @@ class SupervisorAgent(Agent[SupervisorState, SupervisorPrompts]):
 
         state['messages'] += [
             (
-                ChatRoles.SYSTEM.value, 
+                ChatRoles.SYSTEM, 
                 f'A new project with the following details has been received from the user: {state["original_user_input"]}'
             )
         ]
@@ -199,6 +203,7 @@ class SupervisorAgent(Agent[SupervisorState, SupervisorPrompts]):
         """
         logger.info(f"{self.team.rag.member_name} has called!")
 
+        # TODO - LOW: has to be moved to RAG agent
         # check if rag cache was ready if not prepare one
         if not self.is_rag_cache_created:
             logger.info(f"{self.team.rag.member_name}: creating the RAG cache.")
@@ -225,7 +230,7 @@ class SupervisorAgent(Agent[SupervisorState, SupervisorPrompts]):
                 logger.info(f"{self.team.rag.member_name}: Received user requirements and gathering additional information.")
                 state['messages'] += [
                     (
-                        ChatRoles.AI.value,
+                        ChatRoles.AI,
                         f"{self.team.rag.member_name}: Received user requirements and gathering additional information."
                     )
                 ]
@@ -233,7 +238,7 @@ class SupervisorAgent(Agent[SupervisorState, SupervisorPrompts]):
                 logger.info(f"{self.team.rag.member_name}: Received a query from team members and preparing an answer.")
                 state['messages'] += [
                     (
-                        ChatRoles.AI.value,
+                        ChatRoles.AI,
                         f"{self.team.rag.member_name}: Received a query from team members and preparing an answer."
                     )
                 ]
@@ -379,7 +384,7 @@ class SupervisorAgent(Agent[SupervisorState, SupervisorPrompts]):
         self.is_test_generator_agent_called=False
 
         state['messages'] += [(
-            ChatRoles.AI.value,
+            ChatRoles.AI,
             'Calling Architect Agent'
         )]
 
@@ -413,7 +418,7 @@ class SupervisorAgent(Agent[SupervisorState, SupervisorPrompts]):
         """
         
         state['messages'] += [(
-            ChatRoles.AI.value,
+            ChatRoles.AI,
             'Calling Test Code Generator Agent'
         )]
 
@@ -450,7 +455,7 @@ class SupervisorAgent(Agent[SupervisorState, SupervisorPrompts]):
         if state['project_status'] == PStatus.RECEIVED:
             state['messages'] += [
                 (
-                    ChatRoles.AI.value,
+                    ChatRoles.AI,
                    f"The Genpod team has started working on the project with ID: {state['project_id']} and the following microservice ID: {state['microservice_id']}."
                 )
             ]
@@ -463,6 +468,7 @@ class SupervisorAgent(Agent[SupervisorState, SupervisorPrompts]):
                 question=state['original_user_input']
             )
             state['project_status'] = PStatus.NEW
+            logger.info(f"{self.team.supervisor.member_name}: Created task for RAG agent to gather additional info for the user requested project. Project Status moved to {state['project_status']}")
 
             return state
         elif state['project_status'] == PStatus.NEW:
@@ -479,7 +485,11 @@ class SupervisorAgent(Agent[SupervisorState, SupervisorPrompts]):
                         task_status=Status.NEW,
                         additional_info=state['rag_retrieval'],
                         question=''
-                    )            
+                    )
+
+                    logger.info(f"{self.team.supervisor.member_name}: RAG agent has finished preparing additional information for team members.")
+                    logger.info(f"{self.team.supervisor.member_name}: Created new task for architect to work on requirements document. Moved Project to {state['project_status']} phase.")
+
             self.calling_agent = self.team.supervisor.member_id
             
             return state
@@ -658,34 +668,34 @@ class SupervisorAgent(Agent[SupervisorState, SupervisorPrompts]):
             # to the project to help team members efficient and qualified output.
 
             return 'call_rag'
-        elif state['project_status'] == PStatus.INITIAL:
-            # Once the project is ready with additional information needed. Team can starting working on the project
-            # architect is first team member who receives the project details and prepares the the requirements out of it.
-            # In this process if architect need aditional information thats when RAG comes into play at this phase of Project.
-            if self.is_initial_additional_info_ready:
-                return 'call_architect'
-            else:
-                return 'call_rag'
-        elif state['project_status'] == PStatus.MONITORING:
-            if state['current_task'].task_status == Status.AWAITING:
-                return 'call_rag'
-            elif state['current_task'].task_status == Status.RESPONDED:
-                # TODO - LOW: Make this block logic dynamic
-                # Current there is only one agent which asks question
-                # but in future there might more agents which might request
-                # for additional information.
-                # Make this case statements dynamic. so that whoever has the requested the
-                # additional information, flow goes back to them.
-                return 'call_architect'
-        elif state['project_status']==PStatus.EXECUTING and self.calling_agent!=self.team.supervisor.member_id:
-            return calling_map[self.calling_agent]
-        elif state['project_status']==PStatus.EXECUTING and (self.called_agent==self.team.architect.member_id or self.called_agent==self.team.supervisor.member_id):
-            return 'call_planner'
-        elif state['project_status']==PStatus.EXECUTING and (self.called_agent==self.team.planner.member_id or self.called_agent==self.team.coder.member_id) and ((classifier := json.loads(state['coder_inputs']['current_task'].description))['is_function_generation_required']) and not(self.is_test_generator_agent_called) :
-            return 'call_test_code_generator' 
-        elif state['project_status']==PStatus.EXECUTING and (self.called_agent==self.team.planner.member_id or self.called_agent==self.team.coder.member_id or self.called_agent =='TestGenerator') and (((classifier := json.loads(state['coder_inputs']['current_task'].description))['is_function_generation_required'] and self.is_test_generator_agent_called) or not ((classifier := json.loads(state['coder_inputs']['current_task'].description))['is_function_generation_required'])) :
-            return 'call_coder'
-        elif state['project_status']==PStatus.HALTED:
-            return 'update_state' #'Human'
+        # elif state['project_status'] == PStatus.INITIAL:
+        #     # Once the project is ready with additional information needed. Team can starting working on the project
+        #     # architect is first team member who receives the project details and prepares the the requirements out of it.
+        #     # In this process if architect need aditional information thats when RAG comes into play at this phase of Project.
+        #     if self.is_initial_additional_info_ready:
+        #         return 'call_architect'
+        #     else:
+        #         return 'call_rag'
+        # elif state['project_status'] == PStatus.MONITORING:
+        #     if state['current_task'].task_status == Status.AWAITING:
+        #         return 'call_rag'
+        #     elif state['current_task'].task_status == Status.RESPONDED:
+        #         # TODO - LOW: Make this block logic dynamic
+        #         # Current there is only one agent which asks question
+        #         # but in future there might more agents which might request
+        #         # for additional information.
+        #         # Make this case statements dynamic. so that whoever has the requested the
+        #         # additional information, flow goes back to them.
+        #         return 'call_architect'
+        # elif state['project_status']==PStatus.EXECUTING and self.calling_agent!=self.team.supervisor.member_id:
+        #     return calling_map[self.calling_agent]
+        # elif state['project_status']==PStatus.EXECUTING and (self.called_agent==self.team.architect.member_id or self.called_agent==self.team.supervisor.member_id):
+        #     return 'call_planner'
+        # elif state['project_status']==PStatus.EXECUTING and (self.called_agent==self.team.planner.member_id or self.called_agent==self.team.coder.member_id) and ((classifier := json.loads(state['coder_inputs']['current_task'].description))['is_function_generation_required']) and not(self.is_test_generator_agent_called) :
+        #     return 'call_test_code_generator' 
+        # elif state['project_status']==PStatus.EXECUTING and (self.called_agent==self.team.planner.member_id or self.called_agent==self.team.coder.member_id or self.called_agent =='TestGenerator') and (((classifier := json.loads(state['coder_inputs']['current_task'].description))['is_function_generation_required'] and self.is_test_generator_agent_called) or not ((classifier := json.loads(state['coder_inputs']['current_task'].description))['is_function_generation_required'])) :
+        #     return 'call_coder'
+        # elif state['project_status']==PStatus.HALTED:
+        #     return 'update_state' #'Human'
 
         return "update_state"
