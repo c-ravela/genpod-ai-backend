@@ -4,7 +4,7 @@ from typing import List
 from typing_extensions import Annotated, TypedDict
 
 from agents.agent.state import State
-from models.constants import PStatus
+from models.constants import PStatus, ChatRoles
 from models.models import RequirementsDocument, Task
 
 
@@ -100,7 +100,7 @@ class SupervisorState(TypedDict):
 
     # @inout
     messages: Annotated[
-        list[tuple[str, str]], 
+        list[tuple[ChatRoles, str]], 
         State.inout_field(
             "A chronological list of tuples representing the conversation history between the "
             "system, user, and AI. Each tuple contains a role identifier (e.g., 'AI', 'tool', "
@@ -195,7 +195,7 @@ class SupervisorState(TypedDict):
     # TODO: remove this once agent requirements logic is implemented
     coder_inputs: dict
     
-def add_message(state: SupervisorState, message: tuple[str, str]) -> SupervisorState:
+def add_message(state: SupervisorState, message: tuple[ChatRoles, str]) -> SupervisorState:
     """
     Adds a single message to the messages field in the state.
 
