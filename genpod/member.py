@@ -52,7 +52,7 @@ class AgentMember(Generic[GenericAgentState, GenericAgentGraph]):
         self.graph = graph
         self.recursion_limit = -1 # means no limit set
 
-    def stream(self, input: Dict[str, Any] | Any) -> Iterator[GenericAgentState]:
+    def stream(self, input: Dict[str, Any] | Any) -> Iterator[Dict[str, GenericAgentState]]:
         """
         """
         graph_config = {
