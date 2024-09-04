@@ -10,6 +10,8 @@ from typing import Any
 
 from pydantic import BaseModel, Field
 
+from models.skeleton import FunctionSkeletonFields
+
 
 class ToolCall(BaseModel):
     """
@@ -29,7 +31,7 @@ class ToolCall(BaseModel):
 class TestCodeGeneration(BaseModel):
     """
     """
-    
+
     files_to_create: list[str] = Field(
         description="""
         A list of absolute file paths that need to be created as part of the current task
@@ -87,6 +89,16 @@ class TestCodeGeneration(BaseModel):
 
         Please ensure that the commands and their parameters are correctly formatted to prevent any execution errors.
         """,
+        default={},
+        required=True
+    )
+
+    functions_skeleton: dict[str, FunctionSkeletonFields] = Field(
+        description="""
+        A dictionary where each key-value pair represents a file and its corresponding function skeleton. The key 
+        should be the absolute path to the file, and the value should be the well-descriptive function skeleton
+        for that particular file.
+        """, 
         default={},
         required=True
     )
