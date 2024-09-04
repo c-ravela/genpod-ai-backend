@@ -88,6 +88,7 @@ class PStatus(Enum):
     status of a project or task.
 
     Attributes:
+        NONE (str): Initial state indicating no status has been assigned yet.
         RECEIVED (str): Indicates that the project has been received but has 
           not yet been assigned a specific status.
         NEW (str): Represents the pre-initiation state of a project.
@@ -103,6 +104,7 @@ class PStatus(Enum):
           have been fulfilled.
     """
 
+    NONE: str = "NONE"
     RECEIVED: str = "RECEIVED"
     NEW: str = "NEW"
     INITIAL: str = "INITIAL"
