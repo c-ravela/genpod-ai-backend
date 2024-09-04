@@ -1,5 +1,7 @@
 """Test Coder Agent
 """
+import os
+
 from langchain_core.output_parsers import JsonOutputParser
 from langchain_core.runnables.base import RunnableSequence
 from langchain_openai import ChatOpenAI
@@ -210,7 +212,7 @@ class TestCoderAgent(Agent[TestCoderState, TestGeneratorPrompts]):
         self.update_state(state)
         self.last_visited_node = self.entry_node_name
 
-        if self.state['current_task'].task_status == Status.NEW:
+        if self.state['current_planned_task'].task_status == Status.NEW:
             self.mode = "test_code_generation"
             # self.is_segregated=False
             self.is_code_generated = False
@@ -223,7 +225,7 @@ class TestCoderAgent(Agent[TestCoderState, TestGeneratorPrompts]):
 
             self.current_code_generation = TestCodeGeneration()
 
-        return {**self.state}
+        return self.state
     
     def test_code_generation_node(self, state: TestCoderState) -> TestCoderState:
         """
@@ -233,7 +235,7 @@ class TestCoderAgent(Agent[TestCoderState, TestGeneratorPrompts]):
         self.update_state(state)
         self.last_visited_node = self.test_code_generation_node_name
 
-        task = self.state["current_task"]
+        task = self.state['current_planned_task']
 
         logger.info(f"----{self.agent_name}: Started working on the task: {task.description}.----")
   
@@ -245,12 +247,12 @@ class TestCoderAgent(Agent[TestCoderState, TestGeneratorPrompts]):
         try:
             llm_response = self.test_code_generation_chain.invoke({
                 "project_name": self.state['project_name'],
-                "project_path": self.state['project_path'],
+                "project_path": os.path.join(self.state['project_path'], self.state['project_name']),
                 "requirements_document": self.state['requirements_document'],
                 "folder_structure": self.state['project_folder_strucutre'],
                 "task": task.description,
                 "error_message": self.error_message,
-                "functions_skeleton":self.state["functions_skeleton"]
+                "functions_skeleton": self.state["functions_skeleton"]
             })
             # logger.info("Called llm response is :" ,llm_response)
             # with open('/home/pranay/Desktop/Generatedfiles/latest/new_file_llmtest.txt', 'w') as file:
@@ -266,7 +268,7 @@ class TestCoderAgent(Agent[TestCoderState, TestGeneratorPrompts]):
 
             self.update_state_test_code_generation(llm_response)
             self.current_code_generation["test_code"] = llm_response['test_code']
-            self.current_code_generation["files_created"] = llm_response['files_to_create']
+            self.current_code_generation.files_to_create = llm_response['files_to_create']
             self.current_code_generation['infile_license_comments'] = llm_response['infile_license_comments']
             self.current_code_generation['commands_to_execute'] = llm_response['commands_to_execute']
 
@@ -299,7 +301,7 @@ class TestCoderAgent(Agent[TestCoderState, TestGeneratorPrompts]):
         self.update_state(state)
         self.last_visited_node = self.skeleton_generation_node_name
 
-        task = self.state["current_task"]
+        task = self.state['current_planned_task']
 
         logger.info(f"----{self.agent_name}: Started working on the task: {task.description}.----")
   
@@ -311,7 +313,7 @@ class TestCoderAgent(Agent[TestCoderState, TestGeneratorPrompts]):
         try:
             llm_response = self.skeleton_generation_chain.invoke({
                 "project_name": self.state['project_name'],
-                "project_path": self.state['project_path'],
+                "project_path": os.path.join(self.state['project_path'], self.state['project_name']),
                 "requirements_document": self.state['requirements_document'],
                 "folder_structure": self.state['project_folder_strucutre'],
                 "task": task.description,
@@ -321,14 +323,12 @@ class TestCoderAgent(Agent[TestCoderState, TestGeneratorPrompts]):
             self.hasError = False
             self.error_message = ""
 
-
             required_keys = ["skeletons_to_create"]
             missing_keys = [key for key in required_keys if key not in llm_response]
 
             if missing_keys:
                 raise KeyError(f"Missing keys: {missing_keys} in the response. Try Again!")
 
-            # logger.info(llm_response)
             self.update_state_skeleton_generation(llm_response)
             self.current_code_generation["functions_skeleton"] = llm_response['skeletons_to_create']
             logger.info("after state",llm_response)
@@ -349,7 +349,7 @@ class TestCoderAgent(Agent[TestCoderState, TestGeneratorPrompts]):
                 f"{self.agent_name}: {self.error_message}"
             ))
         
-        return {**self.state}
+        return self.state
     
     # def task_segregation_node(self, state: TestCoderState) -> TestCoderState:
     #     """
@@ -486,7 +486,7 @@ class TestCoderAgent(Agent[TestCoderState, TestGeneratorPrompts]):
                 execution_result=CodeFileWriter.write_generated_skeleton_to_file.invoke({
                     "generated_code": str(function_skeleton),
                     "file_path": path,
-                    "generated_project_path":self.state['project_path']
+                    "generated_project_path": self.state['project_path']
                 })
 
                 #if the code successfully stored in the specifies path, write the next code in the file
@@ -500,7 +500,7 @@ class TestCoderAgent(Agent[TestCoderState, TestGeneratorPrompts]):
                 elif execution_result[0]==True:
                     
                     self.hasError=True
-                    self.last_visited_node = self.code_generation_node_name
+                    self.last_visited_node = self.write_skeleton_node_name
                     self.error_message= f"Error Occured while writing the skeleton in the path: {path}. The output of writing the skeleton to the file is {execution_result[1]}."
                     self.add_message((
                     ChatRoles.USER,
@@ -563,10 +563,17 @@ class TestCoderAgent(Agent[TestCoderState, TestGeneratorPrompts]):
                     ChatRoles.USER,
                     f"{self.agent_name}: {self.error_message}"
                 ))
-                # logger.error(self.error_message)
+                logger.error(self.error_message)
 
             self.has_code_been_written_locally = True
-            self.state['current_task'].task_status = Status.DONE
+            self.state['current_planned_task'].is_test_code_generated = True
+            # If the execution reaches this point, it indicates that unit test cases are required for the task.
+            # However, generating the unit test cases alone does not complete the task.
+            # The coder still needs to implement the actual code for the task.
+            # Therefore, we update the task status to INPROGRESS to reflect that additional work is needed,
+            # rather than marking it as DONE.
+            # NOTE: Updating the task status to INPROGRESS here is a workaround.
+            self.state['current_planned_task'].task_status = Status.INPROGRESS
         except Exception as e:
             logger.error(f"----{self.agent_name}: Error Occured while writing the code to the respective files : {str(e)}.----")
 
@@ -578,5 +585,5 @@ class TestCoderAgent(Agent[TestCoderState, TestGeneratorPrompts]):
                 f"{self.agent_name}: {self.error_message}"
             ))
 
-        return {**self.state}
+        return self.state
     
