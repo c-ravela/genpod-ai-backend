@@ -5,7 +5,7 @@ The Coder agent is responsible for completing tasks in a project. The output of
 the Coder agent includes information about the steps to complete a task, 
 the files to be created, the location of the code, the actual code.
 """
-from typing import Dict
+from typing import Any, Dict
 
 from pydantic import BaseModel, Field
 from typing_extensions import ClassVar
@@ -258,3 +258,20 @@ class CodeGenerationPlan(BaseModel):
         default={},
         required=True
     )
+
+    def __getitem__(self, key: str) -> Any:
+        """
+        Allows getting attributes using square bracket notation.
+        """
+        if hasattr(self, key):
+            return getattr(self, key)
+        raise KeyError(f"Key '{key}' not found in RequirementsDocument.")
+
+    def __setitem__(self, key: str, value: Any) -> None:
+        """
+        Allows setting attributes using square bracket notation.
+        """
+        if hasattr(self, key):
+            setattr(self, key, value)
+        else:
+            raise KeyError(f"Key '{key}' not found in RequirementsDocument.")
