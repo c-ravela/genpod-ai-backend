@@ -8,7 +8,6 @@ from pydantic import ValidationError
 from agents.agent.agent import Agent
 from agents.supervisor.supervisor_state import SupervisorState
 from configs.project_config import ProjectAgents
-from configs.supervisor_config import calling_map
 from models.constants import ChatRoles, PStatus, Status
 from models.models import (PlannedTask, PlannedTaskQueue, RequirementsDocument,
                            Task, TaskQueue)
@@ -785,7 +784,7 @@ class SupervisorAgent(Agent[SupervisorState, SupervisorPrompts]):
         elif state['current_task'].task_status == Status.ABANDONED:
             logger.info("------Planner Has Abandoned a Task")
             
-            state['agents_status'] = f'{self.team.planner.member_name} Abandoned a task.'
+            state['agents_status'] = f'{self.team.planner.member_name} Abandoned a task. Task Id: {state['current_task'].task_id}'
             self.called_agent = self.team.planner.member_id
             self.responses[self.team.planner.member_id].append(("Returned from Planner with an abandoned task.", state['current_task']))
         else: # TODO - LOW: Looks like this block of the code is expecting the current_task.task_status == Awaiting. If its included in the condition it will be easier to understand the code.
