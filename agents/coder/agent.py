@@ -23,6 +23,7 @@ from utils.logs.logging_utils import logger
 class CoderAgent(Agent[CoderState, CoderPrompts]):
     """
     """
+
     # names of the graph node
     entry_node_name: str # The entry point of the graph
     code_generation_node_name: str 
@@ -179,11 +180,11 @@ class CoderAgent(Agent[CoderState, CoderPrompts]):
         """
 
         logger.info(f"----{self.agent_name}: Initiating Graph Entry Point----")
-        # logger.info(f"received  state {state}")
-        self.update_state(state)
+        self.state = {**state}
+
         self.last_visited_node = self.entry_node_name
 
-        if self.state['current_task'].task_status == Status.NEW:
+        if self.state['current_planned_task'].task_status == Status.NEW:
             self.mode = "code_generation"
             self.is_code_generated = False
             self.has_command_execution_finished = False
@@ -192,17 +193,17 @@ class CoderAgent(Agent[CoderState, CoderPrompts]):
 
             self.current_code_generation = CodeGenerationPlan()
 
-        return {**self.state}
+        return self.state
     
     def code_generation_node(self, state: CoderState) -> CoderState:
         """
         """
         logger.info(f"----{self.agent_name}: Initiating Code Generation----")
 
-        self.update_state(state)
+        self.state = {**state}
         self.last_visited_node = self.code_generation_node_name
 
-        task = self.state["current_task"]
+        task = self.state["current_planned_task"]
 
         logger.info(f"----{self.agent_name}: Started working on the task: {task.description}.----")
   
@@ -214,7 +215,7 @@ class CoderAgent(Agent[CoderState, CoderPrompts]):
         try:
             
             # TODO: Figure out a proper way to write the condition(if condition)
-            if ((json.loads(task.description))['is_function_generation_required']):
+            if task.is_function_generation_required:
                 llm_response = self.code_generation_chain.invoke({
                     "project_name": self.state['project_name'],
                     "project_path": os.path.join(self.state['project_path'], self.state['project_name']),
@@ -222,8 +223,8 @@ class CoderAgent(Agent[CoderState, CoderPrompts]):
                     "folder_structure": self.state['project_folder_strucutre'],
                     "task": task.description,
                     "error_message": self.error_message,
-                    "unit_test":self.state['test_code'],
-                    "functions_skeleton":self.state['functions_skeleton']
+                    "unit_test": self.state['test_code'],
+                    "functions_skeleton": self.state['functions_skeleton']
                 })
             else:
                  llm_response = self.code_generation_chain.invoke({
@@ -350,7 +351,7 @@ class CoderAgent(Agent[CoderState, CoderPrompts]):
 
         logger.info(f"----{self.agent_name}: Writing the generated code to the respective files in the specified paths ----")
 
-        self.update_state(state)
+        self.state = {**state}
         self.last_visited_node = self.write_generated_code_node_name
 
         try:
@@ -398,7 +399,7 @@ class CoderAgent(Agent[CoderState, CoderPrompts]):
                 f"{self.agent_name}: {self.error_message}"
             ))
 
-        return {**self.state}
+        return self.state
     
     def download_license_node(self, state: CoderState) -> CoderState:
         """
@@ -422,7 +423,7 @@ class CoderAgent(Agent[CoderState, CoderPrompts]):
 
         self.is_license_file_downloaded = True
 
-        return {**self.state}
+        return self.state
     
     def add_license_text_node(self, state: CoderState) -> CoderState:
         """
@@ -455,7 +456,8 @@ class CoderAgent(Agent[CoderState, CoderPrompts]):
                     self.track_add_license_txt.append(path)
 
         self.is_license_text_added_to_files = True
-        self.state['current_task'].task_status = Status.DONE
+        self.state['current_planned_task'].is_code_generate = True
+        self.state['current_planned_task'].task_status = Status.DONE
 
-        return {**self.state}
+        return self.state
     
