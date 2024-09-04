@@ -2,7 +2,6 @@
 Driving code file for this project.
 """
 import os
-from pprint import pprint
 
 from agents.supervisor.supervisor_state import SupervisorState
 from configs.database import get_client_local_db_file_path
@@ -10,7 +9,6 @@ from configs.project_config import ProjectConfig
 from configs.project_path import set_project_path
 from database.database import Database
 from genpod.team import TeamMembers
-from models.constants import ChatRoles
 from utils.logs.logging_utils import logger
 from utils.time import get_timestamp
 
@@ -46,6 +44,7 @@ if __name__=="__main__":
     LICENSE_TEXT = "SPDX-License-Identifier: Apache-2.0\nCopyright 2024 Authors of CRBE & the Organization created CRBE"
 
     PROJECT_PATH = set_project_path(timestamp=TIME_STAMP)
+    logger.info(f"Project is being saved at location: {PROJECT_PATH}")
 
     # Database insertion - START
     # insert the record for the project being generated in database
@@ -76,13 +75,14 @@ if __name__=="__main__":
         'project_path': PROJECT_PATH,
         'license_url': LICENSE_URL,
         'license_text': LICENSE_TEXT,
-        'messages': [(ChatRoles.USER, PROJECT_INPUT)],
     })
-    
+    logger.info(f"The Genpod team has been notified about the new project. {genpod_team.supervisor.member_name} will begin work on it shortly.")
+
     result: SupervisorState = None
     for res in supervisor_response:
-        result = res
-        pprint(res)
+        for node_name, super_state in res.items():
+            logger.info(f"Received state update from supervisor node: {node_name}. Response details: {super_state}")
+            result = super_state
 
     # TODO: DB update should happen at for every iteration in the above for loop
     # write a logic to identify changes in the state.
