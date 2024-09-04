@@ -7,7 +7,7 @@ from typing_extensions import Annotated, TypedDict
 
 from agents.agent.state import State
 from models.constants import ChatRoles
-from models.models import Task
+from models.models import PlannedTask, Task
 from models.skeleton import FunctionSkeleton
 
 
@@ -69,6 +69,15 @@ class TestCoderState(TypedDict):
         State.inout_field(
             "The Task object currently in focus, representing the active task that team "
             "members are working on."
+        )
+    ]
+        
+    # @inout
+    current_planned_task: Annotated[
+        PlannedTask,
+        State.inout_field(
+            "The PlannedTask object currently in focus, representing the active task"
+            "that coder need to work on."
         )
     ]
     
