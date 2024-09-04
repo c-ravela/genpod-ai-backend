@@ -5,7 +5,9 @@ from typing_extensions import Annotated, TypedDict
 
 from agents.agent.state import State
 from models.constants import ChatRoles, PStatus
-from models.models import RequirementsDocument, Task
+from models.models import (PlannedTask, PlannedTaskQueue, RequirementsDocument,
+                           Task, TaskQueue)
+from models.skeleton import FunctionSkeleton
 
 
 class SupervisorState(TypedDict):
@@ -78,14 +80,20 @@ class SupervisorState(TypedDict):
 
     # @out
     tasks: Annotated[
-        List[Task], 
+        TaskQueue, 
         State.out_field("The tasks create while generating the project.")
     ]
 
     # @out
     current_task: Annotated[
         Task,
-        State.out_field("The current task that is team is working on.")
+        State.out_field("The current task that team is working on.")
+    ]
+
+    # @out
+    current_planned_task: Annotated[
+        PlannedTask,
+        State.out_field("The current planned task that team is working on.")
     ]
 
     # @out
@@ -142,7 +150,7 @@ class SupervisorState(TypedDict):
 
     # @out
     planned_tasks: Annotated[
-        List[Task], # This is list of work_packages created by the planner,
+        PlannedTaskQueue, # This is list of work_packages created by the planner,
         State.out_field()
     ]
 
@@ -192,8 +200,22 @@ class SupervisorState(TypedDict):
         "executed on a Linux terminal. Each key-value pair in the dictionary corresponds to an absolute path (the key) and a specific command (the value) to be executed at that path.")
     ]
 
-    # TODO: remove this once agent requirements logic is implemented
-    coder_inputs: dict
+    # @in
+    functions_skeleton:Annotated[
+        FunctionSkeleton,
+        State.in_field(
+            "The well detailed function skeleton for the functions that are in the code."
+        )
+    ]
+
+    # @in
+    test_code: Annotated[
+        str, 
+        State.in_field(
+            "The complete, well-documented working unit test code that adheres to all standards "
+            "requested with the programming language, framework user requested "
+        )
+    ]
     
 def add_message(state: SupervisorState, message: tuple[ChatRoles, str]) -> SupervisorState:
     """
@@ -209,4 +231,4 @@ def add_message(state: SupervisorState, message: tuple[ChatRoles, str]) -> Super
     """
 
     state['messages'] += [message]
-    return {**state}
+    return state
