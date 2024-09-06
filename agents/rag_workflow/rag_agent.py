@@ -24,9 +24,10 @@ class RAGAgent(Agent[RAGState, RAGPrompts]):
 
         self.iteration_count = RAG_TRY_LIMIT
         self.mismo_vectorstore = Chroma(
-                            collection_name = collection_name,
-                            persist_directory = persist_directory,
-                            embedding_function = OpenAIEmbeddings())
+            collection_name = collection_name,
+            persist_directory = persist_directory,
+            embedding_function = OpenAIEmbeddings()
+        )
         self.retriever = self.mismo_vectorstore.as_retriever(search_kwargs={'k': 20})
         
         # Document retrieval Grader chain
