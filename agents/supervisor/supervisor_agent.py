@@ -41,9 +41,6 @@ class SupervisorAgent(Agent[SupervisorState, SupervisorPrompts]):
         self.rag_cache = FuzzyRAGCache()
         self.rag_cache_building = ''
 
-        # TODO: NEED to check when this field has to be updated back and forth
-        self.is_test_generator_agent_called: bool = False
-
         # TODO - LOW: has to be moved to RAG agent
         self.is_rag_cache_created: bool = False # Represents whether rag cache was created or not. single time update
         
@@ -196,10 +193,13 @@ class SupervisorAgent(Agent[SupervisorState, SupervisorPrompts]):
         # initialize supervisor state
         state['project_name'] = ""
         state['project_status'] = PStatus.RECEIVED
+        state['agents_status'] = ''
         state['microservice_name'] = ""
-        state['tasks'] = TaskQueue()
         state['current_task'] = Task()
-        state['requirements_document'] = RequirementsDocument()
+        state['current_planned_task'] = PlannedTask()
+        state['is_rag_query_answered'] = False
+        state['rag_cache_queries'] = []
+        state['tasks'] = TaskQueue()
         state['messages'] = [
             (
                 ChatRoles.USER,
@@ -211,19 +211,16 @@ class SupervisorAgent(Agent[SupervisorState, SupervisorPrompts]):
             )
         ]
         state['human_feedback'] = []
-        state['rag_cache_queries'] = []
-        state['is_rag_query_answered'] = False
-        state['rag_retrieval'] = ''
-        state['agents_status'] = ''
-        state['current_planned_task'] = PlannedTask()
-        state['planned_tasks'] = PlannedTaskQueue()
-        state['planned_task_map'] = {}
-        state['planned_task_requirements'] = {}
         state['project_folder_strucutre'] = ''
         state['code'] = ''
         state['files_created'] = []
         state['infile_license_comments'] = {}
         state['commands_to_execute'] = {}
+        state['functions_skeleton'] = {}
+        state['test_code'] = ""
+        state['planned_tasks'] = PlannedTaskQueue()
+        state['rag_retrieval'] = ''
+        state['requirements_document'] = RequirementsDocument()
 
         self.responses = {member.member_id: [] for member in self.team.get_team_members_as_list()}
         
@@ -667,10 +664,6 @@ class SupervisorAgent(Agent[SupervisorState, SupervisorPrompts]):
                 else:
                     state['current_task'] = next_task
 
-                    requirements_doc = state['requirements_document'].to_markdown()
-                    # TODO - LOW: Better to take away this there is redundancy of storing requirements document
-                    # In Super State and Task as task will persisted in DB.
-                    state['current_task'].additional_info = requirements_doc + '\n' + state['rag_retrieval']
             elif state['current_task'].task_status == Status.AWAITING:
                 # Planner needs additional information
                 # Architect was responsible for answering the query if not then rag comes into play.
@@ -718,80 +711,40 @@ class SupervisorAgent(Agent[SupervisorState, SupervisorPrompts]):
         
         logger.info("----------Calling Planner----------")
         planner_result = self.team.planner.invoke({
+            'context': f"{state['requirements_document'].to_markdown()}\n {state['rag_retrieval']}",
             'current_task': state['current_task'],
             'project_path': state['project_path']
         })
 
-        # TODO - LOW: Perfromance, Memory, Code Enhancement
-        # Currenlty planner is returning list of task thorugh `response`
-        # key of the state and also returning `planned_tasks` and `planned_tasks_map`
-        # There is a redundancy in this way of storing the info.
-        # Other issue is `current_task` being receive from planner now is completely 
-        # different, you can see the below line, this means we are losing the track the 
-        # task assigned to planner. At this stage `current_task` should always be the previously
-        # assigned task. FYI `current_task` is expected to hold tasks from `tasks` list and `planned_tasks`
-        # list. so `current_task` field task might be used to update the status of task in those fields.
-        # if task is not present in the list then it raises an EXCEPTION.
+        state['current_task'] = planner_result['current_task']
 
-        # TODO - LOW: Performance, Memory Enhancement
-        # Currenlty `additional_info` field of Task object is being used to send 
-        # some information like `requirements_document`. This is saving same information
-        # at two points as tasks are being persisted. Better way to do this, give information on
-        # demand/required meaning `requirements_document` is only needed by planner when an task 
-        # has to be broken down to small task, this will be triggered by graph invocation.
-        # send the information as the field of the graph should work. 
-        state['current_task'] = planner_result['response'][-1]
+        # If the status is INPROGRESS, it indicates that the planner has successfully prepared planned tasks.
+        # The task is marked as INPROGRESS rather than DONE because:
+        # - The planner has set up the tasks, but they have not yet been executed.
+        # - The planned tasks are still pending execution.
+        # Once all the planned tasks have been addressed, regardless of their individual states, 
+        # the current task status will be updated to DONE by the supervisor.
+        if state['current_task'].task_status == Status.INPROGRESS:
+            logger.info(f"{self.team.planner.member_name} has successfully completed preparing the planned tasks for Task ID: {state['current_task'].task_id}.")
+            state['planned_tasks'].add_tasks(
+                planner_result['planned_tasks'].get_all_tasks()
+            )
 
-        if state['current_task'].task_status == Status.DONE:
-            logger.info("----------Response from Planner Agent----------")
-            logger.info("Planner Response: %r",planner_result['planned_task_map'])
-
-            state['agents_status'] = f'{self.team.planner.member_name} completed'
+            state['agent_status'] = f"Work packages have been built by {self.team.planner.member_name}."
             self.called_agent = self.team.planner.member_id
-            self.responses[self.team.planner.member_id].append(("Returned from Planner",state['current_task']))
-        elif state['current_task'].task_status == Status.INPROGRESS:
-            # TODO - LOW: Move this logic to planner
-            # Its better if planner only returning planned_tasks as output.
-            # `planned_task_map` `planned_task_requiremtns` is an redundancy.
-            state['planned_task_map'] = {**planner_result['planned_task_map']}
-            state['planned_task_requirements'] = {**planner_result['planned_task_requirements']}
-
-            # TODO: use the response packet and build the planned tasks list
-            # Get the workpackages created by planner for the current task a.k.a. deliverable
-          
-            for wpn, is_function_generation_required in state['planned_task_map'][state['current_task'].description].items():
-                # for each workpackage we need to create a planned_task
-
-                state['planned_tasks'].add_task(
-                    PlannedTask(
-                        description=json.dumps(
-                            {
-                                "work_package_name": wpn,
-                                **state['planned_task_requirements'][wpn],
-                            }
-                        ),
-                        task_status=Status.NEW,
-                        is_function_generation_required=is_function_generation_required
-                    )
-                ) 
-            
-            state['agent_status'] = f"{self.team.planner.member_name} built the work packages"
-            self.called_agent = self.team.planner.member_id
-            self.responses[self.team.planner.member_id].append(("Returned from Planner",state['current_task']))
-
-            logger.info("----------Response from Planner Agent----------")
-            logger.info("Planner Response: %r",planner_result['planned_task_map'])
+            self.responses[self.team.planner.member_id].append(("Returned from Planner", state['current_task']))
         elif state['current_task'].task_status == Status.ABANDONED:
-            logger.info("------Planner Has Abandoned a Task")
-            
-            state['agents_status'] = f'{self.team.planner.member_name} Abandoned a task. Task Id: {state['current_task'].task_id}'
-            self.called_agent = self.team.planner.member_id
-            self.responses[self.team.planner.member_id].append(("Returned from Planner with an abandoned task.", state['current_task']))
-        else: # TODO - LOW: Looks like this block of the code is expecting the current_task.task_status == Awaiting. If its included in the condition it will be easier to understand the code.
-            logger.info("----------Response from Planner Agent----------")
-            logger.info("Planner Response: %s", state['current_task'].question)
+            logger.info(f"{self.team.planner.member_name} has abandoned the task with Task Id: {state['current_task'].task_id}")
 
-            state['agents_status'] = f'{self.team.planner.member_name} Awaiting'
+            state['agents_status'] = f"{self.team.planner.member_name} has abandoned Task ID: {state['current_task'].task_id}."
+            self.called_agent = self.team.planner.member_id
+
+            self.responses[self.team.planner.member_id].append(("Returned from Planner with an abandoned task.", state['current_task']))
+        elif state['current_task'].task_status == Status.AWAITING:
+            logger.info(f"{self.team.planner.member_name} is requesting additional information for Task ID: {state['current_task'].task_id}.")
+ 
+            state['agents_status'] = f"{self.team.planner.member_name} is awaiting additional information for Task ID: {state['current_task'].task_id}."
+
             self.called_agent = self.team.planner.member_id
             self.responses[self.team.planner.member_id].append(("Returned from Planner with a question", state['current_task'].question))
 
