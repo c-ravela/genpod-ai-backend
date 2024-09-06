@@ -6,7 +6,7 @@ capturing a specific set of information required for the project. These models
 are used to structure the data in a consistent and organized manner, enhancing 
 the readability and maintainability of the code.
 """
-from typing import Any, List, Iterator
+from typing import Any, Iterator, List
 
 from pydantic import BaseModel, Field
 

@@ -11,8 +11,7 @@ from agents.agent.agent import Agent
 from agents.tests_generator.tests_generator_state import TestCoderState
 from configs.project_config import ProjectAgents
 from models.constants import ChatRoles, Status
-from models.skeleton import FunctionSkeleton
-from models.tests_generator_models import TestCodeGeneration
+from models.tests_generator_models import FunctionSkeleton, TestCodeGeneration
 from prompts.tests_generator_prompts import TestGeneratorPrompts
 from tools.code import CodeFileWriter
 from tools.shell import Shell

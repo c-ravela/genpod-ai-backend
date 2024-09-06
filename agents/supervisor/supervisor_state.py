@@ -7,7 +7,7 @@ from agents.agent.state import State
 from models.constants import ChatRoles, PStatus
 from models.models import (PlannedTask, PlannedTaskQueue, RequirementsDocument,
                            Task, TaskQueue)
-from models.skeleton import FunctionSkeleton
+from models.tests_generator_models import FunctionSkeleton
 
 
 class SupervisorState(TypedDict):

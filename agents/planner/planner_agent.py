@@ -14,8 +14,8 @@ from agents.planner.planner_state import PlannerState
 from configs.project_config import ProjectAgents
 from models.constants import Status
 from models.models import PlannedTask, PlannedTaskQueue
-from models.planner import BacklogList
-from prompts.planner import PlannerPrompts
+from models.planner_models import BacklogList
+from prompts.planner_prompts import PlannerPrompts
 from utils.logs.logging_utils import logger
 
 

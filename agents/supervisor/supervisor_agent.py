@@ -11,8 +11,8 @@ from configs.project_config import ProjectAgents
 from models.constants import ChatRoles, PStatus, Status
 from models.models import (PlannedTask, PlannedTaskQueue, RequirementsDocument,
                            Task, TaskQueue)
-from models.supervisor import QueryList
-from prompts.supervisor import SupervisorPrompts
+from models.supervisor_models import QueryList
+from prompts.supervisor_prompts import SupervisorPrompts
 from utils.fuzzy_rag_cache import FuzzyRAGCache
 from utils.logs.logging_utils import logger
 

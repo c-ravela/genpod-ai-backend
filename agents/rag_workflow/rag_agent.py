@@ -6,7 +6,7 @@ from agents.agent.agent import Agent
 from agents.rag_workflow.rag_state import RAGState
 from configs.project_config import ProjectAgents
 from configs.supervisor_config import RAG_TRY_LIMIT
-from prompts.rag import RAGPrompts
+from prompts.rag_prompts import RAGPrompts
 from utils.logs.logging_utils import logger
 
 
