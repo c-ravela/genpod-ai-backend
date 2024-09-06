@@ -42,6 +42,12 @@ class SupervisorState(TypedDict):
         State.out_field("The status of the project being generated.")
     ]
 
+    # @out
+    agents_status: Annotated[
+        str,
+        State.out_field()
+    ]
+
     # @in
     microservice_id: Annotated[
         int, 
@@ -79,12 +85,6 @@ class SupervisorState(TypedDict):
     ]
 
     # @out
-    tasks: Annotated[
-        TaskQueue, 
-        State.out_field("The tasks create while generating the project.")
-    ]
-
-    # @out
     current_task: Annotated[
         Task,
         State.out_field("The current task that team is working on.")
@@ -97,13 +97,21 @@ class SupervisorState(TypedDict):
     ]
 
     # @out
-    requirements_document: Annotated[
-        RequirementsDocument,
-        State.inout_field(
-            "A comprehensive, well-structured document in markdown format that outlines "
-            "the project's requirements derived from the user's request. This serves as a "
-            "guide for the development process."
-        )
+    is_rag_query_answered : Annotated[
+        bool,
+        State.out_field("is query answered by rag agent.")
+    ]
+
+    # @out
+    rag_cache_queries: Annotated[
+        List[str],
+        State.out_field("Queries generated for rag cache")
+    ]
+
+    # @out
+    tasks: Annotated[
+        TaskQueue, 
+        State.out_field("The tasks create while generating the project.")
     ]
 
     # @inout
@@ -122,48 +130,6 @@ class SupervisorState(TypedDict):
         State.inout_field(
             "A list human inputs given during human in the loop process"
         )
-    ]
-
-    # @out
-    rag_cache_queries: Annotated[
-        List[str],
-        State.out_field("Queries generated for rag cache")
-    ]
-
-    # @out
-    is_rag_query_answered : Annotated[
-        bool,
-        State.out_field("is query answered by rag agent.")
-    ]
-
-    # @out
-    rag_retrieval: Annotated[
-        str,
-        State.out_field()
-    ]
-
-    # @out
-    agents_status: Annotated[
-        str,
-        State.out_field()
-    ]
-
-    # @out
-    planned_tasks: Annotated[
-        PlannedTaskQueue, # This is list of work_packages created by the planner,
-        State.out_field()
-    ]
-
-    # @out
-    planned_task_map: Annotated[
-        dict, # This is the a map of deliverables to work_packages
-        State.out_field()
-    ]
-
-    # @out
-    planned_task_requirements: Annotated[
-        dict,  # This is the map of work_packages to json formatted requirements
-        State.out_field()
     ]
 
     # @out - Architect 
@@ -216,7 +182,29 @@ class SupervisorState(TypedDict):
             "requested with the programming language, framework user requested "
         )
     ]
-    
+
+    # @out
+    planned_tasks: Annotated[
+        PlannedTaskQueue, # This is list of work_packages created by the planner,
+        State.out_field("A list of work packages planned by the planner")
+    ]
+
+    # @out
+    rag_retrieval: Annotated[
+        str,
+        State.out_field()
+    ]
+
+    # @out
+    requirements_document: Annotated[
+        RequirementsDocument,
+        State.inout_field(
+            "A comprehensive, well-structured document in markdown format that outlines "
+            "the project's requirements derived from the user's request. This serves as a "
+            "guide for the development process."
+        )
+    ]
+
 def add_message(state: SupervisorState, message: tuple[ChatRoles, str]) -> SupervisorState:
     """
     Adds a single message to the messages field in the state.
