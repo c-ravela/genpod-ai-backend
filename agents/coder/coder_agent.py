@@ -8,11 +8,11 @@ from langchain_core.runnables.base import RunnableSequence
 from langchain_openai import ChatOpenAI
 
 from agents.agent.agent import Agent
-from agents.coder.state import CoderState
+from agents.coder.coder_state import CoderState
 from configs.project_config import ProjectAgents
-from models.coder import CodeGenerationPlan
+from models.coder_models import CodeGenerationPlan
 from models.constants import ChatRoles, Status
-from prompts.coder import CoderPrompts
+from prompts.coder_prompts import CoderPrompts
 from tools.code import CodeFileWriter
 from tools.license import License
 from tools.shell import Shell
