@@ -14,7 +14,7 @@ the Architect agent can effectively assist users in implementing their projects.
 from langchain.output_parsers import PydanticOutputParser
 from langchain_core.prompts import PromptTemplate
 
-from models.architect import ProjectDetails, QueryResult, TaskOutput, TasksList
+from models.architect_models import ProjectDetails, QueryResult, TaskOutput, TasksList
 
 
 class ArchitectPrompts:
