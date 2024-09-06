@@ -8,12 +8,12 @@ from langchain_openai import ChatOpenAI
 from typing_extensions import Literal
 
 from agents.agent.agent import Agent
-from agents.tests_generator.state import TestCoderState
+from agents.tests_generator.tests_generator_state import TestCoderState
 from configs.project_config import ProjectAgents
 from models.constants import ChatRoles, Status
 from models.skeleton import FunctionSkeleton
-from models.tests_generator import TestCodeGeneration
-from prompts.tests_generator import TestGeneratorPrompts
+from models.tests_generator_models import TestCodeGeneration
+from prompts.tests_generator_prompts import TestGeneratorPrompts
 from tools.code import CodeFileWriter
 from tools.shell import Shell
 from utils.logs.logging_utils import logger

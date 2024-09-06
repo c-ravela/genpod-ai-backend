@@ -5,7 +5,7 @@ from langchain.output_parsers import PydanticOutputParser
 from langchain_core.prompts import PromptTemplate
 
 from models.skeleton import FunctionSkeleton
-from models.tests_generator import TestCodeGeneration
+from models.tests_generator_models import TestCodeGeneration
 
 
 class TestGeneratorPrompts:
