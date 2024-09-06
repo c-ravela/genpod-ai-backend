@@ -12,12 +12,12 @@ from langchain_openai import ChatOpenAI
 from typing_extensions import Literal
 
 from agents.agent.agent import Agent
-from agents.architect.state import ArchitectState
+from agents.architect.architect_state import ArchitectState
 from configs.project_config import ProjectAgents
-from models.architect import ProjectDetails, QueryResult, TaskOutput
+from models.architect_models import ProjectDetails, QueryResult, TaskOutput
 from models.constants import ChatRoles, PStatus, Status
 from models.models import RequirementsDocument, Task
-from prompts.architect import ArchitectPrompts
+from prompts.architect_prompts import ArchitectPrompts
 from tools.code import CodeFileWriter
 from utils.logs.logging_utils import logger
 
