@@ -3,6 +3,7 @@ from genpod.coder import CoderMember
 from genpod.member import AgentMember
 from genpod.planner import PlannerMember
 from genpod.rag import RagMember
+from genpod.reviewer import ReviewerMember
 from genpod.supervisor import SupervisorMember
 from genpod.tests_generator import TestsGeneratorMember
 
@@ -33,6 +34,9 @@ class TeamMembers:
 
         self.tests_generator = TestsGeneratorMember(persistance_db_path)
         self.tests_generator.set_role_to_member()
+
+        self.reviewer = ReviewerMember(persistance_db_path)
+        self.reviewer.set_role_to_member()
         
     def get_team_members_as_list(self) -> list[AgentMember]:
         """
