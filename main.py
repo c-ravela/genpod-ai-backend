@@ -67,7 +67,7 @@ if __name__=="__main__":
     genpod_team = TeamMembers(DATABASE_PATH, config.collection_name)
     genpod_team.supervisor.set_recursion_limit(500)
     genpod_team.supervisor.graph.agent.setup_team(genpod_team)
-    
+
     supervisor_response = genpod_team.supervisor.stream({
         'project_id': project_details['id'],
         'microservice_id': microservice_details['id'],
@@ -101,3 +101,6 @@ if __name__=="__main__":
         status=str(result['project_status']),
         updated_by=USER_ID
     )
+
+    print(f"Project generated successfully! Project ID: {result['project_id']}, Project Name: {result['project_name']}, Location: {PROJECT_PATH}.")
+    logger.info(f"Project generated successfully! Project ID: {result['project_id']}, Project Name: {result['project_name']}, Location: {PROJECT_PATH}.")
