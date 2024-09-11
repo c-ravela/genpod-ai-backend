@@ -195,7 +195,7 @@ class PlannerAgent(Agent[PlannerState, PlannerPrompts]):
                         }
 
                         planned_task.description = json.dumps(parsed_response)
-                        state['planned_tasks'].add_task(planned_task)
+                        state['planned_tasks'].add_item(planned_task)
 
                         logger.info("Requirements in JSON: %r", parsed_response)
 
