@@ -761,7 +761,8 @@ class SupervisorAgent(Agent[SupervisorState, SupervisorPrompts]):
     def call_reviwer(self, state: SupervisorState) -> SupervisorState:
         """
         """
-        pass
+        
+        return state
 
     def call_human(self, state: SupervisorState) -> SupervisorState:
         # Display relevant information to the human
