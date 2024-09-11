@@ -5,103 +5,119 @@ The Coder agent is responsible for completing tasks in a project. The output of
 the Coder agent includes information about the steps to complete a task, 
 the files to be created, the location of the code, the actual code.
 """
+import re
+
 from typing import Any, Dict
 
-from pydantic import BaseModel, Field
-from typing_extensions import ClassVar
+from pydantic import BaseModel, Field, model_validator
+from configs.shell_config import CODER_COMMANDS
 
-
-class ToolCall(BaseModel):
+class FileContent(BaseModel):
     """
-    """
-    name: str = Field(
-        description="The name of the tool to use", 
-        required=True
-    )
-
-    args: dict[str, str] = Field(
-        description="arguments to the tools",
-        required=True
-    )
-
-class CoderModel(BaseModel):
-    """
-    A data model representing the output of the Coder agent.
-
-    This model includes various fields that capture the details of the task 
-    completion process, such as the steps to complete the task, the files to
-    be created, the location of the code, and the actual code.
-    """
-    can_complete_task: bool = Field(
-        description="can task be completed?",
-        required=True
-    )
-
-    task_abandon_remarks: str = Field(
-        description="reason why task was abandoned.",
-        required=True
-    )
-
-    is_add_info_needed: bool = Field(
-        description="If you need additional ifnormation to complete a task or not.",
-        required=True
-    )
-
-    question_for_additional_info: str = Field(
-        description="what new information you need?"
-    )
-
-    files_to_create: str = Field(
-        description="A list of absolute file paths that need to be created as part of the current task", 
-        required=True
-    )
-
-    code: str = Field(
-        description="The complete, well-documented working code that adheres to all "
-        "standards requested with the programming language, framework user requested ", 
-        required=True
-    )
-    
-    infile_license_comments: dict[str, str] = Field(
-        description="The multiline standard license comment which goes on top of each file."
-        "key should be the extension of the file, ex: language: python, key: .py"
-        "language: C++, key: .cpp, language: Markdown, key: .md, language: C#, key: .cs"
-        "value of these any of these keys should be the license commented in multiline "
-        "format.",
-        required=True
-    )
-
-    tool_calls: list[ToolCall] = Field(
-        description="List of tool calls that need to be made to complete the task",
-        required=True
-    )
-
-    description: ClassVar[str] = "Schema representing the output from the "
-    "Coder agent upon task completion."
-
-class FileSetupPlan(BaseModel):
-    """
-    Represents the setup plan for files, including file creation details and terminal commands to be executed.
+    Represents the content plan for files, including the code to be included in each file and license comments.
     """
 
-    files_to_create: dict[str, str] = Field(
+    file_code: str = Field(
         description="""
-        A dictionary where each key is an absolute file path and the corresponding
-        value is a detailed description of the file. The description should specify
-        what the file should contain or its purpose, providing enough information
-        to understand its role in the project.
+        The code content to be included in all files. This single string will be used as the content for each file.
+        Ensure the code adheres to the required standards and includes necessary documentation.
+
+        Example:
+            'print("Hello, world!")'
+        """,
+        default='',
+        title="File Code Content",
+        example='print("Hello, World!")'
+    )
+
+    license_comments: Dict[str, str] = Field(
+        description="""
+        A dictionary where the key is the file extension (including the dot) and the value is the license comment
+        to be added at the top of files with that extension. This allows for different comment formats for different
+        types of files.
 
         Example:
             {
-                '/absolute/path/to/file1.py': 'Main script for data processing. This file should include the core logic for processing data inputs and outputs.',
-                '/absolute/path/to/file2.md': 'README file with project information. Include project overview, installation instructions, and usage examples.'
+                ".py": "''' \nSPDX-License-Identifier: Apache-2.0\nCopyright 2024 Authors of [Your Organization] & [Your Project]\n'''",
+                ".md": "<!-- SPDX-License-Identifier: Apache-2.0\nCopyright 2024 Authors of [Your Organization] & [Your Project] -->"
             }
         """,
         default={},
-        title="Files to Create with Detailed Descriptions",
+        title="License Comments by File Extension",
         example={
-            '/home/user/project/main.py': 'Main script for data processing. This file should include the core logic for processing data inputs and outputs.',
-            '/home/user/project/README.md': 'README file with project information. Include project overview, installation instructions, and usage examples.'
+            ".py": "''' \nSPDX-License-Identifier: Apache-2.0\nCopyright 2024 Authors of [Your Organization] & [Your Project]\n'''",
+            ".md": "<!-- SPDX-License-Identifier: Apache-2.0\nCopyright 2024 Authors of [Your Organization] & [Your Project] -->"
+        }
+    )
+
+    @model_validator(mode="before")
+    def check_field__file_code(cls, values: Dict[str, Any]) -> Dict[str, Any]:
+        file_code = values.get('file_code')
+
+        if not file_code:
+            raise ValueError('file_code cannot be an empty string.')
+        
+        if not isinstance(file_code, str):
+            raise ValueError('file_code must be a string.')
+        
+        return values
+    
+    @model_validator(mode='before')
+    def check_field__license_comments(cls, values: Dict[str, Any]) -> Dict[str, Any]:
+        license_comments = values.get('license_comments')
+
+        if not isinstance(license_comments, dict):
+            raise ValueError('license_comments must be a dictionary.')
+        
+        for key, value in license_comments.items():
+            if not isinstance(key, str) or not key.startswith('.'):
+                raise ValueError(f'Invalid file extension key: {key}. Must be a string starting with a dot.')
+            if not isinstance(value, str) or not value.strip():
+                raise ValueError(f'License comment for extension "{key}" must be a non-empty string.')
+            
+        return values
+
+class CodeGenerationPlan(BaseModel):
+    """
+    Represents a plan for generating files with specified content and terminal commands
+    """
+
+    file: Dict[str, FileContent] = Field(
+        description="""
+        A dictionary where each key is a file path and each value is the content plan for that file.
+        The content plan includes the code to be included in the file and license comments based on the file extension.
+
+        Example:
+            {
+                '/path/to/file1.py': {
+                    'file_code': 'print("Hello, World!")',
+                    'license_comments': {
+                        '.py': "''' \nSPDX-License-Identifier: Apache-2.0\nCopyright 2024 Authors of [Your Organization] & [Your Project]\n'''"
+                    }
+                },
+                '/path/to/file2.md': {
+                    'file_code': '# Markdown content',
+                    'license_comments': {
+                        '.md': "<!-- SPDX-License-Identifier: Apache-2.0\nCopyright 2024 Authors of [Your Organization] & [Your Project] -->"
+                    }
+                }
+            }
+        """,
+        default={},
+        title="File Content Plans",
+        example={
+            '/home/user/project/main.py': {
+                'file_code': 'print("Hello, World!")',
+                'license_comments': {
+                    '.py': "''' \nSPDX-License-Identifier: Apache-2.0\nCopyright 2024 Authors of [Your Organization] & [Your Project]\n'''"
+                }
+            },
+            '/home/user/project/README.md': {
+                'file_code': '# Markdown content',
+                'license_comments': {
+                    '.md': "<!-- SPDX-License-Identifier: Apache-2.0\nCopyright 2024 Authors of [Your Organization] & [Your Project] -->"
+                }
+            }
         }
     )
 
@@ -155,123 +171,56 @@ class FileSetupPlan(BaseModel):
         }
     )
 
-class FileContent(BaseModel):
-    """
-    Represents the content plan for files, including the code to be included in each file and license comments.
-    This simplified version assumes a single code snippet and license comment for all files.
-    """
+    @model_validator(mode='before')
+    def check_field__file(cls, values: Dict[str, Any]) -> Dict[str, Any]:
+        file = values.get('file')
 
-    file_code: str = Field(
-        description="""
-        The code content to be included in all files. This single string will be used as the content for each file.
-        Ensure the code adheres to the required standards and includes necessary documentation.
-
-        Example:
-            'print("Hello, world!")'
-        """,
-        default='',
-        title="File Code Content",
-        example='print("Hello, World!")'
-    )
-
-    license_comments: Dict[str, str] = Field(
-        description="""
-        A dictionary where the key is the file extension (including the dot) and the value is the license comment
-        to be added at the top of files with that extension. This allows for different comment formats for different
-        types of files.
-
-        Example:
-            {
-                ".py": "''' \nSPDX-License-Identifier: Apache-2.0\nCopyright 2024 Authors of [Your Organization] & [Your Project]\n'''",
-                ".md": "<!-- SPDX-License-Identifier: Apache-2.0\nCopyright 2024 Authors of [Your Organization] & [Your Project] -->"
-            }
-        """,
-        default={},
-        title="License Comments by File Extension",
-        example={
-            ".py": "''' \nSPDX-License-Identifier: Apache-2.0\nCopyright 2024 Authors of [Your Organization] & [Your Project]\n'''",
-            ".md": "<!-- SPDX-License-Identifier: Apache-2.0\nCopyright 2024 Authors of [Your Organization] & [Your Project] -->"
-        }
-    )
-
-class CodeGenerationPlan(BaseModel):
-    """
-    """
-
-    files_to_create: list[str] = Field(
-        description="""
-        A list of absolute file paths that need to be created as part of the current task
-        "
-        [
-            'absolute_file_path1', 
-            'absolute_file_path2', 
-            'absolute_file_path3',
-            .
-            .
-            .
-            .,
-            'absolute_file_pathN'
-        ]        
-        """, 
-        default=[],
-        required=True
-    )
-
-    code: dict[str, str] = Field(
-        description="""
-        A dictionary where each key-value pair represents a file and its corresponding code. The key 
-        should be the absolute path to the file, and the value should be the well-documented working 
-        code for that particular file. The code should adhere to all the requirements and standards 
-        provided.
-        """, 
-        default={},
-        required=True
-    )
-
-    infile_license_comments: dict[str, str] = Field(
-        description="""
-        The standard license text multiline comment which goes on top of each file, key of the dict 
-        should be the extension of the file. 
-        "
-            {
-                ".py": "multiline commment",
-                ".md": "multiline comment",
-                ".yml": "multiline comment",
-            }
-        "
-        """,
-        default={},
-        required=True
-    )
-
-    commands_to_execute: dict[str, str] = Field(
-        description="""
-        This field represents a dictionary of commands intended to be executed on a Linux terminal. Each key-value pair in the dictionary corresponds to an absolute path (the key) and a specific command (the value) to be executed at that path.
-
-        Please adhere to the following guidelines while populating this field:
-        - The key should be the absolute path where the command is to be run.
-        - Only commands from the approved list are allowed. The approved commands include 'mkdir', 'docker', 'python', 'python3', 'pip', 'virtualenv', 'mv', 'pytest', and 'touch', 'git'.
-        - For security reasons, the use of certain symbols is restricted. Specifically, the following symbols are not permitted: '&&', '||', '|', ';'.
-
-        Please ensure that the commands and their parameters are correctly formatted to prevent any execution errors.
-        """,
-        default={},
-        required=True
-    )
-
-    def __getitem__(self, key: str) -> Any:
-        """
-        Allows getting attributes using square bracket notation.
-        """
-        if hasattr(self, key):
-            return getattr(self, key)
-        raise KeyError(f"Key '{key}' not found in RequirementsDocument.")
-
-    def __setitem__(self, key: str, value: Any) -> None:
-        """
-        Allows setting attributes using square bracket notation.
-        """
-        if hasattr(self, key):
-            setattr(self, key, value)
-        else:
-            raise KeyError(f"Key '{key}' not found in RequirementsDocument.")
+        if not file:
+            raise ValueError('file cannot be an empty.')
+        
+        if not isinstance(file, dict):
+            raise ValueError('The "file" field must be a dictionary.')
+        
+        for path, content in file.items():
+            if not isinstance(path, str) or not path:
+                raise ValueError(f'File path "{path}" must be a non-empty string.')
+            
+            if not isinstance(content, dict):
+                raise ValueError(f'Content for "{path}" must be a valid FileContent instance.')
+        
+            try:
+                FileContent(**content)
+            except ValueError as e:
+                raise ValueError(f'Invalid content for file "{path}": {e}')
+            
+        return values
+    
+    @model_validator(mode='before')
+    def check_field__terminal_commands(cls, values: Dict[str, Any]) -> Dict[str, Any]:
+        allowed_commands = CODER_COMMANDS
+        restricted_symbols = re.compile(r'[&|;]')
+        
+        terminal_commands = values.get('terminal_commands')
+        if not terminal_commands:
+            raise ValueError('terminal_commands cannot be an empty.')
+        
+        if not isinstance(terminal_commands, dict):
+            raise ValueError('The "terminal_commands" field must be a dictionary.')
+        
+        for path, actions in terminal_commands.items():
+            if not isinstance(path, str) or not path:
+                raise ValueError(f'Terminal command path "{path}" must be a non-empty string.')
+            if not isinstance(actions, dict) or 'before' not in actions or 'after' not in actions:
+                raise ValueError(f'Terminal command actions for "{path}" must be a dictionary with "before" and "after" keys.')
+            
+            for phase in ['before', 'after']:
+                for dir_path, command in actions[phase].items():
+                    if not isinstance(dir_path, str) or not dir_path:
+                        raise ValueError(f'Directory path "{dir_path}" for command in phase "{phase}" must be a non-empty string.')
+                    if not isinstance(command, str) or restricted_symbols.search(command):
+                        raise ValueError(f'Command "{command}" in phase "{phase}" contains restricted symbols.')
+                    # TODO: Disabling this logic just for now. Need to figure out how to handle in case raising this exception.
+                    # if not any(cmd in command for cmd in allowed_commands):
+                    #     raise ValueError(f'Command "{command}" in phase "{phase}" is not an approved command.')
+        
+        return values

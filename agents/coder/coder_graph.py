@@ -33,10 +33,12 @@ class CoderGraph(Graph[CoderAgent]):
         # node
         coder_flow.add_node(self.agent.entry_node_name, self.agent.entry_node)
         coder_flow.add_node(self.agent.code_generation_node_name, self.agent.code_generation_node)
-        coder_flow.add_node(self.agent.run_commands_node_name, self.agent.run_commands_node)
+        coder_flow.add_node(self.agent.general_task_node_name, self.agent.general_task_node)
+        # coder_flow.add_node(self.agent.run_commands_node_name, self.agent.run_commands_node)
         coder_flow.add_node(self.agent.write_generated_code_node_name, self.agent.write_code_node)
-        coder_flow.add_node(self.agent.download_license_node_name, self.agent.download_license_node)
         coder_flow.add_node(self.agent.add_license_node_name, self.agent.add_license_text_node)
+        coder_flow.add_node(self.agent.download_license_node_name, self.agent.download_license_node)
+        coder_flow.add_node(self.agent.agent_response_node_name, self.agent.agent_response_node)
         coder_flow.add_node(self.agent.update_state_node_name, self.agent.update_state)
 
         # edges
@@ -45,61 +47,34 @@ class CoderGraph(Graph[CoderAgent]):
             self.agent.router,
             {
                 self.agent.code_generation_node_name: self.agent.code_generation_node_name,
-                self.agent.update_state_node_name:self.agent.update_state_node_name
+                self.agent.general_task_node_name: self.agent.general_task_node_name
             }
         )
 
-        coder_flow.add_conditional_edges(
-            self.agent.code_generation_node_name,
-            self.agent.router,
-            {
-                self.agent.code_generation_node_name: self.agent.code_generation_node_name,
-                self.agent.write_generated_code_node_name: self.agent.write_generated_code_node_name,
-                self.agent.update_state_node_name:self.agent.update_state_node_name,
-                self.agent.add_license_node_name: self.agent.add_license_node_name,
-            }
-        )
+        coder_flow.add_edge(self.agent.general_task_node_name, self.agent.write_generated_code_node_name)
+        coder_flow.add_edge(self.agent.code_generation_node_name, self.agent.write_generated_code_node_name)
+        coder_flow.add_edge(self.agent.write_generated_code_node_name, self.agent.add_license_node_name)
 
-        coder_flow.add_conditional_edges(
-            self.agent.run_commands_node_name,
-            self.agent.router,
-            {
-                self.agent.run_commands_node_name: self.agent.run_commands_node_name,
-                self.agent.write_generated_code_node_name: self.agent.write_generated_code_node_name,
-                self.agent.update_state_node_name:self.agent.update_state_node_name
-            }
-        )
-
-        coder_flow.add_conditional_edges(
-            self.agent.write_generated_code_node_name,
-            self.agent.router,
-            {
-                self.agent.write_generated_code_node_name: self.agent.write_generated_code_node_name,
-                self.agent.download_license_node_name: self.agent.download_license_node_name,
-                self.agent.update_state_node_name:self.agent.update_state_node_name,
-                self.agent.add_license_node_name: self.agent.add_license_node_name,
-            }
-        )
-
-        coder_flow.add_conditional_edges(
-            self.agent.download_license_node_name,
-            self.agent.router,
-            {
-                self.agent.add_license_node_name: self.agent.add_license_node_name,
-                self.agent.download_license_node_name: self.agent.download_license_node_name,
-                self.agent.update_state_node_name:self.agent.update_state_node_name
-            }
-        )
+        # coder_flow.add_conditional_edges(
+        #     self.agent.run_commands_node_name,
+        #     self.agent.router,
+        #     {
+        #         self.agent.run_commands_node_name: self.agent.run_commands_node_name,
+        #         self.agent.write_generated_code_node_name: self.agent.write_generated_code_node_name,
+        #     }
+        # )
 
         coder_flow.add_conditional_edges(
             self.agent.add_license_node_name,
             self.agent.router,
             {
-                self.agent.add_license_node_name: self.agent.add_license_node_name,
-                self.agent.update_state_node_name:self.agent.update_state_node_name
+                self.agent.download_license_node_name: self.agent.download_license_node_name,
+                self.agent.agent_response_node_name: self.agent.agent_response_node_name
             }
         )
 
+        coder_flow.add_edge(self.agent.download_license_node_name, self.agent.agent_response_node_name)
+        coder_flow.add_edge(self.agent.agent_response_node_name, self.agent.update_state_node_name)
         coder_flow.add_edge(self.agent.update_state_node_name, END)
 
         # entry point

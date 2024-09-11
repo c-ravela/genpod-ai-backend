@@ -88,7 +88,7 @@ class PlannedTask(BaseModel):
         default=False,
     )
 
-    is_code_generate: bool = Field(
+    is_code_generated: bool = Field(
         description="funtional code is generated or not",
         default=False
     )

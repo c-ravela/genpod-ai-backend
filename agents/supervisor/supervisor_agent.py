@@ -180,8 +180,6 @@ class SupervisorAgent(Agent[SupervisorState, SupervisorPrompts]):
             ValueError: If the team has not been initialized.
         """
 
-        # TODO: New fields has been added to super state add them here.
-        
         if self.team is None:
             raise ValueError(
                 f"Error: The team for '{self.agent_name}' has not been initialized. "
@@ -211,16 +209,12 @@ class SupervisorAgent(Agent[SupervisorState, SupervisorPrompts]):
             )
         ]
         state['human_feedback'] = []
-        state['project_folder_strucutre'] = ''
-        state['code'] = ''
-        state['files_created'] = []
-        state['infile_license_comments'] = {}
-        state['commands_to_execute'] = {}
         state['functions_skeleton'] = {}
         state['test_code'] = ""
         state['planned_tasks'] = PlannedTaskQueue()
         state['rag_retrieval'] = ''
         state['requirements_document'] = RequirementsDocument()
+        state['code_generation_plan_list'] = []
 
         self.responses = {member.member_id: [] for member in self.team.get_team_members_as_list()}
         
@@ -236,7 +230,7 @@ class SupervisorAgent(Agent[SupervisorState, SupervisorPrompts]):
         logger.info(f"{self.team.rag.member_name} has been called.")
         self.called_agent = self.team.rag.member_id
         
-        # TODO - LOW: has to be moved to RAG agent
+        # TODO - LOW: RAG cache creation has to be moved to RAG agent
         # check if rag cache was ready if not prepare one
         if not self.is_rag_cache_created:
             logger.info(f"{self.team.rag.member_name}: creating the RAG cache.")
@@ -313,7 +307,7 @@ class SupervisorAgent(Agent[SupervisorState, SupervisorPrompts]):
 
                 # TODO - MEDIUM: We are adding strings like `RAG_Response:` and using this word for conditional checks in a few places.
                 # problem is performance degradation: the application slows down because we are searching for a small string in a very large 
-                # string.
+                # string. 06/09/2024 - conditional checks were removed, but still might need to reconsider the way we store info.
                 state['current_task'].task_status = Status.RESPONDED
                 state['current_task'].additional_info += "\nRAG_Response:\n" + result
                 state['rag_retrieval'] += result
@@ -355,15 +349,13 @@ class SupervisorAgent(Agent[SupervisorState, SupervisorPrompts]):
                 state['requirements_document'] = architect_result['requirements_document']
                 state['project_name'] = architect_result['project_name']
                 state['microservice_name'] = architect_result['project_name']
-                state['project_folder_strucutre'] = architect_result['project_folder_structure']
 
-                return state
             elif architect_result['current_task'].task_status == Status.AWAITING: 
                 state['current_task'] = architect_result['current_task']
                 state['agents_status'] = f'{self.team.architect.member_name} Awaiting'
                 self.responses[self.team.architect.member_id].append(("Returned from Architect with a question:", architect_result['current_task'].question))
 
-                return state
+            return state
         elif state['project_status'] == PStatus.MONITORING:
             # Need to query Architect to get additional information for another agent which will be present in called agent and that will never be updated when returning
             logger.info("----------Querying Architect----------")
@@ -381,7 +373,7 @@ class SupervisorAgent(Agent[SupervisorState, SupervisorPrompts]):
             logger.info("----------Response from Architect Agent----------")
             logger.info("Architect Response: %r", architect_result['current_task'])
 
-            # TODO: make architect to update the task_status to RESPONDED when done. else keep it awaiting means architect has no answer for the question.
+            # TODO: make architect to update the task_status to RESPONDED when done. else keep it awaiting meaning architect has no answer for the question.
             if architect_result['query_answered'] is True:
                 state['agents_status'] = f'{self.team.architect.member_name} completed'
                 self.responses[self.team.architect.member_id].append(("Returned from Architect serving a Query", architect_result['current_task']))
@@ -407,7 +399,6 @@ class SupervisorAgent(Agent[SupervisorState, SupervisorPrompts]):
 
         coder_result = self.team.coder.invoke({
             'project_name': state['project_name'],
-            'project_folder_strucutre': state['project_folder_strucutre'],
             'requirements_document': state['requirements_document'].to_markdown(),
             'project_path': state['project_path'],
             'license_url': state['license_url'],
@@ -421,19 +412,15 @@ class SupervisorAgent(Agent[SupervisorState, SupervisorPrompts]):
 
         state['current_planned_task'] = coder_result['current_planned_task']
 
-        # TODO: on successfull case coder has to add updated fields to super state
         if state['current_planned_task'].task_status == Status.DONE:
-            logger.info("Coder completed work package")
-
-            state['agents_status'] = f'{self.team.coder.member_name} Completed'
+            logger.info(f"{self.team.coder.member_name} has successfully completed the task. Task ID: {state['current_planned_task'].task_id}.")
+            
+            state['code_generation_plan_list'].extend(coder_result['code_generation_plan_list'])
+            state['agents_status'] = f'{self.team.coder.member_name} has successfully completed the task.'
         elif state['current_planned_task'].task_status == Status.ABANDONED:
-            logger.info("Coder unable to complete the work package due to : %s", state['current_planned_task'])
+            logger.info(f"{self.team.coder.member_name} was unable to complete the task. Abandoned Task ID: {state['current_planned_task'].task_id}.")
 
-            state['agent_status'] = f"{self.team.coder.member_name} Completed With Abandonment"
-        else:
-            logger.info("Coder awaiting for additional information\nCoder Query: %s", state['current_planned_task'])
-
-            state['agents_status'] = f'{self.team.coder.member_name} Awaiting'
+            state['agent_status'] = f"{self.team.coder.member_name} has abandoned the task."
 
         self.called_agent = self.team.coder.member_id
         self.responses[self.team.coder.member_id].append(("Returned from Coder", state['current_planned_task']))
@@ -453,7 +440,7 @@ class SupervisorAgent(Agent[SupervisorState, SupervisorPrompts]):
 
         test_coder_result = self.team.tests_generator.invoke({
             'project_name': state['project_name'],
-            'project_folder_strucutre': state['project_folder_strucutre'],
+            'project_folder_strucutre': state['requirements_document'].directory_structure,
             'requirements_document': state['requirements_document'].to_markdown(),
             'project_path': state['project_path'],
             'license_url': state['license_url'],
@@ -659,7 +646,7 @@ class SupervisorAgent(Agent[SupervisorState, SupervisorPrompts]):
 
                 # All task must have been finished.
                 if next_task is None:
-                    # TODO: Need to consider the Abandoned Tasks. Before considering the task as complete.
+                    # TODO: Need to consider the Abandoned Tasks. Before considering the Project status as complete.
                     state['project_status'] = PStatus.DONE
                 else:
                     state['current_task'] = next_task
@@ -836,7 +823,7 @@ class SupervisorAgent(Agent[SupervisorState, SupervisorPrompts]):
                 
                 # Other conditions like is_code_generated from PlannedTask object is also useful
                 # to figure out if coder has already completed the task.
-                if not state['current_planned_task'].is_code_generate:
+                if not state['current_planned_task'].is_code_generated:
                     logger.info(f"Delegator: Invoking call_test_code_generator due to Project Status: {PStatus.EXECUTING} and PlannedTask Status: {Status.NEW}.")
                     return 'call_coder'
             else:
