@@ -6,14 +6,111 @@ capturing a specific set of information required for the project. These models
 are used to structure the data in a consistent and organized manner, enhancing 
 the readability and maintainability of the code.
 """
-from typing import Any, Iterator, List
-
+from typing import Any, Iterator, List, TypeVar, Generic, Optional
 from pydantic import BaseModel, Field
 
 from models.constants import Status
 from utils.task_utils import generate_task_id
 
+QueueType = TypeVar("QueueType", bound=BaseModel)
 
+class Queue(BaseModel, Generic[QueueType]):
+    """
+    A base class to manage a queue of items with an index to keep track of the next item to process.
+    """
+
+    next: int = Field(
+        description="Index of the next item to process",
+        default=0
+    )
+
+    items: List[QueueType] = Field(
+        description="List of items in the queue",
+        default=[]
+    )
+
+    def add_item(self, item: QueueType) -> None:
+        """
+        Adds a new item to the end of the queue.
+        
+        Args:
+            item (QueueType): The item to be added.
+        """
+        self.items.append(item)
+
+    def add_items(self, items: List[QueueType]) -> None:
+        """
+        Adds a list of items to the end of the queue.
+        
+        Args:
+            items (List[QueueType]): A list of items to be added.
+        """
+        self.items.extend(items)
+
+    def get_next_item(self) -> Optional[QueueType]:
+        """
+        Retrieves and advances to the next item in the queue.
+        
+        Returns:
+            Optional[QueueType]: The next item in the queue, or None if no items are left.
+        """
+        if self.next < len(self.items):
+            item = self.items[self.next]
+            self.next += 1
+            return item
+        
+        return None
+
+    def get_all_items(self) -> List[QueueType]:
+        """
+        Returns a list of all items in the queue.
+        
+        Returns:
+            List[QueueType]: A list containing all items in the queue.
+        """
+        return self.items
+
+    def update_item(self, updated_item: QueueType) -> None:
+        """
+        Updates an existing item in the queue with the new values from the updated_item.
+        
+        This method must be implemented by subclasses.
+        
+        Args:
+            updated_item (QueueType): The updated item with new values.
+        
+        Raises:
+            NotImplementedError: If this method is not overridden in a subclass.
+        """
+        raise NotImplementedError("Subclasses must implement this method.")
+    
+    def __str__(self) -> str:
+        """
+        Returns a string representation of the Queue.
+        
+        Returns:
+            str: A string representing the current items and the index of the next item.
+        """
+        return f"Items: {self.items}, Next Index: {self.next}"
+
+    def __iter__(self) -> Iterator[QueueType]:
+        """
+        Returns an iterator over the items in the queue.
+        
+        Returns:
+            Iterator[QueueType]: An iterator for the items in the queue.
+        """
+        return iter(self.items)
+
+    def __len__(self) -> int:
+        """
+        Returns the number of items in the queue.
+        
+        Returns:
+            int: The number of items in the queue.
+        """
+        return len(self.items)
+    
 class Task(BaseModel):
     """
     A data model representing a task and its current state within a project
@@ -47,17 +144,33 @@ class Task(BaseModel):
         default=""
     )
 
-    remarks: str = Field(
-        description="A field for notes on the task's status. If the task is "
-        "abandoned, state the reason here.",
-        default=""
-    )
+class TaskQueue(Queue[Task]):
+    """
+    A queue specifically for Task objects.
+    """
+    
+    def update_item(self, updated_task: Task) -> None:
+        """
+        Updates an existing task in the queue with the new values from the updated_task.
+
+        Args:
+            updated_task (Task): The updated Task object with new values.
+        
+        Raises:
+            ValueError: If the task to be updated is not found in the queue.
+        """
+        for i, task in enumerate(self.items):
+            if task.task_id == updated_task.task_id:
+                self.items[i] = updated_task
+                return
+        raise ValueError(f"Task with ID {updated_task.task_id} not found in the queue.")
 
 class PlannedTask(BaseModel):
     """
     A data model representing a task and its current state within a project
     or workflow.
     """
+
     parent_task_id: str = Field(
         description="A unique task id representing it parent task id",
         default="",
@@ -99,57 +212,132 @@ class PlannedTask(BaseModel):
         required=True
     )
 
+class PlannedTaskQueue(Queue[PlannedTask]):
+    """
+    A queue specifically for PlannedTask objects.
+    """
+
+    def update_item(self, updated_task: PlannedTask) -> None:
+        """
+        Updates an existing planned task in the queue with the new values from the updated_task.
+
+        Args:
+            updated_task (PlannedTask): The updated PlannedTask object with new values.
+        
+        Raises:
+            ValueError: If the planned task to be updated is not found in the queue.
+        """
+        for i, task in enumerate(self.items):
+            if task.task_id == updated_task.task_id:
+                self.items[i] = updated_task
+                return
+            
+        raise ValueError(f"PlannedTask with ID {updated_task.task_id} not found in the queue.")
+
+class Issue(BaseModel):
+    """
+    A model representing an issue with various attributes including status, description, 
+    and file path.
+    """
+
+    issue_id: str = Field(
+        description="A unique identifier for the issue.",
+        default_factory=generate_task_id()
+    )
+
+    issue_status: Status = Field(
+        description="The current status of the issue.",
+        default=Status.NONE,
+        required=True
+    )
+
+    description: str = Field(
+        description="A brief description of the issue.",
+        default="",
+        required=True
+    )
+
+    file_path: str = Field(
+        description="The file path where the issue is located or associated with.",
+        default="",
+        required=True
+    )
+
+class IssuesQueue(Queue[Issue]):
+    """
+    A specialized queue for managing issues, allowing updates to existing issues within the queue.
+    """
+    
+    def update_item(self, updated_issue: Issue) -> None:
+        """
+        Update an existing issue in the queue with the provided updated issue.
+
+        Args:
+            updated_issue (Issue): The updated issue to replace the existing issue in the queue.
+
+        Raises:
+            ValueError: If the issue with the specified ID is not found in the queue.
+        """
+        for i, issue in enumerate(self.items):
+            if issue.issue_id == updated_issue.issue_id:
+                self.items[i] = updated_issue
+                return
+        raise ValueError(f"Issue with ID {updated_issue.issue_id} not found in the queue.")
+
 class RequirementsDocument(BaseModel):
     """
-    This class encapsulates the various requirements of a project. 
+    Represents a comprehensive document that encapsulates the various requirements of a project. 
+    This class includes details about the project's architecture, tasks, coding standards, 
+    implementation process, and licensing information. It also provides methods to generate
+    a Markdown representation of the document.
     """
 
     project_overview: str = Field(
-        description="A brief overview of the project.",
+        description="A brief overview of the project, summarizing its goals and objectives.",
         default=""
     )
     
     project_architecture: str = Field(
-        description="Detailed information about the project's architecture.",
+        description="Detailed information about the project's architecture, including design patterns and key components.",
         default=""
     )
 
     directory_structure: str = Field(
-        description="A description of the project's directory and folder structure.",
+        description="A description of the project's directory and folder structure, outlining the organization of files and directories.",
         default=""
     )
 
     microservices_architecture: str = Field(
-        description="Details about the design and architecture of the project's microservices.",
+        description="Details about the design and architecture of the project's microservices, including their interactions and dependencies.",
         default=""
     )
 
     tasks_overview: str = Field(
-        description="An overview of the tasks involved in the project.",
+        description="An overview of the tasks involved in the project, including their purpose and key objectives.",
         default=""
     )
 
     coding_standards: str = Field(
-        description="The coding standards and conventions followed in the project.",
+        description="The coding standards and conventions followed in the project, ensuring consistency and quality in the codebase.",
         default=""
     )
 
     implementation_process: str = Field(
-        description="A detailed description of the implementation process.",
+        description="A detailed description of the implementation process, including phases, milestones, and methodologies.",
         default=""
     )
 
     project_license_information: str = Field(
-        description="Information about the project's licensing terms and conditions.",
+        description="Information about the project's licensing terms and conditions, including usage rights and restrictions.",
         default=""
     )
 
     def to_markdown(self) -> str:
         """
-        Generates a Markdown-formatted requirements document for the project.
+        Generates a Markdown-formatted string representing the requirements document.
 
         Returns:
-            str: A Markdown string representing the requirements document.
+            str: A Markdown string that represents the requirements document, formatted with sections for each attribute.
         """
 
         return f"""
@@ -182,7 +370,16 @@ class RequirementsDocument(BaseModel):
     
     def __getitem__(self, key: str) -> Any:
         """
-        Allows getting attributes using square bracket notation.
+        Retrieves the value of an attribute using square bracket notation.
+
+        Args:
+            key (str): The name of the attribute to retrieve.
+
+        Returns:
+            Any: The value of the specified attribute.
+
+        Raises:
+            KeyError: If the attribute with the specified key does not exist in the document.
         """
         if hasattr(self, key):
             return getattr(self, key)
@@ -190,205 +387,16 @@ class RequirementsDocument(BaseModel):
 
     def __setitem__(self, key: str, value: Any) -> None:
         """
-        Allows setting attributes using square bracket notation.
+        Sets the value of an attribute using square bracket notation.
+
+        Args:
+            key (str): The name of the attribute to set.
+            value (Any): The new value to assign to the specified attribute.
+
+        Raises:
+            KeyError: If the attribute with the specified key does not exist in the document.
         """
         if hasattr(self, key):
             setattr(self, key, value)
         else:
             raise KeyError(f"Key '{key}' not found in RequirementsDocument.")
-
-class TaskQueue(BaseModel):
-    """
-    A class to manage a queue of tasks with an index to keep track of the next task to process.
-    """
-    
-    next: int = Field(
-        description="index of next field",
-        default=0
-    )
-
-    queue: List[Task] = Field(
-        description="list of tasks",
-        default=[]
-    )
-
-    def add_task(self, t: Task) -> None:
-        """
-        Adds a new task to the end of the queue.
-        
-        Args:
-            t (Task): The Task object to be added.
-        """
-        self.queue.append(t)
-
-    def add_tasks(self, tasks: List[Task]) -> None:
-        """
-        Adds a list of tasks to the end of the queue.
-        
-        Args:
-            tasks (List[Task]): A list of Task objects to be added.
-        """
-        self.queue.extend(tasks)
-
-    def get_next_task(self) -> Task:
-        """
-        Retrieves and advances to the next task in the queue.
-        
-        Returns:
-            Task: The next Task object, or None if no tasks are left.
-        """
-        if self.next < len(self.queue):
-            task = self.queue[self.next]
-            self.next += 1
-            return task
-        return None
-
-    def get_all_tasks(self) -> List[Task]:
-        """
-        Returns a list of all tasks in the queue.
-        
-        Returns:
-            List[Task]: A list containing all Task objects in the queue.
-        """
-        return self.queue
-    
-    def update_task(self, updated_task: Task) -> None:
-        """
-        Updates an existing task in the queue with the new values from the updated_task.
-
-        Args:
-            updated_task (Task): The updated Task object with new values.
-        
-        Raises:
-            ValueError: If the task to be updated is not found in the queue.
-        """
-        for i, task in enumerate(self.queue):
-            if task.task_id == updated_task.task_id:
-                self.queue[i] = updated_task
-                return
-        raise ValueError(f"Task with ID {updated_task.task_id} not found in the queue.")
-
-    def __str__(self) -> str:
-        """
-        Returns a string representation of the TaskQueue.
-        
-        Returns:
-            str: A string representing the current tasks and the index of the next task.
-        """
-        return f"Tasks: {self.queue}, Next Index: {self.next}"
-
-    def __iter__(self) -> Iterator[Task]:
-        """
-        Returns an iterator over the tasks in the queue.
-        
-        Returns:
-            Iterator[Task]: An iterator for the tasks in the queue.
-        """
-        return iter(self.queue)
-
-    def __len__(self) -> int:
-        """
-        Returns the number of tasks in the queue.
-        
-        Returns:
-            int: The number of tasks in the queue.
-        """
-        return len(self.queue)
-    
-class PlannedTaskQueue(BaseModel):
-    """
-    A class to manage a queue of tasks with an index to keep track of the next task to process.
-    """
-    
-    next: int = Field(
-        description="index of next field",
-        default=0
-    )
-
-    queue: List[PlannedTask] = Field(
-        description="list of planned tasks",
-        default=[]
-    )
-
-    def add_task(self, t: PlannedTask) -> None:
-        """
-        Adds a new task to the end of the queue.
-        
-        Args:
-            t (Task): The Task object to be added.
-        """
-        self.queue.append(t)
-
-    def add_tasks(self, tasks: List[PlannedTask]) -> None:
-        """
-        Adds a list of tasks to the end of the queue.
-        
-        Args:
-            tasks (List[Task]): A list of Task objects to be added.
-        """
-        self.queue.extend(tasks)
-
-    def get_next_task(self) -> PlannedTask:
-        """
-        Retrieves and advances to the next task in the queue.
-        
-        Returns:
-            Task: The next Task object, or None if no tasks are left.
-        """
-        if self.next < len(self.queue):
-            task = self.queue[self.next]
-            self.next += 1
-            return task
-        return None
-    
-    def get_all_tasks(self) -> List[PlannedTask]:
-        """
-        Returns a list of all tasks in the queue.
-        
-        Returns:
-            List[PlannedTask]: A list containing all PlannedTask objects in the queue.
-        """
-        return self.queue
-    
-    def update_task(self, updated_task: PlannedTask) -> None:
-        """
-        Updates an existing task in the queue with the new values from the updated_task.
-
-        Args:
-            updated_task (Task): The updated Task object with new values.
-        
-        Raises:
-            ValueError: If the task to be updated is not found in the queue.
-        """
-        for i, task in enumerate(self.queue):
-            if task.task_id == updated_task.task_id:
-                self.queue[i] = updated_task
-                return
-        raise ValueError(f"Task with ID {updated_task.task_id} not found in the queue.")
-
-    def __str__(self) -> str:
-        """
-        Returns a string representation of the TaskQueue.
-        
-        Returns:
-            str: A string representing the current tasks and the index of the next task.
-        """
-        return f"Tasks: {self.queue}, Next Index: {self.next}"
-    
-    def __iter__(self) -> Iterator[PlannedTask]:
-        """
-        Returns an iterator over the tasks in the queue.
-        
-        Returns:
-            Iterator[PlannedTask]: An iterator for the tasks in the queue.
-        """
-        return iter(self.queue)
-
-    def __len__(self) -> int:
-        """
-        Returns the number of tasks in the queue.
-        
-        Returns:
-            int: The number of tasks in the queue.
-        """
-        return len(self.queue)
