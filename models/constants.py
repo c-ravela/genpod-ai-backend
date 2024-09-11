@@ -41,67 +41,50 @@ class ChatRoles(Enum):
     
 class Status(Enum):
     """
-    An enumeration representing the various states a task or project can be in.
+    Enumeration representing the states of a task or project.
 
-    This class is used to track the progress of a task or project. The states 
-    include 'NEW', 'AWAITING', 'INPROGRESS', 'ABANDONED', and 'DONE'. These 
-    states help in identifying the current status of a task or project.
-
-    Attributes:
-        NONE (str): Represents the task is empty.
-        NEW (str): Represents the initial state of a task or project.
-        AWAITING (str): Represents the state when a task or project is waiting
-          for some event or dependency.
-        RESPONDED (str): Indicates that the task or project was previously in 
-          the 'AWAITING' state and has now received the necessary response.
-        INPROGRESS (str): Represents the state when a task or project is 
-          currently being worked on.
-        ABANDONED (str): Represents the state when a task or project has been 
-          left incomplete.
-        DONE (str): Represents the state when a task or project has been 
-          completed.
+    States:
+    - 'NONE': No status assigned.
+    - 'NEW': Initial state.
+    - 'AWAITING': Waiting for an event or dependency.
+    - 'RESPONDED': Response received after being in 'AWAITING'.
+    - 'INPROGRESS': Currently being worked on.
+    - 'ABANDONED': Left incomplete.
+    - 'DONE': Completed.
     """
-    NONE: str = "NONE"
-    NEW: str = "NEW"
-    AWAITING: str = "AWAITING"
-    RESPONDED: str = "RESPONDED"
-    INPROGRESS: str = "INPROGRESS"
-    ABANDONED: str = "ABANDONED"
-    DONE: str = "DONE"
+    
+    NONE = "NONE"
+    NEW = "NEW"
+    AWAITING = "AWAITING"
+    RESPONDED = "RESPONDED"
+    INPROGRESS = "INPROGRESS"
+    ABANDONED = "ABANDONED"
+    DONE = "DONE"
 
     def __str__(self):
-      """
-      Returns the string representation of the Enum member.
+        """
+        Returns the string representation of the Enum member.
 
-      Returns:
-          str: The value of the Enum member.
-      """
-      return self.value
+        Returns:
+            str: The value of the Enum member.
+        """
+        return self.value
 
 class PStatus(Enum):
     """
-    An enumeration representing the various states a project can be in.
+    Enumeration representing the various states a project can be in.
 
-    This class is used to track the progress of a project. The states
-    include 'RECEIVED', 'NEW', 'INITIAL', 'EXECUTING', 'MONITORING', 
-    'HALTED', and 'DONE'. These states help in identifying the current 
-    status of a project or task.
+    The states track the project's progress through different phases:
 
-    Attributes:
-        NONE (str): Initial state indicating no status has been assigned yet.
-        RECEIVED (str): Indicates that the project has been received but has 
-          not yet been assigned a specific status.
-        NEW (str): Represents the pre-initiation state of a project.
-        INITIAL (str): Represents the initial state when a project is waiting 
-          for setup to be completed.
-        EXECUTING (str): Represents the state of the project when a task is 
-          currently being worked on.
-        MONITORING (str): Represents the state of the project when issues 
-          have arisen during task execution.
-        HALTED (str): Represents the state when all tasks have been completed 
-          or when an unresolved issue requires human intervention.
-        DONE (str): Represents the state when all user-requested requirements 
-          have been fulfilled.
+    - 'NONE': No status assigned yet.
+    - 'RECEIVED': Project has been received but not yet processed.
+    - 'NEW': Project is in the pre-initiation phase.
+    - 'INITIAL': Setup is pending.
+    - 'EXECUTING': Task is in progress.
+    - 'MONITORING': Project is being monitored for issues during execution.
+    - 'REVIEWING': Project is under review.
+    - 'HALTED': Project is paused, either due to completion or unresolved issues requiring intervention.
+    - 'DONE': All user-requested requirements have been fulfilled.
     """
 
     NONE: str = "NONE"
@@ -110,6 +93,7 @@ class PStatus(Enum):
     INITIAL: str = "INITIAL"
     EXECUTING: str = "EXECUTING"
     MONITORING: str = "MONITORING"
+    REVIEWING: str = "REVIEWING"
     HALTED: str = "HALTED"
     DONE: str = "DONE"
 
