@@ -9,8 +9,8 @@ from agents.agent.agent import Agent
 from agents.supervisor.supervisor_state import SupervisorState
 from configs.project_config import ProjectAgents
 from models.constants import ChatRoles, PStatus, Status
-from models.models import (PlannedTask, PlannedTaskQueue, RequirementsDocument,
-                           Task, TaskQueue)
+from models.models import (Issue, IssuesQueue, PlannedTask, PlannedTaskQueue,
+                           RequirementsDocument, Task, TaskQueue)
 from models.supervisor_models import QueryList
 from prompts.supervisor_prompts import SupervisorPrompts
 from utils.fuzzy_rag_cache import FuzzyRAGCache
@@ -195,8 +195,10 @@ class SupervisorAgent(Agent[SupervisorState, SupervisorPrompts]):
         state['microservice_name'] = ""
         state['current_task'] = Task()
         state['current_planned_task'] = PlannedTask()
+        state['current_issue'] = Issue()
         state['is_rag_query_answered'] = False
         state['rag_cache_queries'] = []
+        state['issues'] = IssuesQueue()
         state['tasks'] = TaskQueue()
         state['messages'] = [
             (
@@ -345,7 +347,7 @@ class SupervisorAgent(Agent[SupervisorState, SupervisorPrompts]):
                 state['current_task'] = architect_result['current_task']
                 state['agents_status'] = f'{self.team.architect.member_name} completed'
                 self.responses[self.team.architect.member_id].append(("Returned from Architect", architect_result['tasks']))
-                state['tasks'].add_tasks(architect_result['tasks'])
+                state['tasks'].add_items(architect_result['tasks'])
                 state['requirements_document'] = architect_result['requirements_document']
                 state['project_name'] = architect_result['project_name']
                 state['microservice_name'] = architect_result['project_name']
@@ -625,8 +627,11 @@ class SupervisorAgent(Agent[SupervisorState, SupervisorPrompts]):
             #
             # If there are planned tasks:
             # - The Coder and Tester should work on these tasks.
+            # 
+            # Once all the General Tasks were finised(All of the tasks statuses are DONE) then project state will be 
+            # updated to REVIEWING
 
-            # Three scenario ofr this block of code to get triggered
+            # Three scenario for this block of code to get triggered
             # Architect agent has finished generating the requirements documents and tasks
             # or
             # Coder and Tester completed their task.
@@ -635,19 +640,19 @@ class SupervisorAgent(Agent[SupervisorState, SupervisorPrompts]):
             # Call Planner to prepare planned tasks.
 
             try:
-                state['tasks'].update_task(state['current_task'])
+                state['tasks'].update_item(state['current_task'])
             except Exception as e:
                 logger.error(f"`state['tasks']` received an task which is not in the list. \nException: {e}")
 
             # If any task is abandoned just move on to new task for now. Already task status is updated in the task list.
             # Will decide on what to do with abandoned tasks later.
             if state['current_task'].task_status == Status.DONE or state['current_task'].task_status == Status.ABANDONED:
-                next_task = state['tasks'].get_next_task()
+                next_task = state['tasks'].get_next_item()
 
                 # All task must have been finished.
                 if next_task is None:
-                    # TODO: Need to consider the Abandoned Tasks. Before considering the Project status as complete.
-                    state['project_status'] = PStatus.DONE
+                    # TODO: Need to consider the Abandoned Tasks. Before considering the Project status as REVIEWING.
+                    state['project_status'] = PStatus.REVIEWING
                 else:
                     state['current_task'] = next_task
 
@@ -660,12 +665,12 @@ class SupervisorAgent(Agent[SupervisorState, SupervisorPrompts]):
             elif state['current_task'].task_status == Status.INPROGRESS:
                 # update the planned _task status in the list
                 try:
-                    state['planned_tasks'].update_task(state['current_planned_task'])
+                    state['planned_tasks'].update_item(state['current_planned_task'])
                 except Exception as e:
                     logger.error(f"`state['planned_tasks']` received an task which is not in the list. \nException: {e}")
 
                 if state['current_planned_task'].task_status == Status.NONE or state['current_planned_task'].task_status == Status.DONE or state['current_planned_task'].task_status == Status.ABANDONED:
-                    next_planned_task = state['planned_tasks'].get_next_task()
+                    next_planned_task = state['planned_tasks'].get_next_item()
 
                     if next_planned_task is None:
                         self.are_planned_tasks_in_progress = False
@@ -675,6 +680,22 @@ class SupervisorAgent(Agent[SupervisorState, SupervisorPrompts]):
                         self.are_planned_tasks_in_progress = True
                         self.calling_agent = self.team.supervisor.member_id
                 
+            return state
+        elif state['project_status'] == PStatus.REVIEWING:
+            # When the project status is 'REVIEWING
+            # 
+            # Reviewer will review the generated project for code quality, linting,
+            # Dependancy packages vulnerabilites, code security vulnerabilities,
+            # testing(unit testing, functional testing, Integration testing),
+            # cloud deployment files(docker files).
+            #
+            # If there are problems in any of the scenarios then respective team meber 
+            # has to finish it. Reviewer will return with issues packets.
+            # 
+            # If everythings good(no issues) then Project State will be updated
+            # to DONE.
+            state['project_status'] = PStatus.DONE
+            
             return state
         elif state['project_status'] == PStatus.HALTED:
             # When the project status is 'HALTED':
@@ -713,8 +734,8 @@ class SupervisorAgent(Agent[SupervisorState, SupervisorPrompts]):
         # the current task status will be updated to DONE by the supervisor.
         if state['current_task'].task_status == Status.INPROGRESS:
             logger.info(f"{self.team.planner.member_name} has successfully completed preparing the planned tasks for Task ID: {state['current_task'].task_id}.")
-            state['planned_tasks'].add_tasks(
-                planner_result['planned_tasks'].get_all_tasks()
+            state['planned_tasks'].add_items(
+                planner_result['planned_tasks'].get_all_items()
             )
 
             state['agent_status'] = f"Work packages have been built by {self.team.planner.member_name}."
@@ -736,6 +757,11 @@ class SupervisorAgent(Agent[SupervisorState, SupervisorPrompts]):
             self.responses[self.team.planner.member_id].append(("Returned from Planner with a question", state['current_task'].question))
 
         return state
+
+    def call_reviwer(self, state: SupervisorState) -> SupervisorState:
+        """
+        """
+        pass
 
     def call_human(self, state: SupervisorState) -> SupervisorState:
         # Display relevant information to the human
@@ -834,6 +860,8 @@ class SupervisorAgent(Agent[SupervisorState, SupervisorPrompts]):
             # occurs when architect just completed the assigned task(generating documents and tasks)
             # and now supervisor has to assign tasks for planner.
             logger.info(f"Delegator: Invoking call_supervisor due to Project Status: {PStatus.EXECUTING}.")
+            return 'call_supervisor'
+        elif state['project_status'] == PStatus.REVIEWING:
             return 'call_supervisor'
         elif state['project_status'] == PStatus.HALTED:
             # There may be situations where the LLM (Language Learning Model) cannot make a decision 
