@@ -6,11 +6,12 @@ the Coder agent includes information about the steps to complete a task,
 the files to be created, the location of the code, the actual code.
 """
 import re
-
 from typing import Any, Dict
 
 from pydantic import BaseModel, Field, model_validator
+
 from configs.shell_config import CODER_COMMANDS
+
 
 class FileContent(BaseModel):
     """

@@ -6,8 +6,8 @@ from typing_extensions import Annotated, TypedDict
 from agents.agent.state import State
 from models.coder_models import CodeGenerationPlan
 from models.constants import ChatRoles, PStatus
-from models.models import (PlannedTask, PlannedTaskQueue, RequirementsDocument,
-                           Task, TaskQueue)
+from models.models import (Issue, IssuesQueue, PlannedTask, PlannedTaskQueue,
+                           RequirementsDocument, Task, TaskQueue)
 from models.tests_generator_models import FunctionSkeleton
 
 
@@ -98,6 +98,12 @@ class SupervisorState(TypedDict):
     ]
 
     # @out
+    current_issue: Annotated[
+        Issue,
+        State.out_field("This field represents the issue that is currently being worked on.")
+    ]
+
+    # @out
     is_rag_query_answered : Annotated[
         bool,
         State.out_field("is query answered by rag agent.")
@@ -107,6 +113,11 @@ class SupervisorState(TypedDict):
     rag_cache_queries: Annotated[
         List[str],
         State.out_field("Queries generated for rag cache")
+    ]
+
+    issues: Annotated[
+        IssuesQueue,
+        State.out_field("A queue of issues that have been created by the reviewer.")
     ]
 
     # @out
