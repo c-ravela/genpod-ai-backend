@@ -13,7 +13,7 @@ from configs.project_config import ProjectAgents
 from prompts.reviewer_prompts import ReviewerPrompts
 
 
-class ReviewerAgent(Agent[ReviewerState]):
+class ReviewerAgent(Agent[ReviewerState, ReviewerPrompts]):
     """
     """
 

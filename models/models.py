@@ -243,7 +243,7 @@ class Issue(BaseModel):
 
     issue_id: str = Field(
         description="A unique identifier for the issue.",
-        default_factory=generate_task_id()
+        default_factory=generate_task_id
     )
 
     issue_status: Status = Field(
