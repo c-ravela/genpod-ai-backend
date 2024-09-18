@@ -49,10 +49,10 @@ class SupervisorAgent(Agent[SupervisorState, SupervisorPrompts]):
 
         # Indicates whether any planned tasks are currently in progress.
         # This flag is managed by the supervisor:
-        # - Set to True when the planner breaks down larger tasks into smaller planned tasks.
+        # - Set to True when the planner breaks down larger tasks/issues into smaller planned tasks.
         # - Set to False when the planned tasks list is empty.
         # The flag is used to control a loop that operates while planned tasks are being created and processed.
-        self.are_planned_tasks_in_progress: bool = False 
+        self.are_planned_tasks_in_progress: bool = False
 
         self.calling_agent: str = ""
         self.called_agent: str = ""
@@ -316,10 +316,10 @@ class SupervisorAgent(Agent[SupervisorState, SupervisorPrompts]):
                 state['agents_status'] = f'{self.team.rag.member_name} completed'
                 self.responses[self.team.rag.member_id].append(("Returned from RAG database serving a query", state['current_task']))
                 
-            return {**state}
+            return state
         
-        return {**state}
-            
+        return state
+
     def call_architect(self, state: SupervisorState) -> SupervisorState:
         """
         Prepares requirements document and answers queries for the team members.
@@ -347,7 +347,7 @@ class SupervisorAgent(Agent[SupervisorState, SupervisorPrompts]):
                 state['current_task'] = architect_result['current_task']
                 state['agents_status'] = f'{self.team.architect.member_name} completed'
                 self.responses[self.team.architect.member_id].append(("Returned from Architect", architect_result['tasks']))
-                state['tasks'].add_items(architect_result['tasks'])
+                state['tasks'].extend(architect_result['tasks'])
                 state['requirements_document'] = architect_result['requirements_document']
                 state['project_name'] = architect_result['project_name']
                 state['microservice_name'] = architect_result['project_name']
@@ -655,7 +655,6 @@ class SupervisorAgent(Agent[SupervisorState, SupervisorPrompts]):
                     state['project_status'] = PStatus.REVIEWING
                 else:
                     state['current_task'] = next_task
-
             elif state['current_task'].task_status == Status.AWAITING:
                 # Planner needs additional information
                 # Architect was responsible for answering the query if not then rag comes into play.
@@ -694,8 +693,40 @@ class SupervisorAgent(Agent[SupervisorState, SupervisorPrompts]):
             # 
             # If everythings good(no issues) then Project State will be updated
             # to DONE.
-            state['project_status'] = PStatus.DONE
+
+            if state['issues'].has_pending_items():
+                state['project_status'] = PStatus.RESOLVING
+            else:
+                state['project_status'] = PStatus.DONE
             
+            return state
+        elif state['project_status'] == PStatus.RESOLVING:
+
+            try:
+                state['issues'].update_item(state['current_issue'])
+            except Exception as e:
+                logger.error(f"`state['issues']` received an issue which is not in the list. \nException: {e}")
+
+            if state['current_issue'].issue_status == Status.DONE or state['current_issue'].issue_status == Status.NONE or state['current_issue'].issue_status == Status.ABANDONED:
+                if state['issues'].has_pending_items():
+                    state['current_issue'] = state['issues'].get_next_item()
+                    self.calling_agent = self.team.supervisor.member_id
+                else:
+                    state['project_status'] = PStatus.REVIEWING
+            elif state['current_issue'].issue_status == Status.INPROGRESS:
+                try:
+                    state['planned_tasks'].update_item(state['current_planned_task'])
+                except Exception as e:
+                    logger.error(f"`state['planned_tasks']` received an task which is not in the list. \nException: {e}")
+
+                if state['current_planned_task'].task_status == Status.NONE or state['current_planned_task'].task_status == Status.DONE or state['current_planned_task'].task_status == Status.ABANDONED:
+                    if state['planned_tasks'].has_pending_items():
+                        state['current_planned_task'] = state['planned_tasks'].get_next_item()
+                        self.are_planned_tasks_in_progress = True
+                        self.calling_agent = self.team.supervisor.member_id
+                    else:
+                        self.are_planned_tasks_in_progress = False
+                        state['current_issue'].issue_status = Status.DONE
             return state
         elif state['project_status'] == PStatus.HALTED:
             # When the project status is 'HALTED':
@@ -721,40 +752,65 @@ class SupervisorAgent(Agent[SupervisorState, SupervisorPrompts]):
         planner_result = self.team.planner.invoke({
             'context': f"{state['requirements_document'].to_markdown()}\n {state['rag_retrieval']}",
             'current_task': state['current_task'],
-            'project_path': state['project_path']
+            'project_path': state['project_path'],
+            'current_issue': state['current_issue'],
+            'project_status': state['project_status']
         })
 
-        state['current_task'] = planner_result['current_task']
+        if state['project_status'] == PStatus.EXECUTING:
+            state['current_task'] = planner_result['current_task']
 
-        # If the status is INPROGRESS, it indicates that the planner has successfully prepared planned tasks.
-        # The task is marked as INPROGRESS rather than DONE because:
-        # - The planner has set up the tasks, but they have not yet been executed.
-        # - The planned tasks are still pending execution.
-        # Once all the planned tasks have been addressed, regardless of their individual states, 
-        # the current task status will be updated to DONE by the supervisor.
-        if state['current_task'].task_status == Status.INPROGRESS:
-            logger.info(f"{self.team.planner.member_name} has successfully completed preparing the planned tasks for Task ID: {state['current_task'].task_id}.")
-            state['planned_tasks'].add_items(
-                planner_result['planned_tasks'].get_all_items()
-            )
+            # If the status is INPROGRESS, it indicates that the planner has successfully prepared planned tasks.
+            # The task is marked as INPROGRESS rather than DONE because:
+            # - The planner has set up the tasks, but they have not yet been executed.
+            # - The planned tasks are still pending execution.
+            # Once all the planned tasks have been addressed, regardless of their individual states, 
+            # the current task status will be updated to DONE by the supervisor.
+            if state['current_task'].task_status == Status.INPROGRESS:
+                logger.info(f"{self.team.planner.member_name} has successfully completed preparing the planned tasks for Task ID: {state['current_task'].task_id}.")
+                state['planned_tasks'].extend(planner_result['planned_tasks'])
 
-            state['agent_status'] = f"Work packages have been built by {self.team.planner.member_name}."
-            self.called_agent = self.team.planner.member_id
-            self.responses[self.team.planner.member_id].append(("Returned from Planner", state['current_task']))
-        elif state['current_task'].task_status == Status.ABANDONED:
-            logger.info(f"{self.team.planner.member_name} has abandoned the task with Task Id: {state['current_task'].task_id}")
+                state['agent_status'] = f"Work packages have been built by {self.team.planner.member_name}."
+                self.called_agent = self.team.planner.member_id
+                self.responses[self.team.planner.member_id].append(("Returned from Planner", state['current_task']))
+            elif state['current_task'].task_status == Status.ABANDONED:
+                logger.info(f"{self.team.planner.member_name} has abandoned the task with Task Id: {state['current_task'].task_id}")
 
-            state['agents_status'] = f"{self.team.planner.member_name} has abandoned Task ID: {state['current_task'].task_id}."
-            self.called_agent = self.team.planner.member_id
+                state['agents_status'] = f"{self.team.planner.member_name} has abandoned Task ID: {state['current_task'].task_id}."
+                self.called_agent = self.team.planner.member_id
 
-            self.responses[self.team.planner.member_id].append(("Returned from Planner with an abandoned task.", state['current_task']))
-        elif state['current_task'].task_status == Status.AWAITING:
-            logger.info(f"{self.team.planner.member_name} is requesting additional information for Task ID: {state['current_task'].task_id}.")
- 
-            state['agents_status'] = f"{self.team.planner.member_name} is awaiting additional information for Task ID: {state['current_task'].task_id}."
+                self.responses[self.team.planner.member_id].append(("Returned from Planner with an abandoned task.", state['current_task']))
+            elif state['current_task'].task_status == Status.AWAITING:
+                logger.info(f"{self.team.planner.member_name} is requesting additional information for Task ID: {state['current_task'].task_id}.")
+    
+                state['agents_status'] = f"{self.team.planner.member_name} is awaiting additional information for Task ID: {state['current_task'].task_id}."
 
-            self.called_agent = self.team.planner.member_id
-            self.responses[self.team.planner.member_id].append(("Returned from Planner with a question", state['current_task'].question))
+                self.called_agent = self.team.planner.member_id
+                self.responses[self.team.planner.member_id].append(("Returned from Planner with a question", state['current_task'].question))
+        elif state['project_status'] == PStatus.RESOLVING:
+            state['current_issue'] = planner_result['current_issue']
+
+            if state['current_issue'].issue_status == Status.INPROGRESS:
+                logger.info(f"{self.team.planner.member_name} has successfully completed preparing the planned tasks for Issue ID: {state['current_issue'].issue_id}.")
+                state['planned_tasks'].extend(planner_result['planned_tasks'])
+                
+                state['agent_status'] = f"Work packages have been built by {self.team.planner.member_name} for issues."
+                self.called_agent = self.team.planner.member_id
+                self.responses[self.team.planner.member_id].append(("Returned from Planner", state['current_issue']))
+            elif state['current_issue'].issue_status == Status.ABANDONED:
+                logger.info(f"{self.team.planner.member_name} has abandoned the issue with issue Id: {state['current_issue'].issue_id}")
+
+                state['agents_status'] = f"{self.team.planner.member_name} has abandoned issue ID: {state['current_issue'].issue_id}."
+                self.called_agent = self.team.planner.member_id
+
+                self.responses[self.team.planner.member_id].append(("Returned from Planner with an abandoned task.", state['current_issue']))
+            elif state['current_issue'].issue_status == Status.AWAITING:
+                logger.info(f"{self.team.planner.member_name} is requesting additional information for Issue ID: {state['current_issue'].issue_id}.")
+    
+                state['agents_status'] = f"{self.team.planner.member_name} is awaiting additional information for Issue ID: {state['current_issue'].issue_id}."
+
+                self.called_agent = self.team.planner.member_id
+                self.responses[self.team.planner.member_id].append(("Returned from Planner with a question", state['current_task'].question))                
 
         return state
 
@@ -762,6 +818,23 @@ class SupervisorAgent(Agent[SupervisorState, SupervisorPrompts]):
         """
         """
         
+        logger.info(f"{self.team.reviewer.member_name}: I have been called.")
+
+        reviwer_result = self.team.reviewer.invoke({
+            'project_name': state['project_name'],
+            'project_path': state['project_path'],
+            'license_text': state['license_text'],
+            'requirements_document': state['requirements_document'].to_markdown(),
+        })
+
+        issues: IssuesQueue = reviwer_result['issues']
+
+        if len(issues) > 0:
+            logger.info(f"{self.team.reviewer.member_name}: Found some issues in the project.")
+            state['issues'].extend(issues)
+        else:
+            logger.info(f"{self.team.reviewer.member_name}: No Issues were found.")
+
         return state
 
     def call_human(self, state: SupervisorState) -> SupervisorState:
@@ -863,6 +936,27 @@ class SupervisorAgent(Agent[SupervisorState, SupervisorPrompts]):
             logger.info(f"Delegator: Invoking call_supervisor due to Project Status: {PStatus.EXECUTING}.")
             return 'call_supervisor'
         elif state['project_status'] == PStatus.REVIEWING:
+            return 'call_reviewer'
+        elif state['project_status'] == PStatus.RESOLVING:
+            if self.are_planned_tasks_in_progress:
+                if state['current_planned_task'].is_function_generation_required:
+                    if not state['current_planned_task'].is_test_code_generated:
+                        logger.info(f"Delegator: Invoking call_test_code_generator due to Project Status: {PStatus.RESOLVING} and PlannedTask involving is_function_generation_required and is_test_code_generated.")
+                        return 'call_test_code_generator'
+                
+                # Other conditions like is_code_generated from PlannedTask object is also useful
+                # to figure out if coder has already completed the task.
+                if not state['current_planned_task'].is_code_generated:
+                    logger.info(f"Delegator: Invoking call_test_code_generator due to Project Status: {PStatus.RESOLVING} and PlannedTask Status: {Status.NEW}.")
+                    return 'call_coder'
+            else:
+                if state['current_issue'].issue_status == Status.NEW:
+                    logger.info(f"Delegator: Invoking call_planner due to Project Status: {PStatus.RESOLVING} and Task Status: {Status.NEW}.")
+                    return 'call_planner'
+            
+            # occurs when architect just completed the assigned task(generating documents and tasks)
+            # and now supervisor has to assign tasks for planner.
+            logger.info(f"Delegator: Invoking call_supervisor due to Project Status: {PStatus.RESOLVING}.")
             return 'call_supervisor'
         elif state['project_status'] == PStatus.HALTED:
             # There may be situations where the LLM (Language Learning Model) cannot make a decision 
