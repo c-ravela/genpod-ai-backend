@@ -11,11 +11,12 @@ from agents.agent.agent import Agent
 from agents.reviewer.reviewer_state import ReviewerState
 from configs.project_config import ProjectAgents
 from models.constants import Status
-from models.models import IssuesQueue, Issue
+from models.models import Issue, IssuesQueue
 from models.reviewer_models import ReviewerOutput
 from prompts.reviewer_prompts import ReviewerPrompts
 from tools.semgrep import Semgrep
 from utils.logs.logging_utils import logger
+
 
 class ReviewerAgent(Agent[ReviewerState, ReviewerPrompts]):
     """

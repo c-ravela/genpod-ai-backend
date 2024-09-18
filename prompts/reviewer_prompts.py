@@ -6,6 +6,7 @@ from langchain_core.prompts import PromptTemplate
 
 from models.reviewer_models import ReviewerOutput
 
+
 class ReviewerPrompts:
     """
     This class contains prompts used by reviewers.
