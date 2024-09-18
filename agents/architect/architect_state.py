@@ -8,7 +8,7 @@ from typing_extensions import Annotated, TypedDict
 
 from agents.agent.state import State
 from models.constants import ChatRoles
-from models.models import RequirementsDocument, Task
+from models.models import RequirementsDocument, TaskQueue, Task
 
 
 class ArchitectState(TypedDict): 
@@ -143,7 +143,7 @@ class ArchitectState(TypedDict):
 
     # @out
     tasks: Annotated[
-        list[Task],
+        TaskQueue,
         State.out_field(
             "A list of Task objects, each encapsulating a distinct unit of work necessary "
             "for the project's completion. These tasks are meant to be carried out by the "

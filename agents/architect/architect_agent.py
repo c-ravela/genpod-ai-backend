@@ -16,7 +16,7 @@ from agents.architect.architect_state import ArchitectState
 from configs.project_config import ProjectAgents
 from models.architect_models import ProjectDetails, QueryResult, TaskOutput
 from models.constants import ChatRoles, PStatus, Status
-from models.models import RequirementsDocument, Task
+from models.models import RequirementsDocument, Task, TaskQueue
 from prompts.architect_prompts import ArchitectPrompts
 from tools.code import CodeFileWriter
 from utils.logs.logging_utils import logger
@@ -185,7 +185,7 @@ class ArchitectAgent(Agent[ArchitectState, ArchitectPrompts]):
 
         self.state['messages'] += [message]
 
-    def create_tasks_list(self, tasks_description: list) -> list[Task]:
+    def create_tasks_list(self, tasks_description: list) -> TaskQueue:
         """
         This method creates a list of Task objects from a given list of task descriptions
         
@@ -199,15 +199,15 @@ class ArchitectAgent(Agent[ArchitectState, ArchitectPrompts]):
 
         logger.info(f"----{self.agent_name}: Initiating the process of Task List Creation----")
 
-        tasks_list: list[Task] = []
+        tasks: TaskQueue = TaskQueue()
 
         for description in tasks_description:
-            tasks_list.append(Task(
+            tasks.add_item(Task(
                 description=description,
                 task_status=Status.NEW
             ))   
 
-        return tasks_list
+        return tasks
 
     def request_for_additional_info(self, response: TaskOutput) -> None:
         """
@@ -331,6 +331,7 @@ class ArchitectAgent(Agent[ArchitectState, ArchitectPrompts]):
 
         logger.info(f"----{self.agent_name}: Initiating Graph Entry Point----")
 
+        state['tasks'] = TaskQueue()
         self.state={**state}
         self.last_visited_node = self.entry_node_name
         self.is_additional_info_requested = False
@@ -589,7 +590,7 @@ class ArchitectAgent(Agent[ArchitectState, ArchitectPrompts]):
             if not tasks:
                 raise ValueError(f"The 'tasks' list received from the previous response is empty. Received: {tasks}, Expected: Non empty list of strings.")
    
-            self.state['tasks'] = self.create_tasks_list(tasks)
+            self.state['tasks'].extend(self.create_tasks_list(tasks))
 
             self.are_tasks_seperated = True
             self.add_message((
