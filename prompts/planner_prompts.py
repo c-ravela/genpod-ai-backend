@@ -7,76 +7,100 @@ from models.planner_models import Segregation
 
 class PlannerPrompts:
     backlog_planner_prompt = PromptTemplate(
-        template="""Given the deliverable, additional context and feedback, provide work packages of tasks needed to complete this deliverable.
-        feedback is only present if you did not provide output in appropriate format previously.
+        template="""
+        You are an experienced Project Planner. Your task is to break down a project deliverable or 
+        issue into a list of actionable subtasks.
 
-        Deliverable: {deliverable}
-        Additional context: {context}
-        Feedback: {feedback}
+        You will be provided with:
+        - The main deliverable or issue
+        - Additional context (if available)
+        - Feedback on your previous response, if applicable (only included if the prior output was not in the correct format)
+        
+        Deliverable/Issue: `{deliverable}`
+        Additional context: `{context}`
+        Feedback: `{feedback}`
 
-        Given a Deliverable and Additional context, Please provide your response as a raw Python list, without any markdown formatting or code blocks. The output should look exactly like this, including the square brackets: "['item1', 'item2', 'item3']"
+        **Format Instructions:**
+        - If the input is an issue, your response must be a list with only one subtask that addresses the issue.
+        - If the input is a deliverable, provide a list of actionable subtasks needed to complete it.
+        - Provide your response as a raw Python list, exactly in the format shown below.
+        - Do not include any markdown, code blocks, or additional text.
+        - The output must match this example exactly, including the square brackets:
+        "['subtask1', 'subtask2', 'subtask3']"
 
-        Provide the list of backlog tasks exactly as the example output format above for this deliverable.
-
-        To complete the task accurately it is important to not assume anything and ask questions when any information is missing.
-        Provide the list of backlog of tasks for this deliverable that I can convert using ast.literal_eval(example_output)""",
+        **Important:**
+        - For issues, return exactly one subtask. For deliverables, list all necessary subtasks.
+        - Ensure your response accurately reflects the required subtasks or single subtask based on the type of input.
+        - Base your response only on the information provided.
+        
+        Your task is to provide a backlog of subtasks in the correct format that can be directly converted using `ast.literal_eval()`.
+        """,
         input_variables=["deliverable", "context", "feedback"]
     )
 
     detailed_requirements_prompt = PromptTemplate(
-        template="""As a software development planner, your task is to analyze the given backlog item for the deliverable and provide detailed technical requirements in the specified JSON format. If you need more information, ask specific questions.
-        Feedback is only present if you did not provide output in appropriate format previously.
-        
+        template="""
+        You are an experienced Project Planner. Your task is to analyze the given backlog item and 
+        provide detailed technical requirements in the specified JSON format. 
+
+        If additional information is needed, ask specific questions.
+        Feedback will only be provided if your previous response did not adhere to the correct format.
+
         Backlog Item: {backlog}
-        Deliverable: {deliverable}
+        Deliverable/Issue: {deliverable}
         Additional Context: {context}
         Feedback: {feedback}
 
-        Instructions:
-        - Below is a sample requirements document for the project. This serves as a reference. If you have enough information, provide the detailed technical requirements as a JSON object with the following structure. Avoid adding generic comments within the JSON Object and use strict json format to add comments about any object:
+        **Instructions:**
+        - Refer to the sample requirements document below for guidance. If you have sufficient information, 
+        provide the detailed technical requirements as a JSON object with the structure outlined below. 
+
+        Avoid adding generic comments within the JSON object. Use strict JSON format for comments about any object:
+        ```json
         {{
             "description": "Detailed description of the task",
             "name": "Name of the service or component",
             "language": "Programming language to be used",
             "restConfig": {{
-            "server": {{
-                "DB": "Database type",
-                "uri_string": "<connection string>",
-                "port": "<Port number>",
-                "resources": [
-                {{
-                    "name": "Resource name",
-                    "allowedMethods": [<list of http methods>],
-                    "fields": {{
-                    "FieldName": {{
-                        "datatype": "Data type of the field"
-                    }},
-                    ...
-                    }}
+                "server": {{
+                    "DB": "Database type",
+                    "uri_string": "<connection string>",
+                    "port": "<Port number>",
+                    "resources": [
+                        {{
+                            "name": "Resource name",
+                            "allowedMethods": ["GET", "POST", "PUT", "DELETE"],
+                            "fields": {{
+                                "FieldName": {{
+                                    "datatype": "Data type of the field"
+                                }}
+                                ...
+                            }}
+                        }}
+                        ...
+                    ]
                 }},
-                ...
-                ]
-            }},
-            "framework": "Framework to be used"
+                "framework": "Framework to be used"
             }}
         }}
+        ```
 
-        - If you need more information, respond with a JSON object containing a single detailed question that can be used to retrieve additional information from RAG or can be asked to the Architect of the project:
+        - If additional information is required, respond with a JSON object containing a single, detailed question.
+        ```json
         {{
-            "question": "A single, detailed question that covers all the information you need to proceed with the technical requirements"
+            "question": "A single, detailed question that covers all the information needed to proceed with the technical requirements"
         }}
-
-        Remember:
+        ```
+        
+        **Remember:**
         - Focus on technical aspects and implementation details.
         - Consider architectural decisions, coding standards, and best practices.
         - Include any necessary API specifications, database schema changes, or UI/UX considerations.
-        - If any critical technical information is missing, ask specific questions to clarify.
-        - Ensure all requirements are clear, measurable, and testable from a development perspective.
-
-        Your response:
+        - If critical technical information is missing, ask specific questions to clarify.
+        - Ensure that all requirements are clear, measurable, and testable from a development perspective.
         """,
-            input_variables=["backlog", "deliverable", "context", "feedback"]
-        )
+        input_variables=["backlog", "deliverable", "context", "feedback"]
+    )
 
     segregation_prompt: PromptTemplate =PromptTemplate(
         template="""
