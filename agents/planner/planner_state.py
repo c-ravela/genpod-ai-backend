@@ -4,7 +4,7 @@ from typing import Dict, List
 from typing_extensions import Annotated, TypedDict
 
 from agents.agent.state import State
-from models.models import PlannedTaskQueue, Task
+from models.models import PlannedTaskQueue, Task, Issue
 
 
 class PlannerState(TypedDict):
@@ -16,6 +16,11 @@ class PlannerState(TypedDict):
         details: LLM generation of the minute details needed to complete each task
         response: list of Task packets to main all older responses.
     """
+    # @in
+    project_status: Annotated[
+        str, 
+        State.in_field()
+    ]
 
     # @in
     project_path: Annotated[
@@ -32,6 +37,11 @@ class PlannerState(TypedDict):
     # @inout
     current_task: Annotated[
         Task,
+        State.inout_field()
+    ]
+
+    current_issue: Annotated[
+        Issue,
         State.inout_field()
     ]
 

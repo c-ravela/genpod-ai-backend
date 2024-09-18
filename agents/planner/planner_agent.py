@@ -3,7 +3,7 @@ import codecs
 import json
 import os
 import re
-from typing import List
+from typing import List, Literal
 
 from langchain_core.output_parsers.json import JsonOutputParser
 from langchain_openai import ChatOpenAI
@@ -12,7 +12,7 @@ from pydantic import ValidationError
 from agents.agent.agent import Agent
 from agents.planner.planner_state import PlannerState
 from configs.project_config import ProjectAgents
-from models.constants import Status
+from models.constants import PStatus, Status
 from models.models import PlannedTask, PlannedTaskQueue
 from models.planner_models import BacklogList
 from prompts.planner_prompts import PlannerPrompts
@@ -23,6 +23,11 @@ class PlannerAgent(Agent[PlannerState, PlannerPrompts]):
     """
     """
     
+    # Mode can be either 'performing_tasks' for general task execution
+    # or 'resolving_issues' for focusing on resolving issues.
+    mode: Literal['performing_tasks', 'resolving_issues']
+    deliverable: str
+
     def __init__(self, llm: ChatOpenAI) -> None:
         
         super().__init__(
@@ -33,6 +38,7 @@ class PlannerAgent(Agent[PlannerState, PlannerPrompts]):
             llm
         )
 
+        self.mode = ''
         self.error_count = 0
         self.max_retries = 3
         self.error_messages = []
@@ -94,21 +100,36 @@ class PlannerAgent(Agent[PlannerState, PlannerPrompts]):
         return session_file_count, self.file_count
     
     def new_deliverable_check(self, state: PlannerState) -> str:
-        if state['current_task'].task_status == Status.NEW:
-            return "backlog_planner"
-        else:
-            return "requirements_developer"
-
+        if state['project_status'] == PStatus.EXECUTING:
+            self.mode = 'performing_tasks'
+            self.deliverable = state['current_task'].description
+            if state['current_task'].task_status == Status.NEW:
+                return "backlog_planner"
+            else:
+                return "requirements_developer"
+        elif state['project_status'] == PStatus.RESOLVING:
+            self.mode = 'resolving_issues'
+            self.deliverable = (
+                f"Issue Detected:\n"
+                f"-------------------------\n"
+                f"{state['current_issue'].issue_details()}\n"
+                f"Please review and address this issue promptly."
+            )
+            if state['current_issue'].issue_status == Status.NEW:
+                return "backlog_planner"
+            else:
+                return "requirements_developer"
+            
     def backlog_planner(self, state: PlannerState) -> PlannerState:
         state['planned_tasks'] = PlannedTaskQueue()
 
         while(True):
             try:
                 logger.info("----Working on building backlogs for the deliverable----")
-                logger.info("Deliverable: %s", state['current_task'].description)
+                logger.info("Deliverable: %s", self.deliverable)
 
                 generated_backlogs = self.backlog_plan.invoke({
-                    "deliverable": state['current_task'].description, 
+                    "deliverable": self.deliverable, 
                     "context": state['context'], 
                     "feedback": self.error_messages
                 })
@@ -141,6 +162,7 @@ class PlannerAgent(Agent[PlannerState, PlannerPrompts]):
                     return state
 
     def requirements_developer(self, state: PlannerState) -> PlannerState:
+        
         for backlog in self.planned_backlogs:
             while(True):
                 try:
@@ -148,7 +170,7 @@ class PlannerAgent(Agent[PlannerState, PlannerPrompts]):
                     logger.info("Backlog: %s", backlog)
                     response = self.detailed_requirements.invoke({
                         "backlog": backlog, 
-                        "deliverable": state['current_task'].description, 
+                        "deliverable": self.deliverable, 
                         "context": state['context'], 
                         "feedback": self.error_messages
                     })
@@ -218,22 +240,29 @@ class PlannerAgent(Agent[PlannerState, PlannerPrompts]):
                         self.error_count = 0
                         return state             
         
-        state['current_task'].task_status = Status.INPROGRESS
-
+        if self.mode == 'performing_tasks':
+            state['current_task'].task_status = Status.INPROGRESS
+        elif self.mode  == 'resolving_issues':
+            state['current_issue'].issue_status = Status.INPROGRESS
+            
         files_written, total_files_written = self.write_workpackages_to_files(state['project_path'], state['planned_tasks'])
         logger.info('Wrote down %d work packages into the project folder during the current session. Total files written during the current run %d', files_written, total_files_written)
 
         return state
     
     def generate_response(self, state: PlannerState) -> PlannerState:
-        # After attempting to handle the current task with planner chains, check the task's status.
-        # If the task status is:
-        # - Status.INPROGRESS: The planner has successfully prepared planned tasks.
-        # - Status.AWAITING: The task is waiting for some condition or input before it can proceed.
-        # - Status.NEW: An error occurred during the task execution, and it was not handled properly.
-        # In the case of Status.NEW, we need to abandon the task since it could not be successfully addressed by the planner.
-        if state['current_task'].task_status == Status.NEW:
-            state['current_task'].task_status = Status.ABANDONED
+        if self.mode == 'performing_tasks':
+            # After attempting to handle the current task with planner chains, check the task's status.
+            # If the task status is:
+            # - Status.INPROGRESS: The planner has successfully prepared planned tasks.
+            # - Status.AWAITING: The task is waiting for some condition or input before it can proceed.
+            # - Status.NEW: An error occurred during the task execution, and it was not handled properly.
+            # In the case of Status.NEW, we need to abandon the task since it could not be successfully addressed by the planner.
+            if state['current_task'].task_status == Status.NEW:
+                state['current_task'].task_status = Status.ABANDONED
+        elif self.mode == 'resolving_issues':
+            if state['current_issue'].issue_status == Status.NEW:
+                state['current_issue'].issue_status = Status.ABANDONED
 
         return state
     
