@@ -28,7 +28,7 @@ class FileContent(BaseModel):
         """,
         default='',
         title="File Code Content",
-        example='print("Hello, World!")'
+        examples=['print("Hello, World!")']
     )
 
     license_comments: Dict[str, str] = Field(
@@ -45,10 +45,10 @@ class FileContent(BaseModel):
         """,
         default={},
         title="License Comments by File Extension",
-        example={
-            ".py": "''' \nSPDX-License-Identifier: Apache-2.0\nCopyright 2024 Authors of [Your Organization] & [Your Project]\n'''",
-            ".md": "<!-- SPDX-License-Identifier: Apache-2.0\nCopyright 2024 Authors of [Your Organization] & [Your Project] -->"
-        }
+        examples=[
+            {".py": "''' \nSPDX-License-Identifier: Apache-2.0\nCopyright 2024 Authors of [Your Organization] & [Your Project]\n'''",
+            ".md": "<!-- SPDX-License-Identifier: Apache-2.0\nCopyright 2024 Authors of [Your Organization] & [Your Project] -->"}
+        ]
     )
 
     @model_validator(mode="before")

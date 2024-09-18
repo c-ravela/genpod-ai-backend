@@ -83,6 +83,7 @@ class PStatus(Enum):
     - 'EXECUTING': Task is in progress.
     - 'MONITORING': Project is being monitored for issues during execution.
     - 'REVIEWING': Project is under review.
+    - 'RESOLVING': Issues are being addressed or resolved.
     - 'HALTED': Project is paused, either due to completion or unresolved issues requiring intervention.
     - 'DONE': All user-requested requirements have been fulfilled.
     """
@@ -94,6 +95,7 @@ class PStatus(Enum):
     EXECUTING: str = "EXECUTING"
     MONITORING: str = "MONITORING"
     REVIEWING: str = "REVIEWING"
+    RESOLVING: str = "RESOLVING"
     HALTED: str = "HALTED"
     DONE: str = "DONE"
 
