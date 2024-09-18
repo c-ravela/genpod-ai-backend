@@ -14,6 +14,7 @@ from models.constants import Status
 from utils.task_utils import generate_task_id
 
 QueueType = TypeVar("QueueType", bound=BaseModel)
+TQueue = TypeVar('TQueue', bound='Queue')
 
 class Queue(BaseModel, Generic[QueueType]):
     """
@@ -39,14 +40,14 @@ class Queue(BaseModel, Generic[QueueType]):
         """
         self.items.append(item)
 
-    def add_items(self, items: List[QueueType]) -> None:
+    def extend(self: TQueue, queue: TQueue) -> None:
         """
-        Adds a list of items to the end of the queue.
+        Extends the current queue with the items from another queue of the same type.
         
         Args:
-            items (List[QueueType]): A list of items to be added.
+            other (TQueue): Another instance of the same Queue subclass.
         """
-        self.items.extend(items)
+        self.items.extend(queue)
 
     def get_next_item(self) -> Optional[QueueType]:
         """
@@ -84,6 +85,15 @@ class Queue(BaseModel, Generic[QueueType]):
             NotImplementedError: If this method is not overridden in a subclass.
         """
         raise NotImplementedError("Subclasses must implement this method.")
+    
+    def has_pending_items(self) -> bool:
+        """
+        Checks if there are any pending items that have not yet been processed.
+        
+        Returns:
+            bool: True if there are unprocessed items, False otherwise.
+        """
+        return self.next < len(self.items)
     
     def __str__(self) -> str:
         """
@@ -252,17 +262,47 @@ class Issue(BaseModel):
         required=True
     )
 
-    description: str = Field(
-        description="A brief description of the issue.",
+    file_path: str = Field(
+        description="The path to the file where the issue was found.",
         default="",
-        required=True
+        title="File Path",
+        examples=["/path/to/file.py"]
     )
 
-    file_path: str = Field(
-        description="The file path where the issue is located or associated with.",
-        default="",
-        required=True
+    line_number: Optional[int] = Field(
+        default=None,
+        description="The line number in the file where the issue occurs.",
+        title="Line Number",
+        examples=[42]
     )
+
+    description: str = Field(
+        description="A detailed description of the issue.",
+        default="",
+        title="Issue Description",
+        examples=["Undefined variable 'x' in function 'foo'."]
+    )
+
+    suggestions: Optional[List[str]] = Field(
+        default=None,
+        description="Suggestions for resolving the issue.",
+        title="Suggestions",
+        examples=[ "Define the variable 'x' before use", "Check variable scope and initialization" ]
+    )
+
+    def issue_details(self) -> str:
+        """Return a formatted string representing the actual issue details."""
+        details = f"Issue: {self.description}\n"
+        details += f"File: {self.file_path}\n"
+        
+        if self.line_number:
+            details += f"Line: {self.line_number}\n"
+        
+        if self.suggestions:
+            suggestions_str = "\n".join(self.suggestions)
+            details += f"Suggestions:\n{suggestions_str}\n"
+        
+        return details
 
 class IssuesQueue(Queue[Issue]):
     """
