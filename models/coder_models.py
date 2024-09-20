@@ -68,7 +68,7 @@ class FileContent(BaseModel):
         license_comments = values.get('license_comments')
 
         if not isinstance(license_comments, dict):
-            raise ValueError('license_comments must be a dictionary.')
+            raise ValueError(f'Expected a dictionary for license_comments, but received `{license_comments}` of type {type(license_comments).__name__}.')
         
         for key, value in license_comments.items():
             if not isinstance(key, str) or not key.startswith('.'):
