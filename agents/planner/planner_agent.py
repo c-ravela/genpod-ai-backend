@@ -210,6 +210,11 @@ class PlannerAgent(Agent[PlannerState, PlannerPrompts]):
                                 is_function_generation_required=is_function_generation_required,
                         )
 
+                        if self.mode == "performing_tasks":
+                            planned_task.parent_task_id = state['current_task'].task_id
+                        elif self.mode == "resolving_issues":
+                            planned_task.parent_task_id = state['current_issue'].issue_id
+                            
                         parsed_response = {
                             "task_id": f"{planned_task.task_id}",
                             "work_package_name": f"{backlog}",
