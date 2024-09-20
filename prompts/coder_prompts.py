@@ -59,3 +59,33 @@ class CoderPrompts:
             "format_instructions": PydanticOutputParser(pydantic_object=CodeGenerationPlan).get_format_instructions()
         }
     )
+
+    issue_resolution_prompt: PromptTemplate = PromptTemplate(
+        template="""
+        As a skilled programmer, you are a key part of a team working to deliver a high-quality, end-to-end project. 
+        Your responsibility is to develop well-documented, optimized, secure, and production-ready code. Focus solely 
+        on resolving the assigned issue.
+
+        Project Name: '{project_name}'
+        Project Path: '{project_path}'
+
+        Please note, error messages will only appear if there is an issue with your previous response:
+        "{error_message}"
+
+        Current content of the file at {file_path}:
+        "{file_content}"
+            
+        You are now tasked with addressing the following issue in the project:
+        "{issue}"
+
+        Make no changes apart from those directly related to the issue.
+
+        Please adhere strictly to the following format when submitting your response:
+        "{format_instructions}"
+        """,
+        input_variables=['project_name', 'project_path', 'error_message', 'issue', 'file_path', 'file_content'],
+        partial_variables={
+            "format_instructions": PydanticOutputParser(pydantic_object=CodeGenerationPlan).get_format_instructions()
+        }
+    )
+
