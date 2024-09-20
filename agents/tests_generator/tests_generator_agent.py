@@ -242,7 +242,7 @@ class TestCoderAgent(Agent[TestCoderState, TestGeneratorPrompts]):
             ChatRoles.USER,
             f"Started working on the task: {task.description}."
         ))
-        logger.info("llm callinig ")
+        
         try:
             llm_response = self.test_code_generation_chain.invoke({
                 "project_name": self.state['project_name'],
