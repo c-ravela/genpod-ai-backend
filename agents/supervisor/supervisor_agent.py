@@ -400,6 +400,7 @@ class SupervisorAgent(Agent[SupervisorState, SupervisorPrompts]):
         logger.info("---------- Calling Coder ----------")
 
         coder_result = self.team.coder.invoke({
+            'project_status': state['project_status'],
             'project_name': state['project_name'],
             'requirements_document': state['requirements_document'].to_markdown(),
             'project_path': state['project_path'],
@@ -409,23 +410,30 @@ class SupervisorAgent(Agent[SupervisorState, SupervisorPrompts]):
             'test_code': state['test_code'],
             'current_task': state['current_task'],
             'current_planned_task': state['current_planned_task'],
+            'current_issue': state['current_issue'],
             'messages': state['messages']
         })
 
-        state['current_planned_task'] = coder_result['current_planned_task']
+        if state['project_status'] == PStatus.EXECUTING:
+            state['current_planned_task'] = coder_result['current_planned_task']
 
-        if state['current_planned_task'].task_status == Status.DONE:
-            logger.info(f"{self.team.coder.member_name} has successfully completed the task. Task ID: {state['current_planned_task'].task_id}.")
-            
-            state['code_generation_plan_list'].extend(coder_result['code_generation_plan_list'])
-            state['agents_status'] = f'{self.team.coder.member_name} has successfully completed the task.'
-        elif state['current_planned_task'].task_status == Status.ABANDONED:
-            logger.info(f"{self.team.coder.member_name} was unable to complete the task. Abandoned Task ID: {state['current_planned_task'].task_id}.")
+            if state['current_planned_task'].task_status == Status.DONE:
+                logger.info(f"{self.team.coder.member_name} has successfully completed the task. Task ID: {state['current_planned_task'].task_id}.")
+                
+                state['code_generation_plan_list'].extend(coder_result['code_generation_plan_list'])
+                state['agents_status'] = f'{self.team.coder.member_name} has successfully completed the task.'
+            elif state['current_planned_task'].task_status == Status.ABANDONED:
+                logger.info(f"{self.team.coder.member_name} was unable to complete the task. Abandoned Task ID: {state['current_planned_task'].task_id}.")
 
-            state['agent_status'] = f"{self.team.coder.member_name} has abandoned the task."
+                state['agent_status'] = f"{self.team.coder.member_name} has abandoned the task."
 
-        self.called_agent = self.team.coder.member_id
-        self.responses[self.team.coder.member_id].append(("Returned from Coder", state['current_planned_task']))
+            self.called_agent = self.team.coder.member_id
+            self.responses[self.team.coder.member_id].append(("Returned from Coder", state['current_planned_task']))
+        elif state['project_status'] == PStatus.RESOLVING:
+            state['current_issue'] = coder_result['current_issue']
+
+            if state['current_issue'].issue_status == Status.DONE:
+                state['code_generation_plan_list'].extend(coder_result['code_generation_plan_list'])
 
         return state
 
@@ -938,21 +946,23 @@ class SupervisorAgent(Agent[SupervisorState, SupervisorPrompts]):
         elif state['project_status'] == PStatus.REVIEWING:
             return 'call_reviewer'
         elif state['project_status'] == PStatus.RESOLVING:
-            if self.are_planned_tasks_in_progress:
-                if state['current_planned_task'].is_function_generation_required:
-                    if not state['current_planned_task'].is_test_code_generated:
-                        logger.info(f"Delegator: Invoking call_test_code_generator due to Project Status: {PStatus.RESOLVING} and PlannedTask involving is_function_generation_required and is_test_code_generated.")
-                        return 'call_test_code_generator'
+            if state['current_issue'].issue_status == Status.NEW:
+                return 'call_coder'
+            # if self.are_planned_tasks_in_progress:
+            #     if state['current_planned_task'].is_function_generation_required:
+            #         if not state['current_planned_task'].is_test_code_generated:
+            #             logger.info(f"Delegator: Invoking call_test_code_generator due to Project Status: {PStatus.RESOLVING} and PlannedTask involving is_function_generation_required and is_test_code_generated.")
+            #             return 'call_test_code_generator'
                 
-                # Other conditions like is_code_generated from PlannedTask object is also useful
-                # to figure out if coder has already completed the task.
-                if not state['current_planned_task'].is_code_generated:
-                    logger.info(f"Delegator: Invoking call_test_code_generator due to Project Status: {PStatus.RESOLVING} and PlannedTask Status: {Status.NEW}.")
-                    return 'call_coder'
-            else:
-                if state['current_issue'].issue_status == Status.NEW:
-                    logger.info(f"Delegator: Invoking call_planner due to Project Status: {PStatus.RESOLVING} and Task Status: {Status.NEW}.")
-                    return 'call_planner'
+            #     # Other conditions like is_code_generated from PlannedTask object is also useful
+            #     # to figure out if coder has already completed the task.
+            #     if not state['current_planned_task'].is_code_generated:
+            #         logger.info(f"Delegator: Invoking call_test_code_generator due to Project Status: {PStatus.RESOLVING} and PlannedTask Status: {Status.NEW}.")
+            #         return 'call_coder'
+            # else:
+            #     if state['current_issue'].issue_status == Status.NEW:
+            #         logger.info(f"Delegator: Invoking call_planner due to Project Status: {PStatus.RESOLVING} and Task Status: {Status.NEW}.")
+            #         return 'call_planner'
             
             # occurs when architect just completed the assigned task(generating documents and tasks)
             # and now supervisor has to assign tasks for planner.

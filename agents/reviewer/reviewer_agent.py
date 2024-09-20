@@ -103,7 +103,7 @@ class ReviewerAgent(Agent[ReviewerState, ReviewerPrompts]):
             logger.info(f"----{self.agent_name}: Found some issues reporting them to supervisor.----")
             return self.update_state_node_name
 
-        return self.entry_node_name
+        return self.update_state_node_name
     
     def entry_node(self, state: ReviewerState) -> ReviewerState:
         """
