@@ -7,13 +7,19 @@ from typing_extensions import Annotated, TypedDict
 from agents.agent.state import State
 from models.coder_models import CodeGenerationPlan
 from models.constants import ChatRoles
-from models.models import PlannedTask, Task
+from models.models import Issue, PlannedTask, Task
 
 
 class CoderState(TypedDict):
     """
     """
 
+    # @in
+    project_status: Annotated[
+        str, 
+        State.in_field()
+    ]
+    
     # @in 
     project_name: Annotated[
         str, 
@@ -88,6 +94,11 @@ class CoderState(TypedDict):
         )
     ]
     
+    current_issue: Annotated[
+        Issue,
+        State.inout_field()
+    ]
+
     # @inout
     messages: Annotated[
         list[tuple[ChatRoles, str]], 
