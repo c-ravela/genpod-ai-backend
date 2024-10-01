@@ -5,9 +5,10 @@ ipykernel==6.29.4
 ipython==8.23.0
 langchain==0.2.6
 langchain-community==0.2.6
-langchain-core==0.2.10
+langchain-core
 langchain-experimental==0.0.62
 langchain-openai==0.1.10
+langchain-ollama
 langchain-text-splitters==0.2.2
 langdetect==1.0.9
 langgraph==0.1.1
@@ -16,7 +17,6 @@ networkx==3.3
 numpy==1.26.4
 pandas==2.2.2
 pydantic==2.7.4
-pydantic_core==2.18.4
 requests==2.31.0
 tiktoken==0.7.0
 tokenizers==0.19.1
@@ -31,5 +31,4 @@ unstructured==0.14.3
 unstructured[pdf]
 unstructured[xlsx]
 unstructured[docx]
-notebook
 python-json-logger==2.0.7
