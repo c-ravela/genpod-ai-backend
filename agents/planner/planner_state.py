@@ -4,7 +4,7 @@ from typing import Dict, List
 from typing_extensions import Annotated, TypedDict
 
 from agents.agent.state import State
-from models.models import Issue, PlannedTaskQueue, Task
+from models.models import Issue, PlannedTaskQueue, Task, PlannedIssuesQueue
 
 
 class PlannerState(TypedDict):
@@ -51,8 +51,8 @@ class PlannerState(TypedDict):
         State.out_field("A list of work packages planned by the planner")
     ]
 
-    # @out - not needed
-    response: Annotated[
-        List[Task],
-        State.out_field()
+    # @out
+    planned_issues: Annotated[
+        PlannedIssuesQueue,
+        State.out_field("A list of planned issues")
     ]
