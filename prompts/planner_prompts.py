@@ -6,34 +6,32 @@ from models.planner_models import Segregation
 
 
 class PlannerPrompts:
-    backlog_planner_prompt = PromptTemplate(
+    task_breakdown_prompt = PromptTemplate(
         template="""
-        You are an experienced Project Planner. Your task is to break down a project deliverable or 
-        issue into a list of actionable subtasks.
+        You are an experienced Project Planner. Your task is to break down a project deliverable into 
+        a list of actionable subtasks.
 
         You will be provided with:
-        - The main deliverable or issue
+        - The main deliverable
         - Additional context (if available)
         - Feedback on your previous response, if applicable (only included if the prior output was not in the correct format)
         
-        Deliverable/Issue: `{deliverable}`
+        Deliverable: `{deliverable}`
         Additional context: `{context}`
         Feedback: `{feedback}`
 
         **Format Instructions:**
-        - If the input is an issue, your response must be a list with only one subtask that addresses the issue.
-        - If the input is a deliverable, provide a list of actionable subtasks needed to complete it.
+        - provide a list of actionable subtasks needed to complete this deliverable.
         - Provide your response as a raw Python list, exactly in the format shown below.
         - Do not include any markdown, code blocks, or additional text.
         - The output must match this example exactly, including the square brackets:
         "['subtask1', 'subtask2', 'subtask3']"
 
         **Important:**
-        - For issues, return exactly one subtask. For deliverables, list all necessary subtasks.
-        - Ensure your response accurately reflects the required subtasks or single subtask based on the type of input.
-        - Base your response only on the information provided.
-        
-        Your task is to provide a backlog of subtasks in the correct format that can be directly converted using `ast.literal_eval()`.
+        - Ensure the response reflects the required subtasks, whether it is a single task or multiple tasks.
+        - The output must be directly convertible using `ast.literal_eval()`.
+
+        Your goal is to provide a backlog of subtasks in the correct format for the provided deliverable.
         """,
         input_variables=["deliverable", "context", "feedback"]
     )
@@ -47,7 +45,7 @@ class PlannerPrompts:
         Feedback will only be provided if your previous response did not adhere to the correct format.
 
         Backlog Item: {backlog}
-        Deliverable/Issue: {deliverable}
+        Deliverable: {deliverable}
         Additional Context: {context}
         Feedback: {feedback}
 
@@ -102,7 +100,7 @@ class PlannerPrompts:
         input_variables=["backlog", "deliverable", "context", "feedback"]
     )
 
-    segregation_prompt: PromptTemplate =PromptTemplate(
+    segregation_prompt: PromptTemplate = PromptTemplate(
         template="""
         Objective:
         You are an intelligent assistant designed to assess whether completing a work package requires writing any functions. Use contextual understanding to accurately evaluate the tasks within the work package.
@@ -130,5 +128,25 @@ class PlannerPrompts:
         input_variables=['work_package'],
         partial_variables= {
             "format_instructions": PydanticOutputParser(pydantic_object=Segregation).get_format_instructions()
+        }
+    )
+    
+    issues_segregation_prompt: PromptTemplate = PromptTemplate(
+        template="""
+        You are an intelligent assistant designed to assess whether fixing an issue involves 
+        changes or creation of functions in the given file. Below are the file contents and issue details. 
+        Based on the information provided, return your assessment in the following format:
+
+        File Content:
+        {file_content}
+
+        Issue Details:
+        {issue_details}
+
+        {format_instruction}
+        """,
+        input_variables=['file_content', 'issue_details'],
+        partial_variables={
+            "format_instruction": PydanticOutputParser(pydantic_object=Segregation).get_format_instructions()
         }
     )
