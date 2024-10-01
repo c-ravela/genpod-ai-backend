@@ -13,19 +13,26 @@ from agents.agent.agent import Agent
 from agents.planner.planner_state import PlannerState
 from configs.project_config import ProjectAgents
 from models.constants import PStatus, Status
-from models.models import PlannedTask, PlannedTaskQueue
-from models.planner_models import BacklogList
+from models.models import PlannedTask, PlannedTaskQueue, PlannedIssuesQueue, PlannedIssue
+from models.planner_models import BacklogList, Segregation
 from prompts.planner_prompts import PlannerPrompts
 from utils.logs.logging_utils import logger
-
+from tools.file_system import FS
 
 class PlannerAgent(Agent[PlannerState, PlannerPrompts]):
     """
     """
     
-    # Mode can be either 'performing_tasks' for general task execution
-    # or 'resolving_issues' for focusing on resolving issues.
-    mode: Literal['performing_tasks', 'resolving_issues']
+    task_breakdown_node_name: str
+    requirements_analyzer_node_name: str
+    issues_preparation_node_name: str
+    agent_response_node_name: str
+    update_state_node_name: str
+
+    # Mode explanation:
+    # 'preparing_planned_tasks': Breaking down a general task into smaller, manageable backlog planned tasks.
+    # 'preparing_planned_issues': Checking if unit test case generation is required and preparing a planned issue from the given issue.
+    mode: Literal['preparing_planned_tasks', 'preparing_planned_issues']
     deliverable: str
 
     def __init__(self, llm: ChatOpenAI) -> None:
@@ -38,6 +45,12 @@ class PlannerAgent(Agent[PlannerState, PlannerPrompts]):
             llm
         )
 
+        self.task_breakdown_node_name = "task_breakdown"
+        self.requirements_analyzer_node_name = "requirements_analyzer"
+        self.issues_preparation_node_name = "issues_preparation"
+        self.agent_response_node_name = "agent_response"
+        self.update_state_node_name = "update_state"
+
         self.mode = ''
         self.error_count = 0
         self.max_retries = 3
@@ -46,14 +59,28 @@ class PlannerAgent(Agent[PlannerState, PlannerPrompts]):
 
         self.planned_backlogs: list[str] = []
 
-        # prompts
-        # backlog planner for each deliverable chain
-        self.backlog_plan = self.prompts.backlog_planner_prompt | self.llm
+        # chains
+        self.task_breakdown_chain = (
+            self.prompts.task_breakdown_prompt 
+            | self.llm
+        )
         
-        # detailed requirements generator chain
-        self.detailed_requirements = self.prompts.detailed_requirements_prompt | self.llm
+        self.detailed_requirements_chain = (
+            self.prompts.detailed_requirements_prompt 
+            | self.llm
+        )
 
-        self.segregaion_chain= self.prompts.segregation_prompt| self.llm | JsonOutputParser()
+        self.segregaion_chain = (
+            self.prompts.segregation_prompt
+            | self.llm 
+            | JsonOutputParser()
+        )
+
+        self.issue_segregation_chain = (
+            self.prompts.issues_segregation_prompt
+            | self.llm
+            | JsonOutputParser()
+        )
 
     def write_workpackages_to_files(self, output_dir: str, planned_tasks: PlannedTaskQueue) -> tuple[int, int]:
         """
@@ -101,35 +128,36 @@ class PlannerAgent(Agent[PlannerState, PlannerPrompts]):
     
     def new_deliverable_check(self, state: PlannerState) -> str:
         if state['project_status'] == PStatus.EXECUTING:
-            self.mode = 'performing_tasks'
-            self.deliverable = state['current_task'].description
+            self.mode = 'preparing_planned_tasks'
+
             if state['current_task'].task_status == Status.NEW:
-                return "backlog_planner"
+                return self.task_breakdown_node_name
             else:
-                return "requirements_developer"
+                return self.requirements_analyzer_node_name
         elif state['project_status'] == PStatus.RESOLVING:
-            self.mode = 'resolving_issues'
+            self.mode = 'preparing_planned_issues'
             self.deliverable = (
                 f"Issue Detected:\n"
                 f"-------------------------\n"
                 f"{state['current_issue'].issue_details()}\n"
                 f"Please review and address this issue promptly."
             )
+
             if state['current_issue'].issue_status == Status.NEW:
-                return "backlog_planner"
-            else:
-                return "requirements_developer"
+                return self.issues_preparation_node_name
             
-    def backlog_planner(self, state: PlannerState) -> PlannerState:
+    # TODO - MEDIUM: We have to segeregate the backlogs into categories
+    # like Documents, Coding, Config so on. all possible options
+    def task_breakdown_node(self, state: PlannerState) -> PlannerState:
         state['planned_tasks'] = PlannedTaskQueue()
 
         while(True):
             try:
                 logger.info("----Working on building backlogs for the deliverable----")
-                logger.info("Deliverable: %s", self.deliverable)
+                logger.info("Deliverable: %s", state['current_task'].description)
 
-                generated_backlogs = self.backlog_plan.invoke({
-                    "deliverable": self.deliverable, 
+                generated_backlogs = self.task_breakdown_chain.invoke({
+                    "deliverable": state['current_task'].description, 
                     "context": state['context'], 
                     "feedback": self.error_messages
                 })
@@ -148,7 +176,7 @@ class PlannerAgent(Agent[PlannerState, PlannerPrompts]):
                 self.error_count = 0
                 self.error_messages = []
 
-                return state
+                break # while loop exit
             except (ValidationError, ValueError, SyntaxError) as e:
                 self.error_count += 1
                 error_message = f"Error generating backlogs: {str(e)}"
@@ -159,18 +187,21 @@ class PlannerAgent(Agent[PlannerState, PlannerPrompts]):
                 if self.error_count >= self.max_retries:
                     logger.info("Max retries reached. Halting")
                     self.error_count = 0
-                    return state
+                    
+                    break # while loop exit
+        
+        return state
 
-    def requirements_developer(self, state: PlannerState) -> PlannerState:
+    def requirements_analyzer_node(self, state: PlannerState) -> PlannerState:
         
         for backlog in self.planned_backlogs:
             while(True):
                 try:
                     logger.info("----Now Working on Generating detailed requirements for the backlog----")
                     logger.info("Backlog: %s", backlog)
-                    response = self.detailed_requirements.invoke({
+                    response = self.detailed_requirements_chain.invoke({
                         "backlog": backlog, 
-                        "deliverable": self.deliverable, 
+                        "deliverable": state['current_task'].description, 
                         "context": state['context'], 
                         "feedback": self.error_messages
                     })
@@ -210,11 +241,6 @@ class PlannerAgent(Agent[PlannerState, PlannerPrompts]):
                                 is_function_generation_required=is_function_generation_required,
                         )
 
-                        if self.mode == "performing_tasks":
-                            planned_task.parent_task_id = state['current_task'].task_id
-                        elif self.mode == "resolving_issues":
-                            planned_task.parent_task_id = state['current_issue'].issue_id
-                            
                         parsed_response = {
                             "task_id": f"{planned_task.task_id}",
                             "work_package_name": f"{backlog}",
@@ -243,20 +269,69 @@ class PlannerAgent(Agent[PlannerState, PlannerPrompts]):
                     if self.error_count >= self.max_retries:
                         logger.info("Max retries reached. Halting")
                         self.error_count = 0
+
                         return state             
         
-        if self.mode == 'performing_tasks':
-            state['current_task'].task_status = Status.INPROGRESS
-        elif self.mode  == 'resolving_issues':
-            state['current_issue'].issue_status = Status.INPROGRESS
+        state['current_task'].task_status = Status.INPROGRESS
             
         files_written, total_files_written = self.write_workpackages_to_files(state['project_path'], state['planned_tasks'])
         logger.info('Wrote down %d work packages into the project folder during the current session. Total files written during the current run %d', files_written, total_files_written)
 
         return state
     
-    def generate_response(self, state: PlannerState) -> PlannerState:
-        if self.mode == 'performing_tasks':
+    def issues_preparation_node(self, state: PlannerState) -> PlannerState:
+        """
+        """
+        state['planned_tasks'] = PlannedIssuesQueue()
+        
+        while(True):
+            try:
+                logger.info(f"{self.agent_name}: Preparing planned issues for issue with id: {state['current_issue'].issue_id}.")
+                logger.info(f"Issue: {state['current_issue']}")
+
+                issue_segregation_response = self.issue_segregation_chain.invoke({
+                    "issue_details": state['current_issue'].issue_details(),
+                    "file_content": FS.read_file(state['current_issue'].file_path)
+                })
+
+                validated_response = Segregation(**issue_segregation_response)
+                logger.info(f"Issue {state['current_issue'].issue_id} has been successfully segregated with the following details: {validated_response}")
+
+                planned_issue = PlannedIssue(
+                    parent_id=state['current_issue'].issue_id,
+                    status=Status.NEW,
+                    file_path=state['current_issue'].file_path,
+                    line_number=state['current_issue'].line_number,
+                    description=state['current_issue'].description,
+                    suggestions=state['current_issue'].suggestions,
+                    is_function_generation_required=validated_response.requires_function_creation
+                )
+
+                state['planned_issues'].add_item(planned_issue)
+                
+                self.error_count = 0
+                self.error_messages = []
+
+                break # while loop exit 
+            except Exception as e:
+                self.error_count += 1
+                
+                logger.error(e)
+                self.error_messages.append(e)
+
+                if self.error_count >= self.max_retries:
+                    logger.info(f"Maximum retry attempts reached while processing issue with ID: {state['current_issue'].issue_id}.")
+
+                    return state
+            except FileNotFoundError as ffe:
+                logger.error(f"{self.agent_name}: Error Occured at resolve issue: ===>{type(ffe)}<=== {ffe}.----")
+                
+        state['current_issue'].issue_status = Status.INPROGRESS
+
+        return state
+
+    def agent_response_node(self, state: PlannerState) -> PlannerState:
+        if self.mode == 'preparing_planned_tasks':
             # After attempting to handle the current task with planner chains, check the task's status.
             # If the task status is:
             # - Status.INPROGRESS: The planner has successfully prepared planned tasks.
@@ -265,7 +340,7 @@ class PlannerAgent(Agent[PlannerState, PlannerPrompts]):
             # In the case of Status.NEW, we need to abandon the task since it could not be successfully addressed by the planner.
             if state['current_task'].task_status == Status.NEW:
                 state['current_task'].task_status = Status.ABANDONED
-        elif self.mode == 'resolving_issues':
+        elif self.mode == 'preparing_planned_issues':
             if state['current_issue'].issue_status == Status.NEW:
                 state['current_issue'].issue_status = Status.ABANDONED
 
@@ -291,20 +366,29 @@ class PlannerAgent(Agent[PlannerState, PlannerPrompts]):
         """
         """
         logger.info(f"---- Initiating segregation ----")
+        while(True):
+            try:
+                llm_response = self.segregaion_chain.invoke({
+                    "work_package": f"{workpackage_name} \n {requirements}",
+                })
 
-        try:
-            llm_response = self.segregaion_chain.invoke({
-                "work_package": f"{workpackage_name} \n {requirements}",
-            })
+                validate_response = Segregation(**llm_response)
+                
+                logger.info(f" task type  : {llm_response['requires_function_creation']} ; {llm_response['classification_reason']}")
 
-            required_keys = ["taskType"]
-            missing_keys = [key for key in required_keys if key not in llm_response]
+                self.error_count = 0
+                self.error_messages = []
 
-            if missing_keys:
-                raise KeyError(f"Missing keys: {missing_keys} in the response. Try Again!")
-            
-            logger.info(f" task type  : {llm_response['taskType']} ; {llm_response['reason_for_classification']}")
-        except Exception as e:
-            logger.error(f"---- Error Occured at segregation: {str(e)}.----")
+                break # while loop exit
+            except Exception as e:
+                self.error_count += 1
+                
+                logger.error(e)
+                self.error_messages.append(e)
 
-        return llm_response['taskType']
+                if self.error_count >= self.max_retries:
+                    logger.info(f"Maximum retry attempts reached.")
+
+                    return
+    
+        return validate_response.requires_function_creation
