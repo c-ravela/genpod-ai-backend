@@ -12,7 +12,6 @@ from agents.coder.coder_state import CoderState
 from configs.project_config import ProjectAgents
 from models.coder_models import CodeGenerationPlan
 from models.constants import ChatRoles, PStatus, Status
-from models.models import Issue
 from prompts.coder_prompts import CoderPrompts
 from tools.code import CodeFileWriter
 from tools.file_system import FS
@@ -162,7 +161,7 @@ class CoderAgent(Agent[CoderState, CoderPrompts]):
                 else:
                     self.mode = "general_task"    
         elif self.state['project_status'] == PStatus.RESOLVING:
-            if self.state['current_issue'].issue_status == Status.NEW:
+            if self.state['current_planned_issue'].status == Status.NEW:
                 self.mode = "resolving_issues"
 
         self.is_code_generated = False
@@ -287,17 +286,17 @@ class CoderAgent(Agent[CoderState, CoderPrompts]):
     def resolve_issue_node(self, state: CoderState) -> CoderState:
         """
         """
-        logger.info(f"----{self.agent_name}: Initiating resolve issue node Issue Id: {state['current_issue'].issue_id}----")
+        logger.info(f"----{self.agent_name}: Initiating resolve issue node Issue Id: {state['current_planned_issue'].id}----")
 
         self.state = state
         self.last_visited_node = self.resolve_issue_node_name
 
-        issue: Issue = self.state['current_issue']
-        logger.info(f"----{self.agent_name}: Started working on the issue: {issue.description}.----")
+        planned_issue = self.state['current_planned_issue']
+        logger.info(f"----{self.agent_name}: Started working on the issue: {planned_issue.description}.----")
         
         self.add_message((
             ChatRoles.USER,
-            f"Started working on the issue: {issue.description}."
+            f"Started working on the issue: {planned_issue.description}."
         ))
 
         while True:
@@ -309,11 +308,13 @@ class CoderAgent(Agent[CoderState, CoderPrompts]):
                     "issue": (
                         f"Issue Detected:\n"
                         f"-------------------------\n"
-                        f"{issue.issue_details()}\n"
+                        f"{planned_issue.issue_details()}\n"
                         f"Please review and address this issue promptly."
                     ),
-                    "file_path": issue.file_path,
-                    "file_content": FS.read_file(issue.file_path)
+                    "file_path": planned_issue.file_path,
+                    "file_content": FS.read_file(planned_issue.file_path),
+                    'function_signatures': planned_issue.function_signatures,
+                    "unit_test_code": planned_issue.test_code
                 })
 
                 cleaned_response = CodeGenerationPlan(**llm_response)
@@ -337,7 +338,7 @@ class CoderAgent(Agent[CoderState, CoderPrompts]):
                     f"{self.agent_name}: {self.error_message}"
                 ))
             except FileNotFoundError as ffe:
-                logger.error(f"{self.agent_name}: Error Occured at resolve issue: ===>{type(e)}<=== {e}.----")
+                logger.error(f"{self.agent_name}: Error Occured at resolve issue: ===>{type(ffe)}<=== {ffe}.----")
                 
         return self.state
 
@@ -507,9 +508,9 @@ class CoderAgent(Agent[CoderState, CoderPrompts]):
                 self.state['current_planned_task'].task_status = Status.ABANDONED
         elif self.state['project_status'] == PStatus.RESOLVING:
             if self.is_code_generated and self.has_code_been_written_locally and self.is_license_text_added_to_files:
-                self.state['current_issue'].issue_status = Status.DONE
+                self.state['current_planned_issue'].status = Status.DONE
                 self.state["code_generation_plan_list"] = self.current_code_generation_plan_list
             else: 
-                self.state['current_issue'].issue_status = Status.ABANDONED
+                self.state['current_planned_issue'].status = Status.ABANDONED
         
         return self.state
