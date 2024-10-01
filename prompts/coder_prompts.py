@@ -78,14 +78,28 @@ class CoderPrompts:
         You are now tasked with addressing the following issue in the project:
         "{issue}"
 
-        Make no changes apart from those directly related to the issue.
+        If the issue involves changes to functionality, you will be provided with the relevant function signatures and 
+        unit test code. Make sure to align your code changes with the provided function signatures and ensure that all unit tests pass.
 
+        - **Function Signatures:** 
+        ```
+        {function_signatures}
+        ```
+
+        - **Unit Test Code:**
+        ```
+        {unit_test_code}
+        ```
+
+        **Important Notes:**
+        - Focus only on the resolution of the assigned issue. Avoid making any changes that are not directly related to the issue at hand.
+        - Ensure your solution adheres to the project's guidelines and requirements.
+        
         Please adhere strictly to the following format when submitting your response:
         "{format_instructions}"
         """,
-        input_variables=['project_name', 'project_path', 'error_message', 'issue', 'file_path', 'file_content'],
+        input_variables=['project_name', 'project_path', 'error_message', 'issue', 'file_path', 'file_content', 'function_signatures', 'unit_test_code'],
         partial_variables={
             "format_instructions": PydanticOutputParser(pydantic_object=CodeGenerationPlan).get_format_instructions()
         }
     )
-
