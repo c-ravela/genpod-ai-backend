@@ -1,6 +1,6 @@
 from typing import List
 
-from pydantic import BaseModel, Field, field_validator
+from pydantic import BaseModel, Field, field_validator, StrictBool, field_validator
 
 
 class BacklogList(BaseModel):
@@ -18,15 +18,25 @@ class BacklogList(BaseModel):
 
 class Segregation(BaseModel):
     """
+    A model to classify tasks based on whether they require function creation or updation
+    and provide a reason for classification.
     """
     
-    taskType: bool= Field(
+    requires_function_creation: StrictBool = Field(
         description="""
-        This field holds the boolean value that specifies "True" if the given task involves funciton creation" or  "False" if the give task does not involves funciton.
-        """, required=True
+        This field holds the boolean value that specifies "True" if the task requires function creation,
+        or "False" if the task does not require function creation.
+        """,
+        required=True
     )
 
-    reason_for_classification: str =Field(
-        description="""
-        This field contains the reason for the classification"""
+    classification_reason: str = Field(
+        description="This field contains the reason for the task classification.",
+        default=""
     )
+
+    @field_validator('requires_function_creation', mode="before")
+    def validate_requires_function_creation(cls, value) -> StrictBool:
+        if value is None:
+            raise ValueError("The 'requires_function_creation' field is required and must not be null.")
+        return value

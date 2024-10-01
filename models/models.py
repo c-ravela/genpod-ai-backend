@@ -12,6 +12,7 @@ from pydantic import BaseModel, Field
 
 from models.constants import Status
 from utils.task_utils import generate_task_id
+from models.tests_generator_models import FileFunctionSignatures, TestCodeGeneration
 
 QueueType = TypeVar("QueueType", bound=BaseModel)
 TQueue = TypeVar('TQueue', bound='Queue')
@@ -184,8 +185,7 @@ class PlannedTask(BaseModel):
 
     parent_task_id: str = Field(
         description="A unique task id representing it parent task id",
-        default="",
-        required=True
+        default=""
     )
 
     task_id: str = Field(
@@ -324,6 +324,112 @@ class IssuesQueue(Queue[Issue]):
                 self.items[i] = updated_issue
                 return
         raise ValueError(f"Issue with ID {updated_issue.issue_id} not found in the queue.")
+
+class PlannedIssue(BaseModel):
+    parent_id: str = Field(
+        description="The identifier of the parent issue, if any.",
+        default=""
+    )
+
+    id: str = Field(
+        description="A unique identifier for the issue.",
+        default_factory=generate_task_id
+    )
+
+    status: Status = Field(
+        description="The current status of the issue.",
+        default=Status.NONE,
+    )
+
+    is_function_generation_required: bool = Field(
+        description="Whether the current task involves writing code.",
+        required=True
+    )
+
+    is_test_code_generated: bool = Field(
+        description="Indicates whether unit test cases have been generated for this task.",
+        default=False
+    )
+
+    is_code_generated: bool = Field(
+        description="Indicates whether the functional code has been generated.",
+        default=False
+    )
+
+    file_path: str = Field(
+        description="The path to the file where the issue was found.",
+        default="",
+        title="File Path",
+        examples=["/path/to/file.py"]
+    )
+
+    line_number: Optional[int] = Field(
+        default=None,
+        description="The line number in the file where the issue occurs.",
+        title="Line Number",
+        examples=[42]
+    )
+
+    description: str = Field(
+        description="A detailed description of the issue.",
+        default="",
+        title="Issue Description",
+        examples=["Undefined variable 'x' in function 'foo'."]
+    )
+
+    suggestions: List[str] = Field(
+        default=[],
+        description="Suggestions for resolving the issue.",
+        title="Suggestions",
+        examples=[ "Define the variable 'x' before use", "Check variable scope and initialization" ]
+    )
+
+    function_signatures: FileFunctionSignatures = Field(
+        description="The skeleton or template of the function that needs to be implemented.",
+        default="",
+        examples=["def function_name(args): pass"]
+    )
+
+    test_code: dict[str, str] = Field(
+        description="The generated unit test code for the function.",
+        default="",
+        examples=["def test_function_name(): assert function_name() == expected_output"]
+    )
+
+    def issue_details(self) -> str:
+        """Return a formatted string representing the actual issue details."""
+        details = f"Issue: {self.description}\n"
+        details += f"File: {self.file_path}\n"
+        
+        if self.line_number:
+            details += f"Line: {self.line_number}\n"
+        
+        if self.suggestions:
+            suggestions_str = "\n".join(self.suggestions)
+            details += f"Suggestions:\n{suggestions_str}\n"
+        
+        return details
+
+class PlannedIssuesQueue(Queue[PlannedIssue]):
+    """
+    A specialized queue for managing issues, allowing updates to existing issues within the queue.
+    """
+    
+    def update_item(self, updated_issue: PlannedIssue) -> None:
+        """
+        Update an existing issue in the queue with the provided updated issue.
+
+        Args:
+            updated_issue (PlannedIssue): The updated issue to replace the existing issue in the queue.
+
+        Raises:
+            ValueError: If the issue with the specified ID is not found in the queue.
+        """
+        for i, issue in enumerate(self.items):
+            if issue.id == updated_issue.id:
+                self.items[i] = updated_issue
+                return
+        raise ValueError(f"Issue with ID {updated_issue.id} not found in the queue.")
 
 class RequirementsDocument(BaseModel):
     """
