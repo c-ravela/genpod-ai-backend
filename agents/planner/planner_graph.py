@@ -24,23 +24,26 @@ class PlannerWorkFlow(Graph[PlannerAgent]):
         planner_workflow = StateGraph(PlannerState, config_schema=Task)
         
         # Define the nodes
-        planner_workflow.add_node("backlog_planner", self.agent.backlog_planner)  # retrieve
-        planner_workflow.add_node("requirements_developer", self.agent.requirements_developer)  # grade documents
-        planner_workflow.add_node("response_generator", self.agent.generate_response)
-        planner_workflow.add_node("update_state", self.agent.update_state)
+        planner_workflow.add_node(self.agent.task_breakdown_node_name, self.agent.task_breakdown_node)
+        planner_workflow.add_node(self.agent.requirements_analyzer_node_name, self.agent.requirements_analyzer_node)
+        planner_workflow.add_node(self.agent.issues_preparation_node_name, self.agent.issues_preparation_node)
+        planner_workflow.add_node(self.agent.agent_response_node_name, self.agent.agent_response_node)
+        planner_workflow.add_node(self.agent.update_state_node_name, self.agent.update_state)
 
         # Define edges
-        planner_workflow.add_edge("backlog_planner", "requirements_developer")
-        planner_workflow.add_edge("requirements_developer", "response_generator")
-        planner_workflow.add_edge("response_generator", "update_state")
-        planner_workflow.add_edge("update_state", END)
+        planner_workflow.add_edge(self.agent.task_breakdown_node_name, self.agent.requirements_analyzer_node_name)
+        planner_workflow.add_edge(self.agent.requirements_analyzer_node_name, self.agent.agent_response_node_name)
+        planner_workflow.add_edge(self.agent.issues_preparation_node_name, self.agent.agent_response_node_name)
+        planner_workflow.add_edge(self.agent.agent_response_node_name, self.agent.update_state_node_name)
+        planner_workflow.add_edge(self.agent.update_state_node_name, END)
 
         # Define entry point
         planner_workflow.set_conditional_entry_point(
             self.agent.new_deliverable_check,
             {
-                "backlog_planner": "backlog_planner",
-                "requirements_developer": "requirements_developer"
+                self.agent.task_breakdown_node_name: self.agent.task_breakdown_node_name,
+                self.agent.requirements_analyzer_node_name: self.agent.requirements_analyzer_node_name,
+                self.agent.issues_preparation_node_name: self.agent.issues_preparation_node_name
             }
         )
 
