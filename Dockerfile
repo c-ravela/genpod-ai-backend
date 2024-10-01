@@ -1,5 +1,5 @@
 # Base Image
-FROM python:3.12.3
+FROM python:3.12.6
 
 # Set the working directory in the container
 WORKDIR /opt/genpod
