@@ -8,8 +8,91 @@ from typing import Any, Dict, Union
 
 from dotenv import load_dotenv
 from langchain_openai import ChatOpenAI
+from langchain_ollama import ChatOllama
 
 load_dotenv()
+
+def create_openai_chat_model_instance(
+    model: str,
+    temperature: float,
+    max_retries: int,
+    streaming: bool,
+    model_kwargs: Dict[str, Any]
+) -> ChatOpenAI:
+    """
+    Creates an instance of the ChatOpenAI model with the provided configuration.
+
+    Args:
+        model (str): The name of the OpenAI model to be used (e.g., 'gpt-3.5-turbo').
+        temperature (float): Controls randomness in the model's output. A value between 0 and 1,
+            where higher values (e.g., 0.9) result in more random outputs and lower values (e.g., 0.2) make the output more focused.
+        max_retries (int): The number of retry attempts in case of failure during model execution.
+        streaming (bool): Whether to enable streaming mode for the output (True) or not (False).
+        model_kwargs (Dict[str, Any]): Additional keyword arguments for customizing the ChatOpenAI instance.
+
+    Returns:
+        ChatOpenAI: An initialized instance of the ChatOpenAI model configured with the provided parameters.
+
+    Raises:
+        ValueError: If an unsupported model is provided, or any argument is out of valid range.
+
+    Example:
+        chat_model = create_openai_chat_model_instance(
+            model='gpt-3.5-turbo',
+            temperature=0.7,
+            max_retries=3,
+            streaming=False,
+            model_kwargs={'seed': 400}
+        )
+    """
+
+    supported_openai_models = ['gpt-4-turbo', 'gpt-4o-2024-05-13', 'gpt-4o-2024-08-06', 'chatgpt-4o-latest', 'gpt-4o']
+
+    if model not in supported_openai_models:
+        raise ValueError(f"Unsupported model '{model}' provided for ChatOpenAI. Supported models are: {', '.join(supported_openai_models)}")
+
+    return ChatOpenAI(
+        model=model,
+        temperature=temperature,
+        max_retries=max_retries,
+        streaming=streaming,
+        model_kwargs=model_kwargs
+    )
+
+def create_ollama_chat_model_instance(model: str, temperature: float, keep_alive: bool) -> ChatOllama:
+    """
+    Creates an instance of the ChatOllama model with the provided configuration.
+
+    Args:
+        model (str): The name of the Ollama model to be used (e.g., 'llama3').
+        temperature (float): Controls randomness in the model's output. A value between 0 and 1,
+            where higher values (e.g., 0.9) result in more random outputs, and lower values (e.g., 0.2) make the output more focused.
+        keep_alive (bool): Whether to keep the session alive for reuse (True) or not (False).
+
+    Returns:
+        ChatOllama: An initialized instance of the ChatOllama model configured with the provided parameters.
+
+    Raises:
+        ValueError: If an unsupported model is provided.
+
+    Example:
+    chat_model = create_ollama_chat_model_instance(
+        model='llama3',
+        temperature=0.7,
+        keep_alive=True
+    )
+    """
+
+    supported_ollama_models = ["llama3"]
+
+    if model not in supported_ollama_models:
+        raise ValueError(f"Unsupported model '{model}' provided for ChatOllama. Supported models are: {', '.join(supported_ollama_models)}")
+
+    return ChatOllama(
+        model=model,
+        temperature=temperature,
+        keep_alive=keep_alive
+    )
 
 @dataclass
 class GraphInfo:
@@ -39,59 +122,7 @@ class AgentInfo:
     agent_id: str
     alias: str = ""
     description: str = ""
-
-class LLMConfig:
-    """
-    Configuration for a Language Model (LLM).
-
-    This class encapsulates the settings required to initialize an LLM instance.
-
-    Attributes:
-        model (str): The model name or identifier.
-        temperature (float): The temperature setting for the model's responses.
-        max_retries (int): The maximum number of retries for the model.
-        streaming (bool): Whether streaming is enabled for the model.
-        model_kwargs (Dict[str, Any]): Additional keyword arguments for the model.
-    """
-
-    def __init__(self, model: str, temperature: float, max_retries: int, streaming: bool, model_kwargs: Dict[str, Any]):
-        """
-        Initializes the LLM configuration with the given parameters.
-
-        Args:
-            model (str): The model name or identifier.
-            temperature (float): The temperature setting for the model's responses.
-            max_retries (int): The maximum number of retries for the model.
-            streaming (bool): Whether streaming is enabled for the model.
-            model_kwargs (Dict[str, Any]): Additional keyword arguments for the model.
-        """
-        self.model = model
-        self.temperature = temperature
-        self.max_retries = max_retries
-        self.streaming = streaming
-        self.model_kwargs = model_kwargs
-
-    def create_llm(self) -> ChatOpenAI:
-        """
-        Creates and returns an instance of the configured LLM.
-
-        Returns:
-            ChatOpenAI: An instance of ChatOpenAI.
-
-        Raises:
-            ValueError: If the model configuration is not supported or is not for ChatOpenAI.
-        """
-        if self.model.startswith("gpt"):
-            return ChatOpenAI(
-                model=self.model,
-                temperature=self.temperature,
-                max_retries=self.max_retries,
-                streaming=self.streaming,
-                model_kwargs=self.model_kwargs
-            )
-        else:
-            raise ValueError(f"Unsupported model configuration: {self.model}. Only ChatOpenAI is currently supported.")
-        
+   
 class AgentConfig(AgentInfo):
     """
     Configuration for an agent, including its LLM settings and an optional thread ID.
@@ -103,7 +134,7 @@ class AgentConfig(AgentInfo):
         thread_id (Union[int, None]): Optional thread ID for the agent.
     """
 
-    def __init__(self, agent_name: str, agent_id: str, llm_config: LLMConfig) -> None:
+    def __init__(self, agent_name: str, agent_id: str, chat_model: Union[ChatOpenAI, ChatOllama]) -> None:
         """
         Initializes the agent configuration with the given parameters.
 
@@ -113,7 +144,7 @@ class AgentConfig(AgentInfo):
             llm_config (LLMConfig): The LLM configuration for this agent.
         """
         super().__init__(agent_name, agent_id)
-        self.llm: ChatOpenAI = llm_config.create_llm()
+        self.llm: Union[ChatOpenAI, ChatOllama] = chat_model
         self.thread_id: Union[int, None] = None
 
     def set_thread_id(self, thread_id: int) -> None:
@@ -291,100 +322,82 @@ AGENTS_CONFIG: Dict[str, AgentConfig] = {
     ProjectAgents.supervisor.agent_id: AgentConfig(
         ProjectAgents.supervisor.agent_name,
         ProjectAgents.supervisor.agent_id,
-        LLMConfig(
-            model="gpt-4o-2024-05-13",
-            temperature=0,
-            max_retries=5,
-            streaming=False,
-            model_kwargs={"seed": 4000, "top_p": 0.8}
+        create_ollama_chat_model_instance(
+            model="llama3",
+            temperature=0.4,
+            keep_alive=True
         )
     ),
     ProjectAgents.architect.agent_id: AgentConfig(
         ProjectAgents.architect.agent_name,
         ProjectAgents.architect.agent_id,
-        LLMConfig(
-            model="gpt-4o-2024-05-13",
+        create_ollama_chat_model_instance(
+            model="llama3",
             temperature=0.3,
-            max_retries=5,
-            streaming=True,
-            model_kwargs={"seed": 4000, "top_p": 0.4}
+            keep_alive=True
         )
     ),
     ProjectAgents.coder.agent_id: AgentConfig(
         ProjectAgents.coder.agent_name,
         ProjectAgents.coder.agent_id,
-        LLMConfig(
-            model="gpt-4o-2024-05-13",
+        create_ollama_chat_model_instance(
+            model="llama3",
             temperature=0.3,
-            max_retries=5,
-            streaming=True,
-            model_kwargs={"seed": 4000, "top_p": 0.4}
+            keep_alive=True
         )
     ),
     ProjectAgents.rag.agent_id: AgentConfig(
         ProjectAgents.rag.agent_name,
         ProjectAgents.rag.agent_id,
-        LLMConfig(
-            model="gpt-4o-2024-05-13",
+        create_ollama_chat_model_instance(
+            model="llama3",
             temperature=0,
-            max_retries=5,
-            streaming=True,
-            model_kwargs={"seed": 4000, "top_p": 0.3}
+            keep_alive=True
         )
     ),
     ProjectAgents.planner.agent_id: AgentConfig(
         ProjectAgents.planner.agent_name,
         ProjectAgents.planner.agent_id,
-        LLMConfig(
-            model="gpt-4o-2024-05-13",
-            temperature=0.3,
-            max_retries=5,
-            streaming=True,
-            model_kwargs={"seed": 4000, "top_p": 0.6}
+        create_ollama_chat_model_instance(
+            model="llama3",
+            temperature=0.2,
+            keep_alive=True
         )
     ),
     ProjectAgents.tests_generator.agent_id: AgentConfig(
         ProjectAgents.tests_generator.agent_name,
         ProjectAgents.tests_generator.agent_id,
-        LLMConfig(
-            model="gpt-4o-2024-05-13",
-            temperature=0.3,
-            max_retries=5,
-            streaming=True,
-            model_kwargs={"seed": 4000, "top_p": 0.4}
+        create_ollama_chat_model_instance(
+            model="llama3",
+            temperature=0.4,
+            keep_alive=True
         )
     ),
     ProjectAgents.modernizer.agent_id: AgentConfig(
         ProjectAgents.modernizer.agent_name,
         ProjectAgents.modernizer.agent_id,
-        LLMConfig(
-            model="gpt-4o-2024-05-13",
-            temperature=0.3,
-            max_retries=5,
-            streaming=True,
-            model_kwargs={"seed": 4000, "top_p": 0.6}
+        create_ollama_chat_model_instance(
+            model="llama3",
+            temperature=0.4,
+            keep_alive=True
         )
     ),
     ProjectAgents.human.agent_id: AgentConfig(
         ProjectAgents.human.agent_name,
         ProjectAgents.human.agent_id,
-        LLMConfig(
-            model="gpt-4o-2024-05-13",
-            temperature=0.3,
-            max_retries=5,
-            streaming=True,
-            model_kwargs={"seed": 4000, "top_p": 0.6}
+        create_ollama_chat_model_instance(
+            model="llama3",
+            temperature=0.4,
+            keep_alive=True
         )
     ),
     ProjectAgents.reviewer.agent_id: AgentConfig(
         ProjectAgents.reviewer.agent_name,
         ProjectAgents.reviewer.agent_id,
-        LLMConfig(
-            model="gpt-4o-2024-05-13",
-            temperature=0.3,
-            max_retries=5,
-            streaming=True,
-            model_kwargs={"seed": 4000, "top_p": 0.2}
+        create_ollama_chat_model_instance(
+            model="llama3",
+            temperature=0.4,
+            keep_alive=True
         )
     )
 }
