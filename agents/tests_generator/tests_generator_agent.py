@@ -10,13 +10,13 @@ from typing_extensions import Literal
 from agents.agent.agent import Agent
 from agents.tests_generator.tests_generator_state import TestCoderState
 from configs.project_config import ProjectAgents
-from models.constants import ChatRoles, Status
-from models.tests_generator_models import FunctionSkeleton, TestCodeGeneration
+from models.constants import ChatRoles, PStatus, Status
+from models.tests_generator_models import FunctionSkeleton, TestCodeGeneration, FileFunctionSignatures
 from prompts.tests_generator_prompts import TestGeneratorPrompts
 from tools.code import CodeFileWriter
 from tools.shell import Shell
 from utils.logs.logging_utils import logger
-
+from tools.file_system import FS
 
 class TestCoderAgent(Agent[TestCoderState, TestGeneratorPrompts]):
     """
@@ -25,6 +25,8 @@ class TestCoderAgent(Agent[TestCoderState, TestGeneratorPrompts]):
     entry_node_name: str # The entry point of the graph
     test_code_generation_node_name: str 
     skeleton_generation_node_name: str
+    skeleton_updation_node_name: str
+    test_code_updation_node_name: str
     segregation_node_name:str
     run_commands_node_name: str
     write_generated_code_node_name: str
@@ -33,7 +35,7 @@ class TestCoderAgent(Agent[TestCoderState, TestGeneratorPrompts]):
     add_license_node_name: str 
     update_state_node_name: str 
 
-    mode: Literal["test_code_generation"]
+    mode: Literal['test_code_generation', 'resolving_issues']
 
     # local state of this class which is not exposed
     # to the graph state
@@ -60,6 +62,9 @@ class TestCoderAgent(Agent[TestCoderState, TestGeneratorPrompts]):
     # chains
     test_code_generation_chain: RunnableSequence
     skeleton_generation_chain: RunnableSequence
+    
+    skeleton_updation_chain: RunnableSequence
+    test_code_updation_chain: RunnableSequence
 
     def __init__(self, llm: ChatOpenAI) -> None:
         """
@@ -80,9 +85,10 @@ class TestCoderAgent(Agent[TestCoderState, TestGeneratorPrompts]):
         self.write_skeleton_node_name="write_skeleton"
         self.download_license_node_name = "download_license"
         self.add_license_node_name = "add_license_text"
-        self.update_state_node_name = "state_update"
+        self.update_state_node_name = "update_state"
         self.skeleton_generation_node_name="skeleton_generation"
-
+        self.skeleton_updation_node_name = "skeleton_update"
+        self.test_code_updation_node_name = "test_case_updation"
         self.mode = ""
 
         self.hasError = False
@@ -114,6 +120,18 @@ class TestCoderAgent(Agent[TestCoderState, TestGeneratorPrompts]):
             | JsonOutputParser()
         )
 
+        self.skeleton_updation_chain = (
+            self.prompts.skeleton_generation_for_issue_prompt
+            | self.llm
+            | JsonOutputParser()
+        )
+
+        self.test_code_updation_chain = (
+            self.prompts.unit_test_generation_for_issue_prompt
+            | self.llm
+            | JsonOutputParser()
+        )
+
     def add_message(self, message: tuple[ChatRoles, str]) -> None:
         """
         Adds a single message to the messages field in the state.
@@ -129,20 +147,17 @@ class TestCoderAgent(Agent[TestCoderState, TestGeneratorPrompts]):
     def router(self, state: TestCoderState) -> str:
         """
         """
-
-        if self.hasError:
-            return self.last_visited_node
-        elif self.mode == "test_code_generation":
+        if self.mode == 'test_code_generation':
             if not self.is_skeleton_generated:
                 return self.skeleton_generation_node_name
-            elif not self.has_skeleton_been_written_locally:
-                return self.write_skeleton_node_name
-            elif not self.is_code_generated:
-               return self.test_code_generation_node_name
-            
-            elif not self.has_code_been_written_locally:
-                return self.write_generated_code_node_name
-        
+            elif not self.is_skeleton_written_to_local:
+                return self.test_code_generation_node_name
+        elif self.mode == 'resolving_issues':
+            if not self.is_skeleton_generated:
+                return self.skeleton_updation_node_name
+            elif not self.is_skeleton_written_to_local:
+                return self.test_code_updation_node_name
+
         return self.update_state_node_name
     
     def update_state_skeleton_generation(self,current_sg:FunctionSkeleton)-> None:
@@ -211,18 +226,22 @@ class TestCoderAgent(Agent[TestCoderState, TestGeneratorPrompts]):
         self.update_state(state)
         self.last_visited_node = self.entry_node_name
 
-        if self.state['current_planned_task'].task_status == Status.NEW:
-            self.mode = "test_code_generation"
-            # self.is_segregated=False
-            self.is_code_generated = False
-            self.is_skeleton_generated=False
-            self.has_command_execution_finished = False
-            self.has_skeleton_been_written_locally=False
-            self.has_code_been_written_locally = False
-            self.is_license_file_downloaded = False
-            self.is_license_text_added_to_files = False
+        if self.state['project_status'] == PStatus.EXECUTING:
+            if self.state['current_planned_task'].task_status == Status.NEW:
+                self.mode = "test_code_generation"
+        elif self.state['project_status'] == PStatus.RESOLVING:
+            if self.state['current_planned_issue'].status == Status.NEW:
+                self.mode = "resolving_issues"
 
-            self.current_code_generation = TestCodeGeneration()
+        self.is_code_generated = False
+        self.is_skeleton_generated=False
+        self.has_command_execution_finished = False
+        self.has_skeleton_been_written_locally=False
+        self.has_code_been_written_locally = False
+        self.is_license_file_downloaded = False
+        self.is_license_text_added_to_files = False
+
+        self.current_code_generation = TestCodeGeneration()
 
         return self.state
     
@@ -243,54 +262,54 @@ class TestCoderAgent(Agent[TestCoderState, TestGeneratorPrompts]):
             f"Started working on the task: {task.description}."
         ))
         
-        try:
-            llm_response = self.test_code_generation_chain.invoke({
-                "project_name": self.state['project_name'],
-                "project_path": os.path.join(self.state['project_path'], self.state['project_name']),
-                "requirements_document": self.state['requirements_document'],
-                "folder_structure": self.state['project_folder_strucutre'],
-                "task": task.description,
-                "error_message": self.error_message,
-                "functions_skeleton": self.state["functions_skeleton"]
-            })
-            # logger.info("Called llm response is :" ,llm_response)
-            # with open('/home/pranay/Desktop/Generatedfiles/latest/new_file_llmtest.txt', 'w') as file:
-            #     file.write(str(llm_response))
-            self.hasError = False
-            self.error_message = ""
+        while(True):
+            try:
+                llm_response = self.test_code_generation_chain.invoke({
+                    "project_name": self.state['project_name'],
+                    "project_path": os.path.join(self.state['project_path'], self.state['project_name']),
+                    "requirements_document": self.state['requirements_document'],
+                    "task": task.description,
+                    "error_message": self.error_message,
+                    "functions_skeleton": self.state["functions_skeleton"]
+                })
+                # logger.info("Called llm response is :" ,llm_response)
+                # with open('/home/pranay/Desktop/Generatedfiles/latest/new_file_llmtest.txt', 'w') as file:
+                #     file.write(str(llm_response))
+                self.hasError = False
+                self.error_message = ""
 
-            required_keys = ["files_to_create", "test_code", "infile_license_comments", "commands_to_execute"]
-            missing_keys = [key for key in required_keys if key not in llm_response]
+                required_keys = ["files_to_create", "test_code", "infile_license_comments", "commands_to_execute"]
+                missing_keys = [key for key in required_keys if key not in llm_response]
 
-            if missing_keys:
-                raise KeyError(f"Missing keys: {missing_keys} in the response. Try Again!")
+                if missing_keys:
+                    raise KeyError(f"Missing keys: {missing_keys} in the response. Try Again!")
 
-            self.update_state_test_code_generation(llm_response)
-            self.current_code_generation["test_code"] = llm_response['test_code']
-            self.current_code_generation.files_to_create = llm_response['files_to_create']
-            self.current_code_generation['infile_license_comments'] = llm_response['infile_license_comments']
-            self.current_code_generation['commands_to_execute'] = llm_response['commands_to_execute']
+                self.update_state_test_code_generation(llm_response)
+                self.current_code_generation["test_code"] = llm_response['test_code']
+                self.current_code_generation.files_to_create = llm_response['files_to_create']
+                self.current_code_generation['infile_license_comments'] = llm_response['infile_license_comments']
+                self.current_code_generation['commands_to_execute'] = llm_response['commands_to_execute']
 
-            self.add_message((
-                ChatRoles.USER,
-                f"{self.agent_name}: Test Code Generation completed!"
-            ))
+                self.add_message((
+                    ChatRoles.USER,
+                    f"{self.agent_name}: Test Code Generation completed!"
+                ))
 
-            self.is_code_generated = True
-            
+                self.is_code_generated = True
 
-        except Exception as e:
-            logger.error(f"----{self.agent_name}: Error Occured at code generation: {str(e)}.----")
+                break
+            except Exception as e:
+                logger.error(f"----{self.agent_name}: Error Occured at code generation: {str(e)}.----")
 
-            self.hasError = True
-            self.error_message = f"An error occurred while processing the request: {str(e)}"
+                self.hasError = True
+                self.error_message = f"An error occurred while processing the request: {str(e)}"
 
-            self.add_message((
-                ChatRoles.USER,
-                f"{self.agent_name}: {self.error_message}"
-            ))
+                self.add_message((
+                    ChatRoles.USER,
+                    f"{self.agent_name}: {self.error_message}"
+                ))
         
-        return {**self.state}
+        return self.state
 
     def skeleton_generation_node(self, state: TestCoderState) -> TestCoderState:
         """
@@ -309,107 +328,132 @@ class TestCoderAgent(Agent[TestCoderState, TestGeneratorPrompts]):
             f"Started working on the task: {task.description}."
         ))
 
-        try:
-            llm_response = self.skeleton_generation_chain.invoke({
-                "project_name": self.state['project_name'],
-                "project_path": os.path.join(self.state['project_path'], self.state['project_name']),
-                "requirements_document": self.state['requirements_document'],
-                "folder_structure": self.state['project_folder_strucutre'],
-                "task": task.description,
-                "error_message": self.error_message,
-            })
+        while(True):
+            try:
+                llm_response = self.skeleton_generation_chain.invoke({
+                    "project_name": self.state['project_name'],
+                    "project_path": os.path.join(self.state['project_path'], self.state['project_name']),
+                    "requirements_document": self.state['requirements_document'],
+                    "task": task.description,
+                    "error_message": self.error_message,
+                })
 
-            self.hasError = False
-            self.error_message = ""
+                required_keys = ["skeletons_to_create"]
+                missing_keys = [key for key in required_keys if key not in llm_response]
 
-            required_keys = ["skeletons_to_create"]
-            missing_keys = [key for key in required_keys if key not in llm_response]
+                if missing_keys:
+                    raise KeyError(f"Missing keys: {missing_keys} in the response. Try Again!")
 
-            if missing_keys:
-                raise KeyError(f"Missing keys: {missing_keys} in the response. Try Again!")
+                self.update_state_skeleton_generation(llm_response)
+                self.current_code_generation["functions_skeleton"] = llm_response['skeletons_to_create']
+                logger.info("after state",llm_response)
+                self.add_message((
+                    ChatRoles.USER,
+                    f"{self.agent_name}: skeleton generation completed!"
+                ))
 
-            self.update_state_skeleton_generation(llm_response)
-            self.current_code_generation["functions_skeleton"] = llm_response['skeletons_to_create']
-            logger.info("after state",llm_response)
-            self.add_message((
-                ChatRoles.USER,
-                f"{self.agent_name}: skeleton generation completed!"
-            ))
+                self.hasError = False
+                self.error_message = ""
 
-            self.is_skeleton_generated = True
-        except Exception as e:
-            logger.error(f"----{self.agent_name}: Error Occured at skeleton generation: {str(e)}.----")
+                self.is_skeleton_generated = True
 
-            self.hasError = True
-            self.error_message = f"An error occurred while processing the request: {str(e)}"
+                break
+            except Exception as e:
+                logger.error(f"----{self.agent_name}: Error Occured at skeleton generation: {str(e)}.----")
 
-            self.add_message((
-                ChatRoles.USER,
-                f"{self.agent_name}: {self.error_message}"
-            ))
+                self.hasError = True
+                self.error_message = f"An error occurred while processing the request: {str(e)}"
+
+                self.add_message((
+                    ChatRoles.USER,
+                    f"{self.agent_name}: {self.error_message}"
+                ))
         
         return self.state
     
-    # def task_segregation_node(self, state: TestCoderState) -> TestCoderState:
-    #     """
-    #     """
-    #     logger.info(f"----{self.agent_name}: Initiating segregation ----")
+    def skeleton_updation_node(self, state: TestCoderState) -> TestCoderState:
+        """
+        """
 
-    #     self.update_state(state)
-    #     self.last_visited_node = self.skeleton_generation_node_name
+        logger.info(f"----{self.agent_name}: Initiating skeleton Generation----")
+        self.state = state
+        self.last_visited_node = self.skeleton_updation_node_name
 
-    #     task = self.state["current_task"]
+        planned_issue = self.state['current_planned_issue']
 
-    #     logger.info(f"----{self.agent_name}: Started working on the task: {task.description}.----")
-  
-    #     self.add_message((
-    #         ChatRoles.USER,
-    #         f"Started working on the task: {task.description}."
-    #     ))
+        while(True):
+            try:
+                llm_response = self.skeleton_updation_chain({
+                    'file_content': FS.read_file(planned_issue.file_path),
+                    'issue_details': planned_issue.issue_details(),
+                    'project_name': self.state['project_name'],
+                    "project_path": os.path.join(self.state['project_path'], self.state['project_name']),
+                    "requirements_document": self.state['requirements_document'],
+                    "error_message": self.error_message,
+                })
 
-    #     try:
-    #         llm_response = self.segregaion_chain.invoke({
-    #             "work_package": self.state['work_package']
-    #         })
+                validated_response = FileFunctionSignatures(**llm_response)
+                self.current_code_generation["functions_skeleton"] = validated_response.function_signatures
 
-    #         self.hasError = False
-    #         self.error_message = ""
+                planned_issue.function_signatures = validated_response
+                
+                self.error_message = ""
+                self.state['current_planned_issue'] = planned_issue
+                self.is_skeleton_generated = True
 
+                break
+            except Exception as e:
+                logger.error(f"{self.agent_name}: Error Occured: ===>{type(e)}<=== {e}.----")
 
-    #         required_keys = ["taskType"]
-    #         missing_keys = [key for key in required_keys if key not in llm_response]
+                self.error_message = f"An error occurred while processing the request: {e}"
 
-    #         if missing_keys:
-    #             raise KeyError(f"Missing keys: {missing_keys} in the response. Try Again!")
+        return self.state
 
-    #         # TODO: Need to update these to the state such that it holds the past tasks following field details along current task with no duplicates.
-    #         logger.info(llm_response)
-    #         time.sleep(20)
-    #         # self.update_state_skeleton_generation(llm_response)
+    def test_code_updation_node(self, state: TestCoderState) -> TestCoderState:
+        """
+        """
 
-    #         # : maintian class variable (local to class) to hold the current task's CodeGenerationPlan object so that we are not gonna pass any extra
-    #         # details to the code generation prompt - look self.current_code_generation
-        
-    #         self.current_code_generation["taskType"] = llm_response['taskType']
-    #         logger.info("after state",llm_response)
-    #         self.add_message((
-    #             ChatRoles.USER,
-    #             f"{self.agent_name}: segregation completed!"
-    #         ))
+        self.state = state
+        self.last_visited_node = self.test_code_updation_node_name
 
-    #         self.is_skeleton_generated = True
-    #     except Exception as e:
-    #         logger.error(f"----{self.agent_name}: Error Occured at segregation: {str(e)}.----")
+        planned_issue = self.state['current_planned_issue']
 
-    #         self.hasError = True
-    #         self.error_message = f"An error occurred while processing the request: {str(e)}"
+        while(True):
+            try:
+                llm_response = self.test_code_updation_chain.invoke({
+                    'file_content': FS.read_file(planned_issue.file_path),
+                    'issue_details': planned_issue.issue_details(),
+                    'project_name': self.state['project_name'],
+                    "project_path": os.path.join(self.state['project_path'], self.state['project_name']),
+                    "requirements_document": self.state['requirements_document'],
+                    "error_message": self.error_message,
+                    "functions_skeleton": planned_issue.function_signatures
+                })
 
-    #         self.add_message((
-    #             ChatRoles.USER,
-    #             f"{self.agent_name}: {self.error_message}"
-    #         ))
-        
-    #     return {**self.state}
+                required_keys = ["files_to_create", "test_code", "infile_license_comments", "commands_to_execute"]
+                missing_keys = [key for key in required_keys if key not in llm_response]
+
+                if missing_keys:
+                    raise KeyError(f"Missing keys: {missing_keys} in the response. Try Again!")
+
+                self.update_state_test_code_generation(llm_response)
+                self.current_code_generation["test_code"] = llm_response['test_code']
+                self.current_code_generation.files_to_create = llm_response['files_to_create']
+                self.current_code_generation['infile_license_comments'] = llm_response['infile_license_comments']
+                self.current_code_generation['commands_to_execute'] = llm_response['commands_to_execute']
+
+                planned_issue.test_code = llm_response['test_code']
+
+                self.error_message = ""
+                self.state['current_planned_issue'] = planned_issue
+
+                break
+            except Exception as e:
+                logger.error(f"{self.agent_name}: Error Occured: ===>{type(e)}<=== {e}.----")
+
+                self.error_message = f"An error occurred while processing the request: {e}"
+
+        return self.state
 
     def run_commands_node(self, state: TestCoderState) -> TestCoderState:
         """
@@ -505,7 +549,6 @@ class TestCoderAgent(Agent[TestCoderState, TestGeneratorPrompts]):
                     ChatRoles.USER,
                     f"{self.agent_name}: {self.error_message}"
                 ))
-                # logger.error(self.error_message)
 
             self.has_skeleton_been_written_locally = True
         except Exception as e:
@@ -519,7 +562,7 @@ class TestCoderAgent(Agent[TestCoderState, TestGeneratorPrompts]):
                 f"{self.agent_name}: {self.error_message}"
             ))
 
-        return {**self.state}
+        return self.state
     
     def write_code_node(self, state: TestCoderState) -> TestCoderState:
         """
@@ -555,7 +598,6 @@ class TestCoderAgent(Agent[TestCoderState, TestGeneratorPrompts]):
                     #last visited node as code generation node to generate the code and, with out running the next set of writing the files.
                 elif execution_result[0]==True:
                     
-                    self.hasError=True
                     self.last_visited_node = self.test_code_generation_node_name
                     self.error_message= f"Error Occured while writing the code in the path: {path}. The output of writing the code to the file is {execution_result[1]}."
                     self.add_message((
@@ -565,14 +607,13 @@ class TestCoderAgent(Agent[TestCoderState, TestGeneratorPrompts]):
                 logger.error(self.error_message)
 
             self.has_code_been_written_locally = True
-            self.state['current_planned_task'].is_test_code_generated = True
-            # If the execution reaches this point, it indicates that unit test cases are required for the task.
-            # However, generating the unit test cases alone does not complete the task.
-            # The coder still needs to implement the actual code for the task.
-            # Therefore, we update the task status to INPROGRESS to reflect that additional work is needed,
-            # rather than marking it as DONE.
-            # NOTE: Updating the task status to INPROGRESS here is a workaround.
-            self.state['current_planned_task'].task_status = Status.INPROGRESS
+
+            if self.mode == 'test_code_generation':
+                self.state['current_planned_task'].task_status = Status.INPROGRESS
+                self.state['current_planned_task'].is_test_code_generated = True
+            elif self.mode == 'resolving_issues':
+                self.state['current_planned_issue'].status = Status.INPROGRESS
+                self.state['current_planned_issue'].is_test_code_generated = True
         except Exception as e:
             logger.error(f"----{self.agent_name}: Error Occured while writing the code to the respective files : {str(e)}.----")
 
