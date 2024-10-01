@@ -7,7 +7,7 @@ from typing_extensions import Annotated, TypedDict
 from agents.agent.state import State
 from models.coder_models import CodeGenerationPlan
 from models.constants import ChatRoles
-from models.models import Issue, PlannedTask, Task
+from models.models import Issue, PlannedIssue, PlannedTask, Task
 
 
 class CoderState(TypedDict):
@@ -94,6 +94,12 @@ class CoderState(TypedDict):
         )
     ]
     
+    # @out
+    current_planned_issue: Annotated[
+        PlannedIssue,
+        State.out_field("The current planned issue that team is working on.")
+    ]
+
     current_issue: Annotated[
         Issue,
         State.inout_field()
