@@ -6,8 +6,8 @@ Agent graph state
 from typing_extensions import Annotated, TypedDict
 
 from agents.agent.state import State
-from models.constants import ChatRoles
-from models.models import PlannedTask, Task
+from models.constants import ChatRoles, PStatus
+from models.models import Issue, PlannedIssue, PlannedTask, Task
 from models.tests_generator_models import FunctionSkeleton
 
 
@@ -23,13 +23,10 @@ class TestCoderState(TypedDict):
         )
     ]
 
-    # @in 
-    project_folder_strucutre: Annotated[
-        str,
-        State.in_field(
-            "The organized layout of directories and subdirectories that form the project's "
-            "file system, adhering to best practices for project structure."
-        )
+    # @out
+    project_status: Annotated[
+        PStatus,
+        State.out_field("The status of the project being generated.")
     ]
 
     # @in 
@@ -49,12 +46,6 @@ class TestCoderState(TypedDict):
             "The absolute path in the file system where the project is being generated. "
             "This path is used to store all the project-related files and directories."
         )
-    ]
-
-    # @in
-    license_url: Annotated[
-        str,
-        State.in_field()
     ]
 
     # @in
@@ -81,6 +72,18 @@ class TestCoderState(TypedDict):
         )
     ]
     
+    # @out
+    current_issue: Annotated[
+        Issue,
+        State.out_field("This field represents the issue that is currently being worked on.")
+    ]
+
+    # @out
+    current_planned_issue: Annotated[
+        PlannedIssue,
+        State.out_field("The current planned issue that team is working on.")
+    ]
+
     # @inout
     messages: Annotated[
         list[tuple[ChatRoles, str]],
