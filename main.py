@@ -81,7 +81,7 @@ if __name__=="__main__":
     logger.info(f"Records for new session has been created in the database with ids: {", ".join(f"{agent.agent_id}: {agent.thread_id}" for agent in config.agents)}")
     # Database insertion - END
     
-    genpod_team = TeamMembers(config.agents , DATABASE_PATH, config.vector_collections_name)
+    genpod_team = TeamMembers(config.agents, config.graphs, DATABASE_PATH, config.vector_collections_name)
     genpod_team.supervisor.set_recursion_limit(config.max_graph_recursion_limit)
     genpod_team.supervisor.graph.agent.setup_team(genpod_team)
 
