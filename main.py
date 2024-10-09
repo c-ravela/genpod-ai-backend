@@ -3,9 +3,12 @@ Driving code file for this project.
 """
 import os
 
+from dotenv import load_dotenv
+
 from agents.supervisor.supervisor_state import SupervisorState
 from configs.database import get_client_local_db_file_path
 from configs.project_config import ProjectConfig
+from configs.project_environment import ProjectEnvironment
 from configs.project_path import set_project_path
 from database.database import Database
 from genpod.team import TeamMembers
@@ -15,12 +18,26 @@ from utils.time import get_timestamp
 print("\n\nWe greatly appreciate your interest! Please note that we are in the midst of active development and are striving to make improvements every day!\n\n")
 
 if __name__=="__main__":
+    load_dotenv() # dotenv is just dev environment will be removed for production purpose
+
+    try:
+        pe = ProjectEnvironment()
+
+    except:
+        logger.error("Error loading environment variables.")
+        raise
+
+    try:
+        config_path = pe.get_env("GENPOD_CONFIG_PATH")
+        config = ProjectConfig(config_path)
+        config.load_config()
+        logger.info("Project configuration loaded!")
+    except:
+        logger.error("Error loading project config.")
+        raise
+
     TIME_STAMP = get_timestamp()
     logger.info(f"Project Generation has been triggered at {TIME_STAMP}!")
-
-    # Initialize the project config
-    config = ProjectConfig()
-    logger.info("Project configuration loaded!")
 
     USER_ID = int(os.getenv("USER_ID"))
     if USER_ID is None:
@@ -55,17 +72,17 @@ if __name__=="__main__":
     logger.info(f"Records for new microservice has been created in the database with id: {microservice_details['id']}")
 
     sessions_details = []
-    for key, agent in config.agents_config.items():
+    for agent in config.agents:
         session_detail = db.sessions_table.insert(project_details['id'], microservice_details['id'], USER_ID)
         sessions_details.append(session_detail)
 
         agent.set_thread_id(session_detail['id'])
 
-    logger.info(f"Records for new session has been created in the database with ids: {", ".join(f"{value.agent_id}: {value.thread_id}" for key, value in config.agents_config.items())}")
+    logger.info(f"Records for new session has been created in the database with ids: {", ".join(f"{agent.agent_id}: {agent.thread_id}" for agent in config.agents)}")
     # Database insertion - END
     
-    genpod_team = TeamMembers(DATABASE_PATH, config.collection_name)
-    genpod_team.supervisor.set_recursion_limit(500)
+    genpod_team = TeamMembers(config.agents , DATABASE_PATH, config.vector_collections_name)
+    genpod_team.supervisor.set_recursion_limit(config.max_graph_recursion_limit)
     genpod_team.supervisor.graph.agent.setup_team(genpod_team)
 
     supervisor_response = genpod_team.supervisor.stream({
