@@ -1,22 +1,21 @@
 from langchain_community.vectorstores import Chroma
-from langchain_core.output_parsers import JsonOutputParser, StrOutputParser
-from langchain_openai import ChatOpenAI, OpenAIEmbeddings
+from langchain_openai import OpenAIEmbeddings
 
 from agents.agent.agent import Agent
 from agents.rag_workflow.rag_state import RAGState
-from configs.project_config import ProjectAgents
 from configs.supervisor_config import RAG_TRY_LIMIT
+from llms.llm import LLM
 from prompts.rag_prompts import RAGPrompts
 from utils.logs.logging_utils import logger
 
 
 class RAGAgent(Agent[RAGState, RAGPrompts]):
-    def __init__(self, llm: ChatOpenAI, collection_name: str, persist_directory: str=None):
+    def __init__(self, agent_id: str, agent_name: str, llm: LLM, collection_name: str, persist_directory: str=None):
         assert persist_directory is not None, "Currently only Local Chroma VectorDB is supported"
         
         super().__init__(
-            ProjectAgents.rag.agent_id,
-            ProjectAgents.rag.agent_name,
+            agent_id,
+            agent_name,
             RAGState(),
             RAGPrompts(),
             llm
@@ -30,25 +29,6 @@ class RAGAgent(Agent[RAGState, RAGPrompts]):
         )
         self.retriever = self.mismo_vectorstore.as_retriever(search_kwargs={'k': 20})
         
-        # Document retrieval Grader chain
-        self.retrieval_grader = self.prompts.retriever_grader_prompt | self.llm | JsonOutputParser()
-        
-        # Halucination Grader chain
-        self.hallucination_grader = self.prompts.halucination_grader_prompt | self.llm | JsonOutputParser()
-
-        # Question Re-writer chain
-        self.question_rewriter = self.prompts.re_write_prompt | self.llm | StrOutputParser()
-
-        # Answer grader from the chain
-        self.answer_grader = self.prompts.answer_grader_prompt | self.llm | JsonOutputParser()
-
-        # RAG Answering chain 
-        self.rag_generation_chain = (
-            self.prompts.rag_generation_prompt
-            | self.llm
-            | StrOutputParser()
-        )
-
         self.max_hallucination = None
         
     def retrieve(self, state: RAGState):
@@ -90,8 +70,13 @@ class RAGAgent(Agent[RAGState, RAGPrompts]):
         
 
         # RAG generation
-        generation = self.rag_generation_chain.invoke({"context": documents, "question": question})
-        return {**state, "documents": documents, "question": question, "generation": generation}
+        llm_output = self.llm.invoke(self.prompts.rag_generation_prompt, {
+                "context": documents, 
+                "question": question
+            },
+            'string'
+        )
+        return {**state, "documents": documents, "question": question, "generation": llm_output.response}
 
     def grade_documents(self, state: RAGState):
         """
@@ -112,10 +97,14 @@ class RAGAgent(Agent[RAGState, RAGPrompts]):
         # Score each doc
         filtered_docs = []
         for d in documents:
-            score = self.retrieval_grader.invoke(
-                {"question": question, "document": d.page_content}
+            llm_output = self.llm.invoke(self.prompts.retriever_grader_prompt, {
+                    "question": question, 
+                    "document": d.page_content
+                }, 
+                'json'
             )
-            grade = score["score"]
+            
+            grade = llm_output.response["score"]
             if grade == "yes":
                 # print("----GRADE: DOCUMENT RELEVANT----")
                 logger.info("----GRADE: DOCUMENT RELEVANT----")
@@ -154,8 +143,8 @@ class RAGAgent(Agent[RAGState, RAGPrompts]):
         self.iteration_count -= 1
 
         # Re-write question
-        better_question = self.question_rewriter.invoke({"question": question})
-        return {**state, "documents": documents, "question": better_question, "next":"retrieve"}
+        llm_output = self.llm.invoke(self.prompts.re_write_prompt, {"question": question}, 'string')
+        return {**state, "documents": documents, "question": llm_output.response, "next":"retrieve"}
 
     def decide_to_generate(self, state: RAGState):
         """
@@ -204,10 +193,13 @@ class RAGAgent(Agent[RAGState, RAGPrompts]):
         documents = state["documents"]
         generation = state["generation"]
 
-        score = self.hallucination_grader.invoke(
-            {"documents": documents, "generation": generation}
+        llm_output = self.llm.invoke(self.prompts.halucination_grader_prompt, {
+                "documents": documents, 
+                "generation": generation
+            },
+            'json'
         )
-        grade = score["score"]
+        grade = llm_output.response["score"]
 
         # Check hallucination
         if grade == "yes":
@@ -216,8 +208,14 @@ class RAGAgent(Agent[RAGState, RAGPrompts]):
             # Check question-answering
             # print("----GRADE GENERATION vs QUESTION----")
             logger.info("----GRADE GENERATION vs QUESTION----")
-            score = self.answer_grader.invoke({"question": question, "generation": generation})
-            grade = score["score"]
+            llm_output = self.llm.invoke(self.prompts.answer_grader_prompt, {
+                    "question": question, 
+                    "generation": generation
+                },
+                'json'
+            )
+            
+            grade = llm_output.response["score"]
             if grade == "yes":
                 # print("----DECISION: GENERATION ADDRESSES QUESTION----")
                 logger.info("----DECISION: GENERATION ADDRESSES QUESTION----")

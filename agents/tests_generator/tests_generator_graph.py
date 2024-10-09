@@ -2,27 +2,26 @@
 TestCoder Graph
 """
 
-from langchain_openai import ChatOpenAI
 from langgraph.graph import END, StateGraph
 
 from agents.agent.graph import Graph
 from agents.tests_generator.tests_generator_agent import TestCoderAgent
 from agents.tests_generator.tests_generator_state import TestCoderState
-from configs.project_config import ProjectGraphs
+from llms.llm import LLM
 
 
 class TestCoderGraph(Graph[TestCoderAgent]):
     """
     """
 
-    def __init__(self, llm: ChatOpenAI, persistance_db_path: str) -> None:
+    def __init__(self, graph_id: str, graph_name: str, agent_id: str, agent_name: str, llm: LLM, persistance_db_path: str) -> None:
         """
         """
 
         super().__init__(
-            ProjectGraphs.tests_generator.graph_id,
-            ProjectGraphs.tests_generator.graph_name,
-            TestCoderAgent(llm),
+            graph_id,
+            graph_name,
+            TestCoderAgent(agent_id, agent_name, llm),
             persistance_db_path
         )
 

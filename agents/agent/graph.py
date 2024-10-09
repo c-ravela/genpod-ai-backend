@@ -1,11 +1,10 @@
 import io
-from typing import Generic, TypeVar
+from typing import Any, Generic, TypeVar
 
 from langgraph.checkpoint.sqlite import SqliteSaver
 from langgraph.graph import StateGraph
 from langgraph.graph.graph import CompiledGraph
 from PIL import Image
-from typing_extensions import Any
 
 GenericAgent = TypeVar('GenericAgent', bound=Any)
 

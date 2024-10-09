@@ -5,16 +5,13 @@ managing the state of the Architect agent, processing user inputs, and
 generating appropriate responses.
 """
 import os
-
-from langchain_core.output_parsers import JsonOutputParser
-from langchain_core.runnables.base import RunnableSequence
-from langchain_openai import ChatOpenAI
-from typing_extensions import Literal
+from typing import Literal
 
 from agents.agent.agent import Agent
 from agents.architect.architect_state import ArchitectState
-from configs.project_config import ProjectAgents
-from models.architect_models import ProjectDetails, QueryResult, TaskOutput
+from llms.llm import LLM
+from models.architect_models import (ProjectDetails, QueryResult, TaskOutput,
+                                     TasksList)
 from models.constants import ChatRoles, PStatus, Status
 from models.models import RequirementsDocument, Task, TaskQueue
 from prompts.architect_prompts import ArchitectPrompts
@@ -55,21 +52,7 @@ class ArchitectAgent(Agent[ArchitectState, ArchitectPrompts]):
     last_visited_node: str # The last node that was visited in the graph
     error_message: str # The error message, if an error occurred
 
-    # chains
-    project_overview_chain: RunnableSequence # This is for project comprehensive overview in markdown format
-    architecture_chain: RunnableSequence
-    folder_structure_chain: RunnableSequence
-    microservice_design_chain: RunnableSequence
-    tasks_breakdown_chain: RunnableSequence
-    standards_chain: RunnableSequence
-    implementation_details_chain: RunnableSequence
-    license_legal_chain: RunnableSequence
-
-    project_details_chain: RunnableSequence # This is for project_name and project folder structure
-    additional_information_chain: RunnableSequence
-    task_seperation_chain: RunnableSequence
-
-    def __init__(self, llm: ChatOpenAI) -> None:
+    def __init__(self, agent_id: str, agent_name: str, llm: LLM) -> None:
         """
         This method initializes the ArchitectAgent with a given Language Learning Model (llm) 
         and sets up the architect chain. The architect chain is a sequence of operations 
@@ -80,8 +63,8 @@ class ArchitectAgent(Agent[ArchitectState, ArchitectPrompts]):
         """
         
         super().__init__(
-            ProjectAgents.architect.agent_id,
-            ProjectAgents.architect.agent_name,
+            agent_id,
+            agent_name,
             ArchitectState(),
             ArchitectPrompts(),
             llm
@@ -108,72 +91,6 @@ class ArchitectAgent(Agent[ArchitectState, ArchitectPrompts]):
 
         self.last_visited_node = self.entry_node_name # entry point node
         self.error_message = ""
-
-        self.project_overview_chain = ( 
-            self.prompts.project_overview_prompt
-            | self.llm
-            | JsonOutputParser()
-        )
-
-        self.architecture_chain = (
-            self.prompts.architecture_prompt
-            | self.llm
-            | JsonOutputParser()
-        )
-
-        self.folder_structure_chain = (
-            self.prompts.folder_structure_prompt
-            | self.llm
-            | JsonOutputParser()
-        )
-
-        self.microservice_design_chain = (
-            self.prompts.microservice_design_prompt
-            | self.llm
-            | JsonOutputParser()
-        )
-
-        self.tasks_breakdown_chain = (
-            self.prompts.tasks_breakdown_prompt
-            | self.llm
-            | JsonOutputParser()
-        )
-
-        self.standards_chain = (
-            self.prompts.standards_prompt
-            | self.llm
-            | JsonOutputParser()
-        )
-
-        self.implementation_details_chain = (
-            self.prompts.implementation_details_prompt
-            | self.llm
-            | JsonOutputParser()
-        )
-
-        self.license_legal_chain = (
-            self.prompts.license_details_prompt
-            | self.llm
-            | JsonOutputParser()
-        )
-
-        self.project_details_chain = (
-            self.prompts.project_details_prompt
-            | self.llm
-            | JsonOutputParser()
-        )
-
-        self.additional_information_chain = (
-            self.prompts.additional_info_prompt
-            | self.llm
-            | JsonOutputParser()
-        )
-
-        self.task_seperation_chain = (
-            self.prompts.tasks_separation_prompt
-            | self.llm
-            | JsonOutputParser()
-        )
 
     def add_message(self, message: tuple[ChatRoles, str]) -> None:
         """
@@ -377,15 +294,15 @@ class ArchitectAgent(Agent[ArchitectState, ArchitectPrompts]):
                     f"{self.agent_name}: Progressing with Step 0 - project_overview."
                 ))
 
-                response: TaskOutput = self.project_overview_chain.invoke({
+                llm_output = self.llm.invoke_with_pydantic_model(self.prompts.project_overview_prompt, {
                     "user_request": f"{self.state['original_user_input']}",
                     "task_description": f"{self.state['current_task'].description}",
                     "additional_information": f"{self.state['current_task'].additional_info}"
-                })
+                }, TaskOutput)
 
                 self.has_error_occured = False
                 self.error_message = ""
-                self.handle_requirements_overview(response)
+                self.handle_requirements_overview(llm_output.response)
 
             if self.generation_step == 1: # 1. Architecture
                 self.add_message((
@@ -393,13 +310,13 @@ class ArchitectAgent(Agent[ArchitectState, ArchitectPrompts]):
                     f"{self.agent_name}: Progressing with Step 1 - Architecture."
                 ))
 
-                response: TaskOutput = self.architecture_chain.invoke({
+                llm_output = self.llm.invoke_with_pydantic_model(self.prompts.architecture_prompt, {
                     "project_overview": f"{self.state['requirements_document'].project_overview}",
-                })
-
+                }, TaskOutput)
+                
                 self.has_error_occured = False
                 self.error_message = ""
-                self.handle_requirements_overview(response)
+                self.handle_requirements_overview(llm_output.response)
 
             if self.generation_step == 2: # 2. Folder Structure
                 self.add_message((
@@ -407,14 +324,14 @@ class ArchitectAgent(Agent[ArchitectState, ArchitectPrompts]):
                     f"{self.agent_name}: Progressing with Step 2 - Folder Structure."
                 ))
 
-                response: TaskOutput = self.folder_structure_chain.invoke({
+                llm_output = self.llm.invoke_with_pydantic_model(self.prompts.folder_structure_prompt, {
                     "project_overview": f"{self.state['requirements_document'].project_overview}",
                     "architecture": f"{self.state['requirements_document'].project_architecture}",
-                })
+                }, TaskOutput)
 
                 self.has_error_occured = False
                 self.error_message = ""
-                self.handle_requirements_overview(response)
+                self.handle_requirements_overview(llm_output.response)
 
             if self.generation_step == 3: # 3. Micro service Design
                 self.add_message((
@@ -422,14 +339,14 @@ class ArchitectAgent(Agent[ArchitectState, ArchitectPrompts]):
                     f"{self.agent_name}: Progressing with Step 3 - Microservice Design."
                 ))
 
-                response: TaskOutput = self.microservice_design_chain.invoke({
+                llm_output = self.llm.invoke_with_pydantic_model(self.prompts.microservice_design_prompt, {
                     "project_overview": f"{self.state['requirements_document'].project_overview}",
                     "architecture": f"{self.state['requirements_document'].project_architecture}",
-                })
+                }, TaskOutput)
 
                 self.has_error_occured = False
                 self.error_message = ""
-                self.handle_requirements_overview(response)
+                self.handle_requirements_overview(llm_output.response)
 
             if self.generation_step == 4: # 4. Tasks Breakdown
                 self.add_message((
@@ -437,15 +354,15 @@ class ArchitectAgent(Agent[ArchitectState, ArchitectPrompts]):
                     f"{self.agent_name}: Progressing with Step 4 - Tasks Breakdown."
                 ))
 
-                response: TaskOutput = self.tasks_breakdown_chain.invoke({
+                llm_output = self.llm.invoke_with_pydantic_model(self.prompts.tasks_breakdown_prompt, {
                     "project_overview": f"{self.state['requirements_document'].project_overview}",
                     "architecture": f"{self.state['requirements_document'].project_architecture}",
                     "microservice_design": f"{self.state['requirements_document'].microservices_architecture}",
-                })
+                }, TaskOutput)
 
                 self.has_error_occured = False
                 self.error_message = ""
-                self.handle_requirements_overview(response)
+                self.handle_requirements_overview(llm_output.response)
 
             if self.generation_step == 5: # 5. Standards
                 self.add_message((
@@ -453,14 +370,14 @@ class ArchitectAgent(Agent[ArchitectState, ArchitectPrompts]):
                     f"{self.agent_name}: Progressing with Step 5 - Standards."
                 ))
 
-                response: TaskOutput = self.standards_chain.invoke({
+                llm_output = self.llm.invoke_with_pydantic_model(self.prompts.standards_prompt, {
                     "user_request": f"{self.state['original_user_input']}\n",
                     "task_description": f"{self.state['requirements_document'].tasks_overview}",
-                })
+                }, TaskOutput)
 
                 self.has_error_occured = False
                 self.error_message = ""
-                self.handle_requirements_overview(response)
+                self.handle_requirements_overview(llm_output.response)
 
             if self.generation_step == 6: # 6. Implementation Details
                 self.add_message((
@@ -468,15 +385,15 @@ class ArchitectAgent(Agent[ArchitectState, ArchitectPrompts]):
                     f"{self.agent_name}: Progressing with Step 6 - Implementation Details."
                 ))
 
-                response: TaskOutput = self.implementation_details_chain.invoke({
-                "architecture": f"{self.state['requirements_document'].project_architecture}\n",
-                "microservice_design": f"{self.state['requirements_document'].microservices_architecture}",
-                "folder_structure": f"{self.state['requirements_document'].directory_structure}",
-                })
+                llm_output = self.llm.invoke_with_pydantic_model(self.prompts.implementation_details_prompt, {
+                    "architecture": f"{self.state['requirements_document'].project_architecture}\n",
+                    "microservice_design": f"{self.state['requirements_document'].microservices_architecture}",
+                    "folder_structure": f"{self.state['requirements_document'].directory_structure}",
+                }, TaskOutput)
 
                 self.has_error_occured = False
                 self.error_message = ""
-                self.handle_requirements_overview(response)
+                self.handle_requirements_overview(llm_output.response)
 
             if self.generation_step == 7: # 7. License Details
                 self.add_message((
@@ -484,14 +401,14 @@ class ArchitectAgent(Agent[ArchitectState, ArchitectPrompts]):
                     f"{self.agent_name}: Progressing with Step 7 - License Details."
                 ))
 
-                response: TaskOutput = self.license_legal_chain.invoke({
+                llm_output = self.llm.invoke_with_pydantic_model(self.prompts.license_details_prompt, {
                     "user_request": f"{self.state['original_user_input']}",
                     "license_text": f"{self.state['license_text']}",
-                })
+                }, TaskOutput)
 
                 self.has_error_occured = False
                 self.error_message = ""
-                self.handle_requirements_overview(response)
+                self.handle_requirements_overview(llm_output.response)
 
             if self.generation_step == 8:
                 self.is_requirements_document_generated = True
@@ -504,8 +421,8 @@ class ArchitectAgent(Agent[ArchitectState, ArchitectPrompts]):
                 f"{self.agent_name}: {self.error_message}"
             ))
             logger.error(f"Exception: {type(e)} --> {self.agent_name}: {self.error_message}")
-
-        return {**self.state}
+        
+        return self.state
 
     def write_requirements_node(self, state: ArchitectState) -> ArchitectState:
         """
@@ -574,23 +491,15 @@ class ArchitectAgent(Agent[ArchitectState, ArchitectPrompts]):
         self.state={**state}
 
         try:
-            task_seperation_solution = self.task_seperation_chain.invoke({
+            llm_output = self.llm.invoke_with_pydantic_model(self.prompts.tasks_separation_prompt, {
                 "tasks": self.state['requirements_document'].tasks_overview,
                 "error_message": self.error_message
-            })
+            }, TasksList)
             
             self.has_error_occured = False
             self.error_message = ""
-            
-            tasks = task_seperation_solution['tasks']
 
-            if not isinstance(tasks, list):
-                raise TypeError(f"Expected 'tasks' to be of type list but received {type(tasks).__name__}.")
-
-            if not tasks:
-                raise ValueError(f"The 'tasks' list received from the previous response is empty. Received: {tasks}, Expected: Non empty list of strings.")
-   
-            self.state['tasks'].extend(self.create_tasks_list(tasks))
+            self.state['tasks'].extend(self.create_tasks_list(llm_output.response.tasks))
 
             self.are_tasks_seperated = True
             self.add_message((
@@ -626,12 +535,12 @@ class ArchitectAgent(Agent[ArchitectState, ArchitectPrompts]):
             ))           
             logger.error(f"Exception: {type(e)} --> {self.agent_name}: {self.error_message}")
 
-        return {**self.state}
+        return self.state
 
     def project_details_node(self, state: ArchitectState) -> ArchitectState:
         """
         This method is used to gather project details. It updates the current state with the 
-        provided state and invokes the project_details_chain to get the project details.
+        provided state and invokes the project_details_prompt to get the project details.
 
         Args:
             state (ArchitectState): The current state of the architect.
@@ -651,21 +560,15 @@ class ArchitectAgent(Agent[ArchitectState, ArchitectPrompts]):
         ))
 
         try:
-            response: ProjectDetails = self.project_details_chain.invoke({
+            llm_output = self.llm.invoke_with_pydantic_model(self.prompts.project_details_prompt, {
                 "user_request": f"{self.state['original_user_input']}\n",
                 "error_message": f"{self.error_message}\n",
-            })
+            }, ProjectDetails)
 
             self.has_error_occured = False
             self.error_message = ""
 
-            required_keys = ["project_name"]
-            missing_keys = [key for key in required_keys if key not in response]
-
-            if missing_keys:
-                raise KeyError(f"Missing keys: {missing_keys} in the response. Try Again!")
-
-            self.state['project_name'] = response['project_name']
+            self.state['project_name'] = llm_output.response.project_name
 
             self.add_message((
                 ChatRoles.USER,
@@ -685,12 +588,12 @@ class ArchitectAgent(Agent[ArchitectState, ArchitectPrompts]):
 
             logger.error(f"Exception: {type(e)} --> {self.agent_name}: {self.error_message}")
 
-        return {**self.state}
+        return self.state
     
     def additional_information_node(self, state: ArchitectState) -> ArchitectState:
         """
         This method is used to gather additional information if needed. It updates the current 
-        state with the provided state and invokes the additional_information_chain to get the 
+        state with the provided state and invokes the additional_information_prompt to get the 
         additional information.
 
         Args:
@@ -711,24 +614,18 @@ class ArchitectAgent(Agent[ArchitectState, ArchitectPrompts]):
         ))
         
         try:
-            llm_response: QueryResult = self.additional_information_chain.invoke({
+            llm_output = self.llm.invoke_with_pydantic_model(self.prompts.additional_info_prompt, {
                 "requirements_document": self.state['requirements_document'].to_markdown(),
                 "question": self.state['current_task'].question,
                 "error_message": self.error_message
-            })
+            }, QueryResult)
 
             self.has_error_occured = False
             self.error_message = ""
 
-            required_keys = ["is_answer_found", "response_text"]
-            missing_keys = [key for key in required_keys if key not in llm_response]
-
-            if missing_keys:
-                raise KeyError(f"Missing keys: {missing_keys} in the response. Try Again!")
-
-            self.state["query_answered"] = llm_response['is_answer_found']
+            self.state["query_answered"] = llm_output.response.is_answer_found
             
-            response_text = llm_response['response_text'] if self.state["query_answered"] else "I don't have any additional information about the question."
+            response_text = llm_output.response.response_text if self.state["query_answered"] else "I don't have any additional information about the question."
             self.state["current_task"].additional_info = f"{self.state['current_task'].additional_info}, \nArchitect_Response:\n{response_text}"
 
             message_text = "Additional information has been successfully provided." if self.state["query_answered"] else "Unfortunately, I couldn't provide the additional information requested."
@@ -750,4 +647,4 @@ class ArchitectAgent(Agent[ArchitectState, ArchitectPrompts]):
 
             logger.error(f"Exception: {type(e)} --> {self.agent_name}: {self.error_message}")
             
-        return {**self.state}
+        return self.state

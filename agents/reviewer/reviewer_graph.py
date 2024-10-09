@@ -1,24 +1,23 @@
 """
 """
-from langchain_openai import ChatOpenAI
 from langgraph.graph import END, StateGraph
 
 from agents.agent.graph import Graph
 from agents.reviewer.reviewer_agent import ReviewerAgent
 from agents.reviewer.reviewer_state import ReviewerState
-from configs.project_config import ProjectGraphs
+from llms.llm import LLM
 
 
 class ReviewerGraph(Graph[ReviewerAgent]):
     """
     """
 
-    def __init__(self,  llm: ChatOpenAI, persistance_db_path: str) -> None:
+    def __init__(self, graph_id: str, graph_name: str, agent_id: str, agent_name: str, llm: LLM, persistance_db_path: str) -> None:
         """"""
         super().__init__(
-            ProjectGraphs.reviewer.graph_id,
-            ProjectGraphs.reviewer.graph_name, 
-            ReviewerAgent(llm),
+            graph_id,
+            graph_name, 
+            ReviewerAgent(agent_id, agent_name, llm),
             persistance_db_path
         )
 

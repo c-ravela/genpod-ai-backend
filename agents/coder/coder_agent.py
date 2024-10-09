@@ -3,13 +3,9 @@
 import os
 from typing import List, Literal
 
-from langchain_core.output_parsers import JsonOutputParser
-from langchain_core.runnables.base import RunnableSequence
-from langchain_openai import ChatOpenAI
-
 from agents.agent.agent import Agent
 from agents.coder.coder_state import CoderState
-from configs.project_config import ProjectAgents
+from llms.llm import LLM
 from models.coder_models import CodeGenerationPlan
 from models.constants import ChatRoles, PStatus, Status
 from prompts.coder_prompts import CoderPrompts
@@ -52,17 +48,13 @@ class CoderAgent(Agent[CoderState, CoderPrompts]):
 
     current_code_generation_plan_list: List[CodeGenerationPlan]
 
-    # chains
-    code_generation_chain: RunnableSequence
-    resolve_issue_chain: RunnableSequence
-
-    def __init__(self, llm: ChatOpenAI) -> None:
+    def __init__(self, agent_id: str, agent_name: str, llm: LLM) -> None:
         """
         """
         
         super().__init__(
-            ProjectAgents.coder.agent_id,
-            ProjectAgents.coder.agent_name,
+            agent_id,
+            agent_name,
             CoderState(),
             CoderPrompts(),
             llm
@@ -92,18 +84,6 @@ class CoderAgent(Agent[CoderState, CoderPrompts]):
         self.error_message = ""
 
         self.current_code_generation_plan_list = []
-
-        self.code_generation_chain = (
-            self.prompts.code_generation_prompt
-            | self.llm
-            | JsonOutputParser()
-        )
-
-        self.resolve_issue_chain = (
-            self.prompts.issue_resolution_prompt
-            | self.llm
-            | JsonOutputParser()
-        )
 
     def add_message(self, message: tuple[ChatRoles, str]) -> None:
         """
@@ -194,7 +174,7 @@ class CoderAgent(Agent[CoderState, CoderPrompts]):
         # generate single file at a time.
         while True:
             try:
-                llm_response: CodeGenerationPlan = self.code_generation_chain.invoke({
+                llm_output = self.llm.invoke_with_pydantic_model(self.prompts.code_generation_prompt, {
                     "project_name": self.state['project_name'],
                     "project_path": os.path.join(self.state['project_path'], self.state['project_name']),
                     "requirements_document": self.state['requirements_document'],
@@ -202,9 +182,9 @@ class CoderAgent(Agent[CoderState, CoderPrompts]):
                     "task": task.description,
                     "functions_skeleton": "no function sekeletons available for this task.",
                     "unit_test_cases": "no unit test cases available for this task."
-                })
+                }, CodeGenerationPlan)
 
-                cleaned_response = CodeGenerationPlan(**llm_response)
+                cleaned_response = llm_output.response
                 self.current_code_generation_plan_list.append(cleaned_response)
 
                 self.error_message = ""
@@ -250,7 +230,7 @@ class CoderAgent(Agent[CoderState, CoderPrompts]):
             while True:
 
                 try:
-                    llm_response = self.code_generation_chain.invoke({
+                    llm_output = self.llm.invoke_with_pydantic_model(self.prompts.code_generation_prompt, {
                         "project_name": self.state['project_name'],
                         "project_path": os.path.join(self.state['project_path'], self.state['project_name']),
                         "requirements_document": self.state['requirements_document'],
@@ -258,9 +238,9 @@ class CoderAgent(Agent[CoderState, CoderPrompts]):
                         "task": task.description,
                         "functions_skeleton": {file_path: function_skeleton},
                         "unit_test_cases": self.state['test_code'] 
-                    })
+                    }, CodeGenerationPlan)
 
-                    cleaned_response = CodeGenerationPlan(**llm_response)
+                    cleaned_response = llm_output.response
                     self.current_code_generation_plan_list.append(cleaned_response)
 
                     self.error_message = ""
@@ -301,7 +281,7 @@ class CoderAgent(Agent[CoderState, CoderPrompts]):
 
         while True:
             try:
-                llm_response: CodeGenerationPlan = self.resolve_issue_chain.invoke({
+                llm_output = self.llm.invoke_with_pydantic_model(self.prompts.issue_resolution_prompt, {
                     "project_name": self.state['project_name'],
                     "project_path": os.path.join(self.state['project_path'], self.state['project_name']),
                     "error_message": self.error_message,
@@ -315,9 +295,9 @@ class CoderAgent(Agent[CoderState, CoderPrompts]):
                     "file_content": FS.read_file(planned_issue.file_path),
                     'function_signatures': planned_issue.function_signatures,
                     "unit_test_code": planned_issue.test_code
-                })
+                }, CodeGenerationPlan)
 
-                cleaned_response = CodeGenerationPlan(**llm_response)
+                cleaned_response = llm_output.response
                 self.current_code_generation_plan_list.append(cleaned_response)
 
                 self.error_message = ""

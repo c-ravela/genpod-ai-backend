@@ -1,15 +1,10 @@
 """
 """
 import os
-from typing import Literal
-
-from langchain_core.output_parsers import JsonOutputParser
-from langchain_core.runnables.base import RunnableSequence
-from langchain_openai import ChatOpenAI
 
 from agents.agent.agent import Agent
 from agents.reviewer.reviewer_state import ReviewerState
-from configs.project_config import ProjectAgents
+from llms.llm import LLM
 from models.constants import Status
 from models.models import Issue, IssuesQueue
 from models.reviewer_models import ReviewerOutput
@@ -41,13 +36,13 @@ class ReviewerAgent(Agent[ReviewerState, ReviewerPrompts]):
     project_path: str
     error_message: str
 
-    def __init__(self, llm: ChatOpenAI) -> None:
+    def __init__(self, agent_id: str, agent_name: str, llm: LLM) -> None:
         """
         """
 
         super().__init__(
-            ProjectAgents.reviewer.agent_id,
-            ProjectAgents.reviewer.agent_name,
+            agent_id,
+            agent_name,
             ReviewerState(),
             ReviewerPrompts(),
             llm
@@ -60,13 +55,6 @@ class ReviewerAgent(Agent[ReviewerState, ReviewerPrompts]):
         self.project_path = ""
         
         self.error_message = ""
-        
-        # chains
-        self.static_code_analysis_chain = (
-            self.prompts.static_code_analysis_prompt
-            | self.llm
-            | JsonOutputParser()
-        ) 
 
     def prepare_issues(self, output: ReviewerOutput) -> IssuesQueue:
         """
@@ -136,14 +124,13 @@ class ReviewerAgent(Agent[ReviewerState, ReviewerPrompts]):
 
         while True:
             try:
-                llm_response: ReviewerOutput = self.static_code_analysis_chain.invoke({
+                llm_output = self.llm.invoke_with_pydantic_model(self.prompts.static_code_analysis_prompt, {
                     'static_analysis_tool': sg.name(), 
                     'tool_result': result,
                     'error_message': self.error_message
-                })
+                }, ReviewerOutput)
 
-                logger.info(f"----{self.agent_name}: Validating response----")
-                validated_response = ReviewerOutput(**llm_response)
+                validated_response = llm_output.response
                 
                 self.error_message = ""
                 break # while loop exit

@@ -1,21 +1,20 @@
 import os
 
-from langchain_openai import ChatOpenAI
 from langgraph.graph import END, StateGraph
 
 from agents.agent.graph import Graph
 from agents.rag_workflow.rag_agent import RAGAgent
 from agents.rag_workflow.rag_state import RAGState
-from configs.project_config import ProjectGraphs
+from llms.llm import LLM
 
 
 class RAGWorkFlow(Graph[RAGAgent]):
 
-    def __init__(self, llm: ChatOpenAI, persistance_db_path: str, collection_name: str, persist_directory: str=None):
+    def __init__(self, graph_id: str, graph_name: str, agent_id: str, agent_name: str, llm: LLM, persistance_db_path: str, collection_name: str, persist_directory: str=None):
         super().__init__(
-            ProjectGraphs.rag.graph_id,
-            ProjectGraphs.rag.graph_name, 
-            RAGAgent(llm, collection_name = collection_name, persist_directory=persist_directory),
+            graph_id,
+            graph_name, 
+            RAGAgent(agent_id, agent_name, llm, collection_name = collection_name, persist_directory=persist_directory),
             persistance_db_path
         )
 

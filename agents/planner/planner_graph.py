@@ -1,19 +1,18 @@
-from langchain_openai import ChatOpenAI
 from langgraph.graph import END, StateGraph
 
 from agents.agent.graph import Graph
 from agents.planner.planner_agent import PlannerAgent
 from agents.planner.planner_state import PlannerState
-from configs.project_config import ProjectGraphs
+from llms.llm import LLM
 from models.models import Task
 
 
 class PlannerWorkFlow(Graph[PlannerAgent]):
-    def __init__(self, llm: ChatOpenAI, persistance_db_path: str):
+    def __init__(self, graph_id: str, graph_name: str, agent_id: str, agent_name: str, llm: LLM, persistance_db_path: str):
         super().__init__(
-            ProjectGraphs.planner.graph_id,
-            ProjectGraphs.planner.graph_name, 
-            PlannerAgent(llm),
+            graph_id,
+            graph_name, 
+            PlannerAgent(agent_id, agent_name, llm),
             persistance_db_path
         )
 

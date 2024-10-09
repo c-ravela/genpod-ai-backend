@@ -1,13 +1,12 @@
 import ast
-import json
 from typing import TYPE_CHECKING, Dict, List, Tuple
 
-from langchain_openai import ChatOpenAI
+from langchain_core.messages import AIMessage
 from pydantic import ValidationError
 
 from agents.agent.agent import Agent
 from agents.supervisor.supervisor_state import SupervisorState
-from configs.project_config import ProjectAgents
+from llms.llm import LLM
 from models.constants import ChatRoles, PStatus, Status
 from models.models import (Issue, IssuesQueue, PlannedTask, PlannedTaskQueue,
                            RequirementsDocument, Task, TaskQueue)
@@ -25,11 +24,11 @@ class SupervisorAgent(Agent[SupervisorState, SupervisorPrompts]):
     team: 'TeamMembers'
     previous_project_status: PStatus
 
-    def __init__(self, llm: ChatOpenAI) -> None:
+    def __init__(self, agent_id: str, agent_name: str, llm: LLM) -> None:
 
         super().__init__(
-            ProjectAgents.supervisor.agent_id,
-            ProjectAgents.supervisor.agent_name,
+            agent_id,
+            agent_name,
             SupervisorState(),
             SupervisorPrompts(),
             llm
@@ -67,10 +66,6 @@ class SupervisorAgent(Agent[SupervisorState, SupervisorPrompts]):
         self.responses: Dict[str, List[Tuple[str, Task]]] = {}
         self.tasks = []
    
-        # prompts
-        self.project_init_questionaire = self.prompts.init_rag_questionaire_prompt | self.llm
-        self.evaluation_chain = self.prompts.follow_up_questions | self.llm
-
     def setup_team(self, team: 'TeamMembers') -> None:
         """
         Sets up the team for the project.
@@ -105,7 +100,8 @@ class SupervisorAgent(Agent[SupervisorState, SupervisorPrompts]):
         # Prepare questionaire for rag cache
         while(count > 0):
             try:
-                req_queries = self.project_init_questionaire.invoke({'user_prompt': query,'context':context})
+                response = self.llm.invoke(self.prompts.init_rag_questionaire_prompt, {'user_prompt': query,'context': context})
+                req_queries: AIMessage = response.response
                 req_queries = ast.literal_eval(req_queries.content)
                 validated_requirements_queries = QueryList(req_queries=req_queries)
                 break
@@ -140,11 +136,12 @@ class SupervisorAgent(Agent[SupervisorState, SupervisorPrompts]):
 
                     if result['query_answered'] is True:
                         # Evaluate the RAG response
-                        evaluation_result = self.evaluation_chain.invoke({
+                        llm_output = self.llm.invoke(self.prompts.follow_up_questions, {
                             'user_query':req_query,
-                            'initial_rag_response':rag_response}
-                        )
+                            'initial_rag_response':rag_response
+                        })
                         
+                        evaluation_result: AIMessage = llm_output.response
                         if evaluation_result.content.startswith("COMPLETE"):
                             final_response += f"Question: {req_query}\nAnswer: {rag_response}\n\n"
                         elif evaluation_result.content.startswith("INCOMPLETE"):

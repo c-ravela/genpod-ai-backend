@@ -4,13 +4,12 @@ This module contains the Architect class which is responsible for defining
 the state graph for the Architect agent. The state graph determines the flow 
 of control between different states of the Architect agent.
 """
-from langchain_openai import ChatOpenAI
 from langgraph.graph import END, StateGraph
 
 from agents.agent.graph import Graph
 from agents.architect.architect_agent import ArchitectAgent
 from agents.architect.architect_state import ArchitectState
-from configs.project_config import ProjectGraphs
+from llms.llm import LLM
 
 
 class ArchitectGraph(Graph[ArchitectAgent]):
@@ -23,7 +22,7 @@ class ArchitectGraph(Graph[ArchitectAgent]):
     and designate the entry point.
     """
 
-    def __init__(self, llm: ChatOpenAI, persistance_db_path: str) -> None:
+    def __init__(self, graph_id: str, graph_name: str, agent_id: str, agent_name: str, llm: LLM, persistance_db_path: str) -> None:
         """
         Constructor for the ArchitectGraph class.
 
@@ -31,9 +30,9 @@ class ArchitectGraph(Graph[ArchitectAgent]):
         and sets up the state graph.
         """
         super().__init__(
-            ProjectGraphs.architect.graph_id,
-            ProjectGraphs.architect.graph_name, 
-            ArchitectAgent(llm),
+            graph_id,
+            graph_name,
+            ArchitectAgent(agent_id, agent_name, llm),
             persistance_db_path
         )
 

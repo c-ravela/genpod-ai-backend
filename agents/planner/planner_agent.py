@@ -5,13 +5,11 @@ import os
 import re
 from typing import List, Literal
 
-from langchain_core.output_parsers.json import JsonOutputParser
-from langchain_openai import ChatOpenAI
 from pydantic import ValidationError
 
 from agents.agent.agent import Agent
 from agents.planner.planner_state import PlannerState
-from configs.project_config import ProjectAgents
+from llms.llm import LLM
 from models.constants import PStatus, Status
 from models.models import (PlannedIssue, PlannedIssuesQueue, PlannedTask,
                            PlannedTaskQueue)
@@ -37,11 +35,11 @@ class PlannerAgent(Agent[PlannerState, PlannerPrompts]):
     mode: Literal['preparing_planned_tasks', 'preparing_planned_issues']
     deliverable: str
 
-    def __init__(self, llm: ChatOpenAI) -> None:
+    def __init__(self, agent_id: str, agent_name: str, llm: LLM) -> None:
         
         super().__init__(
-            ProjectAgents.planner.agent_id,
-            ProjectAgents.planner.agent_name,
+            agent_id,
+            agent_name,
             PlannerState(),
             PlannerPrompts(),
             llm
@@ -60,29 +58,6 @@ class PlannerAgent(Agent[PlannerState, PlannerPrompts]):
         self.file_count = 0
 
         self.planned_backlogs: list[str] = []
-
-        # chains
-        self.task_breakdown_chain = (
-            self.prompts.task_breakdown_prompt 
-            | self.llm
-        )
-        
-        self.detailed_requirements_chain = (
-            self.prompts.detailed_requirements_prompt 
-            | self.llm
-        )
-
-        self.segregaion_chain = (
-            self.prompts.segregation_prompt
-            | self.llm 
-            | JsonOutputParser()
-        )
-
-        self.issue_segregation_chain = (
-            self.prompts.issues_segregation_prompt
-            | self.llm
-            | JsonOutputParser()
-        )
 
     def write_workpackages_to_files(self, output_dir: str, planned_tasks: PlannedTaskQueue) -> tuple[int, int]:
         """
@@ -158,19 +133,15 @@ class PlannerAgent(Agent[PlannerState, PlannerPrompts]):
                 logger.info("----Working on building backlogs for the deliverable----")
                 logger.info("Deliverable: %s", state['current_task'].description)
 
-                generated_backlogs = self.task_breakdown_chain.invoke({
-                    "deliverable": state['current_task'].description, 
-                    "context": state['context'], 
-                    "feedback": self.error_messages
-                })
+                llm_output = self.llm.invoke(self.prompts.task_breakdown_prompt, {
+                        "deliverable": state['current_task'].description,
+                        "context": state['context'],
+                        "feedback": self.error_messages
+                    },
+                    'json'
+                )
 
-                if generated_backlogs.content.startswith('```json') and generated_backlogs.content.endswith('```'):
-                    # Remove the ```json prefix and ``` suffix
-                    cleaned_generated_backlogs = generated_backlogs.content.removeprefix('```json').removesuffix('```').strip()
-                else:
-                    cleaned_generated_backlogs = generated_backlogs.content
-
-                backlogs_list = ast.literal_eval(cleaned_generated_backlogs)
+                backlogs_list = ast.literal_eval(llm_output.response)
                 
                 # Validate the response using Pydantic
                 self.planned_backlogs = BacklogList(backlogs=backlogs_list).backlogs
@@ -201,30 +172,32 @@ class PlannerAgent(Agent[PlannerState, PlannerPrompts]):
                 try:
                     logger.info("----Now Working on Generating detailed requirements for the backlog----")
                     logger.info("Backlog: %s", backlog)
-                    response = self.detailed_requirements_chain.invoke({
-                        "backlog": backlog, 
-                        "deliverable": state['current_task'].description, 
-                        "context": state['context'], 
-                        "feedback": self.error_messages
-                    })
+                    llm_output = self.llm.invoke(self.prompts.detailed_requirements_prompt, {
+                            "backlog": backlog, 
+                            "deliverable": state['current_task'].description, 
+                            "context": state['context'], 
+                            "feedback": self.error_messages
+                        },
+                        'json'
+                    )
 
-                    # Let's clean the response to remove json prefix that llm sometimes appends to the actual text
-                    # Strip whitespace from the beginning and end
-                    cleaned_response = response.content.strip()
-                    # Remove single-line comments
-                    # cleaned_response = re.sub(r'//.*$', '', cleaned_response, flags=re.MULTILINE)
-                    # Remove multi-line comments
-                    # cleaned_response = re.sub(r'/\*.*?\*/', '', cleaned_response, flags=re.DOTALL)
+                    # # Let's clean the response to remove json prefix that llm sometimes appends to the actual text
+                    # # Strip whitespace from the beginning and end
+                    # cleaned_response = response.content.strip()
+                    # # Remove single-line comments
+                    # # cleaned_response = re.sub(r'//.*$', '', cleaned_response, flags=re.MULTILINE)
+                    # # Remove multi-line comments
+                    # # cleaned_response = re.sub(r'/\*.*?\*/', '', cleaned_response, flags=re.DOTALL)
                     
-                    # Check if the text starts with ```json and ends with ```
-                    if cleaned_response.startswith('```json') and cleaned_response.endswith('```'):
-                        # Remove the ```json prefix and ``` suffix
-                        cleaned_json = cleaned_response.removeprefix('```json').removesuffix('```').strip()
-                    else:
-                        # If not enclosed in code blocks, use the text as is
-                        cleaned_json = cleaned_response
+                    # # Check if the text starts with ```json and ends with ```
+                    # if cleaned_response.startswith('```json') and cleaned_response.endswith('```'):
+                    #     # Remove the ```json prefix and ``` suffix
+                    #     cleaned_json = cleaned_response.removeprefix('```json').removesuffix('```').strip()
+                    # else:
+                    #     # If not enclosed in code blocks, use the text as is
+                    #     cleaned_json = cleaned_response
 
-                    parsed_response: dict = json.loads(cleaned_json)
+                    parsed_response: dict = json.loads(llm_output.response)
                     logger.info("response from planner ", parsed_response)
 
                     if "question" in parsed_response.keys():
@@ -291,12 +264,14 @@ class PlannerAgent(Agent[PlannerState, PlannerPrompts]):
                 logger.info(f"{self.agent_name}: Preparing planned issues for issue with id: {state['current_issue'].issue_id}.")
                 logger.info(f"Issue: {state['current_issue']}")
 
-                issue_segregation_response = self.issue_segregation_chain.invoke({
-                    "issue_details": state['current_issue'].issue_details(),
-                    "file_content": FS.read_file(state['current_issue'].file_path)
-                })
+                llm_output = self.llm.invoke_with_pydantic_model(self.prompts.issues_segregation_prompt, {
+                        "issue_details": state['current_issue'].issue_details(),
+                        "file_content": FS.read_file(state['current_issue'].file_path)
+                    },
+                    Segregation
+                )
 
-                validated_response = Segregation(**issue_segregation_response)
+                validated_response = llm_output.response
                 logger.info(f"Issue {state['current_issue'].issue_id} has been successfully segregated with the following details: {validated_response}")
 
                 planned_issue = PlannedIssue(
@@ -370,14 +345,14 @@ class PlannerAgent(Agent[PlannerState, PlannerPrompts]):
         logger.info(f"---- Initiating segregation ----")
         while(True):
             try:
-                llm_response = self.segregaion_chain.invoke({
-                    "work_package": f"{workpackage_name} \n {requirements}",
-                })
+                llm_output = self.llm.invoke_with_pydantic_model(self.prompts.segregation_prompt, {
+                        "work_package": f"{workpackage_name} \n {requirements}",
+                    },
+                    Segregation
+                )
 
-                validate_response = Segregation(**llm_response)
+                validate_response = llm_output.response
                 
-                logger.info(f" task type  : {llm_response['requires_function_creation']} ; {llm_response['classification_reason']}")
-
                 self.error_count = 0
                 self.error_messages = []
 

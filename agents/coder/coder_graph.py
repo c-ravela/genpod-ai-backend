@@ -1,26 +1,25 @@
 """
 Coder Graph
 """
-from langchain_openai import ChatOpenAI
 from langgraph.graph import END, StateGraph
 from langgraph.graph.graph import CompiledGraph
 
 from agents.agent.graph import Graph
 from agents.coder.coder_agent import CoderAgent
 from agents.coder.coder_state import CoderState
-from configs.project_config import ProjectGraphs
+from llms.llm import LLM
 
 
 class CoderGraph(Graph[CoderAgent]):
     """
     """
 
-    def __init__(self,  llm: ChatOpenAI, persistance_db_path: str) -> None:
+    def __init__(self, graph_id: str, graph_name: str, agent_id: str, agent_name: str, llm: LLM, persistance_db_path: str) -> None:
         """"""
         super().__init__(
-            ProjectGraphs.coder.graph_id,
-            ProjectGraphs.coder.graph_name, 
-            CoderAgent(llm),
+            graph_id,
+            graph_name, 
+            CoderAgent(agent_id, agent_name, llm),
             persistance_db_path
         )
 

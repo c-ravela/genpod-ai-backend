@@ -1,15 +1,11 @@
 """Test Coder Agent
 """
 import os
-
-from langchain_core.output_parsers import JsonOutputParser
-from langchain_core.runnables.base import RunnableSequence
-from langchain_openai import ChatOpenAI
-from typing_extensions import Literal
+from typing import Literal
 
 from agents.agent.agent import Agent
 from agents.tests_generator.tests_generator_state import TestCoderState
-from configs.project_config import ProjectAgents
+from llms.llm import LLM
 from models.constants import ChatRoles, PStatus, Status
 from models.tests_generator_models import (FileFunctionSignatures,
                                            FunctionSkeleton,
@@ -62,20 +58,13 @@ class TestCoderAgent(Agent[TestCoderState, TestGeneratorPrompts]):
 
     current_code_generation: TestCodeGeneration
 
-    # chains
-    test_code_generation_chain: RunnableSequence
-    skeleton_generation_chain: RunnableSequence
-    
-    skeleton_updation_chain: RunnableSequence
-    test_code_updation_chain: RunnableSequence
-
-    def __init__(self, llm: ChatOpenAI) -> None:
+    def __init__(self, agent_id: str, agent_name: str, llm: LLM) -> None:
         """
         """
 
         super().__init__(
-            ProjectAgents.tests_generator.agent_id,
-            ProjectAgents.tests_generator.agent_name,
+            agent_id,
+            agent_name,
             TestCoderState(),
             TestGeneratorPrompts(),
             llm
@@ -109,31 +98,15 @@ class TestCoderAgent(Agent[TestCoderState, TestGeneratorPrompts]):
         self.last_visited_node = self.test_code_generation_node_name
         self.error_message = ""
 
-        self.current_code_generation = TestCodeGeneration()
+        self.current_code_generation = TestCodeGeneration(
+            files_to_create=[],
+            test_code={},
+            infile_license_comments={},
+            commands_to_execute={},
+            functions_skeleton={}
+        )
 
         self.track_add_license_txt = []
-        self.test_code_generation_chain = (
-            self.prompts.test_generation_prompt
-            | self.llm
-            | JsonOutputParser()
-        )
-        self.skeleton_generation_chain = (
-            self.prompts.skeleton_generation_prompt
-            | self.llm
-            | JsonOutputParser()
-        )
-
-        self.skeleton_updation_chain = (
-            self.prompts.skeleton_generation_for_issue_prompt
-            | self.llm
-            | JsonOutputParser()
-        )
-
-        self.test_code_updation_chain = (
-            self.prompts.unit_test_generation_for_issue_prompt
-            | self.llm
-            | JsonOutputParser()
-        )
 
     def add_message(self, message: tuple[ChatRoles, str]) -> None:
         """
@@ -267,31 +240,24 @@ class TestCoderAgent(Agent[TestCoderState, TestGeneratorPrompts]):
         
         while(True):
             try:
-                llm_response = self.test_code_generation_chain.invoke({
+                llm_output = self.llm.invoke_with_pydantic_model(self.prompts.test_generation_prompt, {
                     "project_name": self.state['project_name'],
                     "project_path": os.path.join(self.state['project_path'], self.state['project_name']),
                     "requirements_document": self.state['requirements_document'],
                     "task": task.description,
                     "error_message": self.error_message,
                     "functions_skeleton": self.state["functions_skeleton"]
-                })
-                # logger.info("Called llm response is :" ,llm_response)
-                # with open('/home/pranay/Desktop/Generatedfiles/latest/new_file_llmtest.txt', 'w') as file:
-                #     file.write(str(llm_response))
+                }, TestCodeGeneration)
+
                 self.hasError = False
                 self.error_message = ""
 
-                required_keys = ["files_to_create", "test_code", "infile_license_comments", "commands_to_execute"]
-                missing_keys = [key for key in required_keys if key not in llm_response]
-
-                if missing_keys:
-                    raise KeyError(f"Missing keys: {missing_keys} in the response. Try Again!")
-
-                self.update_state_test_code_generation(llm_response)
-                self.current_code_generation["test_code"] = llm_response['test_code']
-                self.current_code_generation.files_to_create = llm_response['files_to_create']
-                self.current_code_generation['infile_license_comments'] = llm_response['infile_license_comments']
-                self.current_code_generation['commands_to_execute'] = llm_response['commands_to_execute']
+                response = llm_output.response
+                self.update_state_test_code_generation(response)
+                self.current_code_generation.test_code = response.test_code
+                self.current_code_generation.files_to_create = response.files_to_create
+                self.current_code_generation.infile_license_comments = response.infile_license_comments
+                self.current_code_generation.commands_to_execute = response.commands_to_execute
 
                 self.add_message((
                     ChatRoles.USER,
@@ -333,23 +299,17 @@ class TestCoderAgent(Agent[TestCoderState, TestGeneratorPrompts]):
 
         while(True):
             try:
-                llm_response = self.skeleton_generation_chain.invoke({
+                llm_output = self.llm.invoke_with_pydantic_model(self.prompts.skeleton_generation_prompt, {
                     "project_name": self.state['project_name'],
                     "project_path": os.path.join(self.state['project_path'], self.state['project_name']),
                     "requirements_document": self.state['requirements_document'],
                     "task": task.description,
                     "error_message": self.error_message,
-                })
+                }, FunctionSkeleton)
 
-                required_keys = ["skeletons_to_create"]
-                missing_keys = [key for key in required_keys if key not in llm_response]
+                self.update_state_skeleton_generation(llm_output.response)
+                self.current_code_generation.functions_skeleton = llm_output.response.skeletons_to_create
 
-                if missing_keys:
-                    raise KeyError(f"Missing keys: {missing_keys} in the response. Try Again!")
-
-                self.update_state_skeleton_generation(llm_response)
-                self.current_code_generation["functions_skeleton"] = llm_response['skeletons_to_create']
-                logger.info("after state",llm_response)
                 self.add_message((
                     ChatRoles.USER,
                     f"{self.agent_name}: skeleton generation completed!"
@@ -386,16 +346,16 @@ class TestCoderAgent(Agent[TestCoderState, TestGeneratorPrompts]):
 
         while(True):
             try:
-                llm_response = self.skeleton_updation_chain({
+                llm_output = self.llm.invoke_with_pydantic_model(self.prompts.skeleton_generation_for_issue_prompt, {
                     'file_content': FS.read_file(planned_issue.file_path),
                     'issue_details': planned_issue.issue_details(),
                     'project_name': self.state['project_name'],
                     "project_path": os.path.join(self.state['project_path'], self.state['project_name']),
                     "requirements_document": self.state['requirements_document'],
                     "error_message": self.error_message,
-                })
+                }, FileFunctionSignatures)
 
-                validated_response = FileFunctionSignatures(**llm_response)
+                validated_response = llm_output.response
                 self.current_code_generation["functions_skeleton"] = validated_response.function_signatures
 
                 planned_issue.function_signatures = validated_response
@@ -423,7 +383,7 @@ class TestCoderAgent(Agent[TestCoderState, TestGeneratorPrompts]):
 
         while(True):
             try:
-                llm_response = self.test_code_updation_chain.invoke({
+                llm_output = self.llm.invoke_with_pydantic_model(self.prompts.unit_test_generation_for_issue_prompt, {
                     'file_content': FS.read_file(planned_issue.file_path),
                     'issue_details': planned_issue.issue_details(),
                     'project_name': self.state['project_name'],
@@ -431,21 +391,16 @@ class TestCoderAgent(Agent[TestCoderState, TestGeneratorPrompts]):
                     "requirements_document": self.state['requirements_document'],
                     "error_message": self.error_message,
                     "functions_skeleton": planned_issue.function_signatures
-                })
+                }, TestCodeGeneration)
 
-                required_keys = ["files_to_create", "test_code", "infile_license_comments", "commands_to_execute"]
-                missing_keys = [key for key in required_keys if key not in llm_response]
+                response = llm_output.response
+                self.update_state_test_code_generation(response)
+                self.current_code_generation.test_code = response.test_code
+                self.current_code_generation.files_to_create = response.files_to_create
+                self.current_code_generation.infile_license_comments = response.infile_license_comments
+                self.current_code_generation.commands_to_execute = response.commands_to_execute
 
-                if missing_keys:
-                    raise KeyError(f"Missing keys: {missing_keys} in the response. Try Again!")
-
-                self.update_state_test_code_generation(llm_response)
-                self.current_code_generation["test_code"] = llm_response['test_code']
-                self.current_code_generation.files_to_create = llm_response['files_to_create']
-                self.current_code_generation['infile_license_comments'] = llm_response['infile_license_comments']
-                self.current_code_generation['commands_to_execute'] = llm_response['commands_to_execute']
-
-                planned_issue.test_code = llm_response['test_code']
+                planned_issue.test_code = response.test_code
 
                 self.error_message = ""
                 self.state['current_planned_issue'] = planned_issue

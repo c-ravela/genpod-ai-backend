@@ -4,16 +4,16 @@ from langgraph.graph import END, StateGraph
 from agents.agent.graph import Graph
 from agents.supervisor.supervisor_agent import SupervisorAgent
 from agents.supervisor.supervisor_state import SupervisorState
-from configs.project_config import ProjectGraphs
+from llms.llm import LLM
 
 
 class SupervisorWorkflow(Graph[SupervisorAgent]):
-    def __init__(self, llm: ChatOpenAI, persistance_db_path: str):
+    def __init__(self, graph_id: str, graph_name: str, agent_id: str, agent_name: str, llm: LLM, persistance_db_path: str):
     
         super().__init__(
-            ProjectGraphs.supervisor.graph_id,
-            ProjectGraphs.supervisor.graph_name, 
-            SupervisorAgent(llm),
+            graph_id,
+            graph_name,
+            SupervisorAgent(agent_id, agent_name, llm),
             persistance_db_path
         )
 
