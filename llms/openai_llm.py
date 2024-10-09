@@ -19,6 +19,8 @@ class OpenAI(LLM[ChatOpenAI]):
             model (str): The name of the OpenAI model to use (e.g., 'gpt-3.5-turbo').
             model_config (Dict[str, Any]): Configuration settings specific to the model.
         """
+
+        model_config['stream_usage'] = True # This required for OpenAI to return usage metadata
         super().__init__(provider="openai", model=model, model_config=model_config, llm_class=ChatOpenAI, max_retries=max_retries, retry_backoff=retry_backoff)
     
     def _create_chain(self, prompt: PromptTemplate, response_type: Literal['string', 'json', 'raw']) -> RunnableSequence:

@@ -56,7 +56,7 @@ class LLM(ABC, Generic[TLLMInstance]):
         self.__current_retry_backoff = self._retry_backoff
         self._last_metrics = LLMMetrics(0, 0, 0)
         
-    def invoke_with_model(self, prompt: PromptTemplate, prompt_inputs: Dict[str, Any], response_model: Type[TResponse]) -> LLMOutput[TResponse]:
+    def invoke_with_pydantic_model(self, prompt: PromptTemplate, prompt_inputs: Dict[str, Any], response_model: Type[TResponse]) -> LLMOutput[TResponse]:
         """
         Invoke the LLM chain and return the response, with an optional retry mechanism, and parse into a structured model.
         """
@@ -73,12 +73,17 @@ class LLM(ABC, Generic[TLLMInstance]):
         """
         Extracts usage metadata from the LLM response.
         """
+
         usage_metadata = llm_response.usage_metadata
-        self._last_metrics = LLMMetrics(
-            it=usage_metadata.get('input_tokens', 0),
-            ot=usage_metadata.get('output_tokens', 0),
-            tt=usage_metadata.get('total_tokens', 0)
-        )
+        if usage_metadata:
+            self._last_metrics = LLMMetrics(
+                it=usage_metadata.get('input_tokens', 0),
+                ot=usage_metadata.get('output_tokens', 0),
+                tt=usage_metadata.get('total_tokens', 0)
+            )
+        else:
+            self._last_metrics = LLMMetrics(0, 0, 0)
+        
         return llm_response
 
     @abstractmethod
@@ -116,7 +121,6 @@ class LLM(ABC, Generic[TLLMInstance]):
                     self.__current_retry_backoff = self._retry_backoff
                     raise RuntimeError(f"LLM invocation failed after {self.__max_retries} attempts: {e}")
                 else:
-                    print(e)
                     print(f"Invocation failed (attempt {attempt}/{self.__max_retries}). Retrying in {self.__current_retry_backoff} seconds...")
                     sleep(self.__current_retry_backoff)
                     self.__current_retry_backoff *= 2
