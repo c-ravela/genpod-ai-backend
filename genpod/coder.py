@@ -1,6 +1,6 @@
 from agents.coder.coder_graph import CoderGraph
 from agents.coder.coder_state import CoderState
-from configs.project_config import ProjectAgents, ProjectConfig
+from configs.project_config import ProjectAgents
 from genpod.member import AgentMember
 
 
@@ -8,13 +8,13 @@ class CoderMember(AgentMember[CoderState, CoderGraph]):
     """
     """
 
-    def __init__(self, persistance_db_path: str):
+    def __init__(self, agents: ProjectAgents, persistance_db_path: str):
         """"""
 
-        self.coder_config = ProjectConfig().agents_config[ProjectAgents.coder.agent_id]
+        coder_config = agents.coder
         super().__init__(
-            self.coder_config, 
+            coder_config, 
             CoderState, 
-            CoderGraph(self.coder_config.llm, persistance_db_path)
+            CoderGraph(coder_config.llm, persistance_db_path)
         )
-    
+   

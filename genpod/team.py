@@ -1,3 +1,4 @@
+from configs.project_config import ProjectAgents
 from genpod.architect import ArchitectMember
 from genpod.coder import CoderMember
 from genpod.member import AgentMember
@@ -12,34 +13,27 @@ class TeamMembers:
     """
     Manages a team of different agents.
     """
-    def __init__(self, persistance_db_path: str, vector_db_collection: str) -> None:
+
+    def __init__(self, agents: ProjectAgents, persistance_db_path: str, vector_db_collection: str) -> None:
         """
         Initializes the team members with their configurations and state/graph setups.
         """
 
-        self.supervisor = SupervisorMember(persistance_db_path)
-        self.supervisor.set_role_to_manager()
+        self.supervisor = SupervisorMember(agents, persistance_db_path)
+        self.supervisor.set_role(AgentMember.Role.MANAGER)
 
-        self.architect = ArchitectMember(persistance_db_path)
-        self.architect.set_role_to_lead()
+        self.architect = ArchitectMember(agents, persistance_db_path)
+        self.architect.set_role(AgentMember.Role.LEAD)
 
-        self.coder = CoderMember(persistance_db_path)
-        self.coder.set_role_to_member()
-
-        self.planner = PlannerMember(persistance_db_path)
-        self.planner.set_role_to_member()
-
-        self.rag = RagMember(persistance_db_path, vector_db_collection)
-        self.rag.set_role_to_member()
-
-        self.tests_generator = TestsGeneratorMember(persistance_db_path)
-        self.tests_generator.set_role_to_member()
-
-        self.reviewer = ReviewerMember(persistance_db_path)
-        self.reviewer.set_role_to_member()
+        self.coder = CoderMember(agents, persistance_db_path)
+        self.planner = PlannerMember(agents, persistance_db_path)
+        self.rag = RagMember(agents, persistance_db_path, vector_db_collection)
+        self.tests_generator = TestsGeneratorMember(agents, persistance_db_path)
+        self.reviewer = ReviewerMember(agents, persistance_db_path)
         
     def get_team_members_as_list(self) -> list[AgentMember]:
         """
+        Returns a list of all agent members in the team.
         """
 
         members = []

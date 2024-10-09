@@ -3,7 +3,7 @@ from typing import Any, Dict
 
 from agents.supervisor.supervisor_graph import SupervisorWorkflow
 from agents.supervisor.supervisor_state import SupervisorState
-from configs.project_config import ProjectAgents, ProjectConfig
+from configs.project_config import ProjectAgents
 from genpod.member import AgentMember
 
 
@@ -12,15 +12,15 @@ class SupervisorMember(AgentMember[SupervisorState, SupervisorWorkflow]):
     Represents a supervisor member with additional checks.
     """
 
-    def __init__(self, persistance_db_path: str) -> None:
+    def __init__(self, agents: ProjectAgents, persistance_db_path: str) -> None:
         """
         Initializes the SupervisorMember with specific configurations.
         """
-        self.supervisor_config = ProjectConfig().agents_config[ProjectAgents.supervisor.agent_id]
+        supervisor_config = agents.supervisor
         super().__init__(
-            self.supervisor_config, 
+            supervisor_config, 
             SupervisorState, 
-            SupervisorWorkflow(self.supervisor_config.llm, persistance_db_path)
+            SupervisorWorkflow(supervisor_config.llm, persistance_db_path)
         )
     
     def invoke(self, input: Dict[str, Any] | Any) -> SupervisorState:

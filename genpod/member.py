@@ -5,7 +5,7 @@ from langchain_openai import ChatOpenAI
 
 from agents.agent.graph import Graph
 from agents.agent.state import State
-from configs.project_config import AgentConfig
+from configs.project_config import AgentInfo
 
 GenericAgentState = TypeVar('GenericAgentState', bound=Any)
 GenericAgentGraph = TypeVar('GenericAgentGraph', bound=Graph)
@@ -34,14 +34,14 @@ class AgentMember(Generic[GenericAgentState, GenericAgentGraph]):
     
     recursion_limit: int
 
-    def __init__(self, agent_config: AgentConfig, state_class: GenericAgentState, graph: GenericAgentGraph) -> None:
+    def __init__(self, agent_info: AgentInfo, state_class: GenericAgentState, graph: GenericAgentGraph) -> None:
         """
         Initializes an AgentMember instance with the given configuration and state.
         """
-        self.member_id = agent_config.agent_id
-        self.member_name = agent_config.agent_name
-        self.llm = agent_config.llm
-        self.thread_id = agent_config.thread_id
+        self.member_id = agent_info.agent_id
+        self.member_name = agent_info.agent_name
+        self.llm = agent_info.llm
+        self.thread_id = agent_info.thread_id
 
         sc = State(state_class)
         self.fields = sc.get_fields()
@@ -51,34 +51,19 @@ class AgentMember(Generic[GenericAgentState, GenericAgentGraph]):
 
         self.graph = graph
         self.recursion_limit = -1 # means no limit set
+        self.member_role: self.Role = self.Role.MEMBER  # Default role
 
     def stream(self, input: Dict[str, Any] | Any) -> Iterator[Dict[str, GenericAgentState]]:
-        """
-        """
-        graph_config = {
-            "configurable": {
-                "thread_id": self.thread_id
-            }
-        }
+        return self._invoke_graph('stream', input)
 
+    def invoke(self, input: Dict[str, Any] | Any) -> GenericAgentState:
+        return self._invoke_graph('invoke', input)
+    
+    def _invoke_graph(self, method_name: str, input: Dict[str, Any] | Any) -> Any:
+        graph_config = {"configurable": {"thread_id": self.thread_id}}
         if self.recursion_limit != -1:
             graph_config['recursion_limit'] = self.recursion_limit
-
-        return self.graph.app.stream(input, graph_config)
-
-    def invoke(self, input: Dict[str, Any] | Any) -> GenericAgentState: 
-        """
-        """
-        graph_config = {
-            "configurable": {
-                "thread_id": self.thread_id
-            }
-        }
-
-        if self.recursion_limit != -1:
-            graph_config['recursion_limit'] = self.recursion_limit
-
-        return self.graph.app.invoke(input, graph_config)
+        return getattr(self.graph.app, method_name)(input, graph_config)
 
     def set_recursion_limit(self, limit: int) -> None:
         """
@@ -86,28 +71,10 @@ class AgentMember(Generic[GenericAgentState, GenericAgentGraph]):
 
         self.recursion_limit = limit
 
-    def set_role_to_manager(self) -> None:
-        """
-        """
-
-        self.member_role = self.Role.MANAGER
-
-    def set_role_to_lead(self) -> None:
-        """
-        """
-
-        self.member_role = self.Role.LEAD
-    
-    def set_role_to_member(self) -> None:
-        """
-        """
-
-        self.member_role = self.Role.MEMBER
+    def set_role(self, role: Role) -> None:
+        self.member_role = role
 
     def __str__(self) -> str:
-        """
-        Returns a user-friendly string representation of the object.
-        """
         return (f"AgentMember(member_id={self.member_id!r}, "
                 f"member_name={self.member_name!r}, "
                 f"member_role={self.member_role!r}, "
@@ -117,5 +84,5 @@ class AgentMember(Generic[GenericAgentState, GenericAgentGraph]):
                 f"in_fields={self.in_fields}, "
                 f"out_fields={self.out_fields}, "
                 f"inout_fields={self.inout_fields}, "
-                f"graph_type={type(self.graph).__name__})"
-                f"recursion_limit={self.recursion_limit}")
+                f"graph_type={type(self.graph).__name__}, "
+                f"recursion_limit={self.recursion_limit})")
