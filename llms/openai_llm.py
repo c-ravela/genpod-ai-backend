@@ -34,7 +34,7 @@ class OpenAI(LLM[ChatOpenAI]):
         """
 
         # Extract metadata before passing to the parsers
-        base_chain = prompt | self._llm_instance | super().extract_usage_metadata
+        base_chain = prompt | self._llm_instance | super()._extract_usage_metadata
 
         if response_type == 'string':
             return base_chain | StrOutputParser()

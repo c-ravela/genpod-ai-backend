@@ -8,7 +8,7 @@ from langchain_core.runnables.base import RunnableSequence
 from pydantic import BaseModel, ValidationError
 
 TLLMInstance = TypeVar('TLLMInstance')
-TResponse = TypeVar('TResponse')
+TResponse = TypeVar('TResponse', bound=BaseModel)
 
 class LLMMetrics:
     """Class to represent metrics related to LLM invocations."""
@@ -37,7 +37,7 @@ class LLMOutput(Generic[TResponse]):
             response (TResponse): The response from the LLM.
             metrics (LLMMetrics): The metrics associated with the response.
         """
-        self.response = response
+        self.response: TResponse = response
         self.metrics = metrics
 
 class LLM(ABC, Generic[TLLMInstance]):
@@ -56,20 +56,20 @@ class LLM(ABC, Generic[TLLMInstance]):
         self.__current_retry_backoff = self._retry_backoff
         self._last_metrics = LLMMetrics(0, 0, 0)
         
-    def invoke_with_model(self, prompt: PromptTemplate, prompt_inputs: Dict[str, Any], response_model: Type[BaseModel]) -> LLMOutput[BaseModel]:
+    def invoke_with_model(self, prompt: PromptTemplate, prompt_inputs: Dict[str, Any], response_model: Type[TResponse]) -> LLMOutput[TResponse]:
         """
         Invoke the LLM chain and return the response, with an optional retry mechanism, and parse into a structured model.
         """
         default_response_type = 'json'
         return self.__invoke_with_retry(prompt, prompt_inputs, default_response_type, response_model)
 
-    def invoke(self, prompt: PromptTemplate, prompt_inputs: Dict[str, Any], response_type: Literal['string', 'json', 'raw'] = 'raw') -> LLMOutput[Union[str, dict, Any]]:
+    def invoke(self, prompt: PromptTemplate, prompt_inputs: Dict[str, Any], response_type: Literal['string', 'json', 'raw'] = 'raw') -> LLMOutput[Union[str, dict, AIMessage]]:
         """
         Invoke the LLM chain and return the response in the specified format.
         """
         return self.__invoke_with_retry(prompt, prompt_inputs, response_type)
 
-    def extract_usage_metadata(self, llm_response: AIMessage):
+    def _extract_usage_metadata(self, llm_response: AIMessage):
         """
         Extracts usage metadata from the LLM response.
         """
@@ -86,7 +86,7 @@ class LLM(ABC, Generic[TLLMInstance]):
         """Create a runnable chain for invoking the LLM. Must be implemented by provider classes."""
         pass
 
-    def __invoke_with_retry(self, prompt: PromptTemplate, prompt_inputs: Dict[str, Any], response_type: Literal['string', 'json', 'raw'] = 'raw', response_model: Type[BaseModel] = None) -> LLMOutput[Union[str, dict, Any, BaseModel]]:
+    def __invoke_with_retry(self, prompt: PromptTemplate, prompt_inputs: Dict[str, Any], response_type: Literal['string', 'json', 'raw'] = 'raw', response_model: Type[TResponse] = None) -> LLMOutput[Union[str, dict, AIMessage, TResponse]]:
         """
         Invokes the LLM with a retry mechanism.
         """
@@ -158,6 +158,3 @@ class LLM(ABC, Generic[TLLMInstance]):
                 f"Last Metrics: Input Tokens: {self._last_metrics.input_tokens}, "
                 f"Output Tokens: {self._last_metrics.output_tokens}, "
                 f"Total Tokens: {self._last_metrics.total_tokens}")
-
-
-
