@@ -3,7 +3,7 @@ This module defines the data model for the output of the Architect agent in
 the form of a Requirements Document.
 
 """
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
 from typing_extensions import ClassVar
 
 
@@ -60,6 +60,14 @@ class TasksList(BaseModel):
 
     description: ClassVar[str] = "Schema representing a list of tasks derived from the project requirements."
 
+    @field_validator("tasks")
+    def check__tasks(cls, value):
+        if not isinstance(value, list):
+            raise TypeError(f"Expected 'tasks' to be of type list but received {type(value).__name__}.")
+
+        if not value:
+            raise ValueError(f"The 'tasks' list received from the previous response is empty. Received: {value}, Expected: Non empty list of strings.")
+   
 class QueryResult(BaseModel):
     """
     This model represents the result of a query or question. It contains information 
