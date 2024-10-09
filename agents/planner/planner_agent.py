@@ -13,11 +13,13 @@ from agents.agent.agent import Agent
 from agents.planner.planner_state import PlannerState
 from configs.project_config import ProjectAgents
 from models.constants import PStatus, Status
-from models.models import PlannedTask, PlannedTaskQueue, PlannedIssuesQueue, PlannedIssue
+from models.models import (PlannedIssue, PlannedIssuesQueue, PlannedTask,
+                           PlannedTaskQueue)
 from models.planner_models import BacklogList, Segregation
 from prompts.planner_prompts import PlannerPrompts
-from utils.logs.logging_utils import logger
 from tools.file_system import FS
+from utils.logs.logging_utils import logger
+
 
 class PlannerAgent(Agent[PlannerState, PlannerPrompts]):
     """

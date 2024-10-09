@@ -4,7 +4,7 @@ from typing import Dict, List
 from typing_extensions import Annotated, TypedDict
 
 from agents.agent.state import State
-from models.models import Issue, PlannedTaskQueue, Task, PlannedIssuesQueue
+from models.models import Issue, PlannedIssuesQueue, PlannedTaskQueue, Task
 
 
 class PlannerState(TypedDict):

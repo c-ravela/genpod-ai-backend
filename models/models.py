@@ -11,8 +11,9 @@ from typing import Any, Generic, Iterator, List, Optional, TypeVar
 from pydantic import BaseModel, Field
 
 from models.constants import Status
+from models.tests_generator_models import (FileFunctionSignatures,
+                                           TestCodeGeneration)
 from utils.task_utils import generate_task_id
-from models.tests_generator_models import FileFunctionSignatures, TestCodeGeneration
 
 QueueType = TypeVar("QueueType", bound=BaseModel)
 TQueue = TypeVar('TQueue', bound='Queue')

@@ -6,7 +6,8 @@ from typing_extensions import Annotated, TypedDict
 from agents.agent.state import State
 from models.coder_models import CodeGenerationPlan
 from models.constants import ChatRoles, PStatus
-from models.models import (Issue, IssuesQueue, PlannedTask, PlannedTaskQueue, PlannedIssuesQueue, PlannedIssue,
+from models.models import (Issue, IssuesQueue, PlannedIssue,
+                           PlannedIssuesQueue, PlannedTask, PlannedTaskQueue,
                            RequirementsDocument, Task, TaskQueue)
 from models.tests_generator_models import FunctionSkeleton
 
