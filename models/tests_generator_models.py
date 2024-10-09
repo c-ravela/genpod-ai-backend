@@ -81,7 +81,6 @@ class TestCodeGeneration(BaseModel):
             'absolute_file_pathN'
         ]        
         """, 
-        default=[],
         required=True
     )
 
@@ -92,7 +91,6 @@ class TestCodeGeneration(BaseModel):
         unit test code for that particular file. The code should adhere to all the requirements and standards 
         provided.
         """, 
-        default={},
         required=True
     )
 
@@ -108,7 +106,6 @@ class TestCodeGeneration(BaseModel):
             }
         "
         """,
-        default={},
         required=True
     )
 
@@ -123,7 +120,6 @@ class TestCodeGeneration(BaseModel):
 
         Please ensure that the commands and their parameters are correctly formatted to prevent any execution errors.
         """,
-        default={},
         required=True
     )
 
@@ -133,7 +129,6 @@ class TestCodeGeneration(BaseModel):
         should be the absolute path to the file, and the value should be the well-descriptive function skeleton
         for that particular file.
         """, 
-        default={},
         required=True
     )
 
