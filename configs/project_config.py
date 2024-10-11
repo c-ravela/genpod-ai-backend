@@ -20,6 +20,7 @@ SUPPORTED_LLMS = {
         'llama3'
     ],
     'anthropic': [
+        'claude-3-5-sonnet-20240620',
         'claude-instant-1.2'
     ]
 }

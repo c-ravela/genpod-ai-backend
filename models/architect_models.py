@@ -67,7 +67,9 @@ class TasksList(BaseModel):
 
         if not value:
             raise ValueError(f"The 'tasks' list received from the previous response is empty. Received: {value}, Expected: Non empty list of strings.")
-   
+
+        return value
+
 class QueryResult(BaseModel):
     """
     This model represents the result of a query or question. It contains information 

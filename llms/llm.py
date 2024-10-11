@@ -25,6 +25,11 @@ class LLMMetrics:
         self.input_tokens = it
         self.output_tokens = ot
         self.total_tokens = tt
+    
+    def __str__(self) -> str:
+        return (
+            f'total_tokens: {self.total_tokens}, input_tokens: {self.input_tokens}, output_tokens: {self.output_tokens}'
+        )
 
 class LLMOutput(Generic[TResponse]):
     """Represents the output of a language model invocation, including response and metrics."""
@@ -39,6 +44,12 @@ class LLMOutput(Generic[TResponse]):
         """
         self.response: TResponse = response
         self.metrics = metrics
+
+    def __str__(self) -> str:
+        return (
+            f'response: {self.response}'
+            f'\nmetrics: {self.metrics}'
+        )
 
 class LLM(ABC, Generic[TLLMInstance]):
     """Abstract base class for different LLM (Large Language Model) providers."""
