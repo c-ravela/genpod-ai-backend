@@ -136,17 +136,17 @@ class TestCoderAgent(Agent[TestCoderState, TestGeneratorPrompts]):
 
         return self.update_state_node_name
     
-    def update_state_skeleton_generation(self,current_sg:FunctionSkeleton)-> None:
+    def update_state_skeleton_generation(self,current_sg: FunctionSkeleton)-> None:
         try:
     
             if self.state['functions_skeleton'] is None:
-                self.state["functions_skeleton"] = current_sg['skeletons_to_create']
+                self.state["functions_skeleton"] = current_sg.skeletons_to_create
             else:
-                state_ifc = current_sg['skeletons_to_create'].copy()
+                state_ifc = current_sg.skeletons_to_create.copy()
 
                 for key in state_ifc:
                     if key in self.state['functions_skeleton']:
-                        del current_sg['skeletons_to_create'][key]
+                        del current_sg.skeletons_to_create[key]
         except Exception as e:
             logger.info("error",e)
 
@@ -155,35 +155,35 @@ class TestCoderAgent(Agent[TestCoderState, TestGeneratorPrompts]):
         """
 
         if self.state['files_created'] is None:
-            self.state['files_created'] = current_cg['files_to_create']
+            self.state['files_created'] = current_cg.files_to_create
         else:
-            new_list = [item for item in current_cg['files_to_create'] if item not in self.state['files_created']]
+            new_list = [item for item in current_cg.files_to_create if item not in self.state['files_created']]
 
             self.state['files_created'] += new_list
         
         if self.state['test_code'] is None:
-            self.state["test_code"] = current_cg['test_code']
+            self.state["test_code"] = current_cg.test_code
         else:
-            state_ifc = current_cg['test_code'].copy()
+            state_ifc = current_cg.test_code.copy()
 
             for key in state_ifc:
                 if key in self.state['test_code']:
-                    del current_cg['test_code'][key]   
+                    del current_cg.test_code[key]   
         if self.state['infile_license_comments'] is None:
-            self.state['infile_license_comments'] = current_cg['infile_license_comments']
+            self.state['infile_license_comments'] = current_cg.infile_license_comments
         else:
-            state_ifc = current_cg['infile_license_comments'].copy()
+            state_ifc = current_cg.infile_license_comments.copy()
 
             for key in state_ifc:
                 if key in self.state['infile_license_comments']:
-                    del current_cg['infile_license_comments'][key]
+                    del current_cg.infile_license_comments[key]
             
-            self.state['infile_license_comments'].update(current_cg['infile_license_comments'])
+            self.state['infile_license_comments'].update(current_cg.infile_license_comments)
 
         if self.state['commands_to_execute'] is None:
-            self.state['commands_to_execute'] = current_cg['commands_to_execute']
+            self.state['commands_to_execute'] = current_cg.commands_to_execute
         else:
-            self.state['commands_to_execute'].update(current_cg['commands_to_execute'])
+            self.state['commands_to_execute'].update(current_cg.commands_to_execute)
 
     def entry_node(self, state: TestCoderState) -> TestCoderState:
         """
@@ -217,7 +217,13 @@ class TestCoderAgent(Agent[TestCoderState, TestGeneratorPrompts]):
         self.is_license_file_downloaded = False
         self.is_license_text_added_to_files = False
 
-        self.current_code_generation = TestCodeGeneration()
+        self.current_code_generation = TestCodeGeneration(
+            files_to_create=[],
+            test_code={},
+            infile_license_comments={},
+            commands_to_execute={},
+            functions_skeleton={}
+        )
 
         return self.state
     
@@ -421,7 +427,7 @@ class TestCoderAgent(Agent[TestCoderState, TestGeneratorPrompts]):
         self.update_state(state)
         self.last_visited_node = self.run_commands_node_name
         try:
-            for path, command in self.current_code_generation['commands_to_execute'].items():
+            for path, command in self.current_code_generation.commands_to_execute.items():
                 
                 logger.info(f"----{self.agent_name}: Started executing the command: {command}, at the path: {path}.----")
     
@@ -444,8 +450,8 @@ class TestCoderAgent(Agent[TestCoderState, TestGeneratorPrompts]):
                 elif execution_result[0]==True:
                     
                     self.hasError=True
-                    self.last_visited_node = self.code_generation_node_name
-                    self.error_message= f"Error Occured while executing the command: {command}, in the path: {path}. The output of the command execution is {execution_result[1]}. This is the dictionary of commands and the paths where the respective command are supposed to be executed you have generated in previous run: {self.current_code_generation['commands_to_execute']}"
+                    self.last_visited_node = self.run_commands_node_name
+                    self.error_message= f"Error Occured while executing the command: {command}, in the path: {path}. The output of the command execution is {execution_result[1]}. This is the dictionary of commands and the paths where the respective command are supposed to be executed you have generated in previous run: {self.current_code_generation.commands_to_execute}"
                     self.add_message((
                     ChatRoles.USER,
                     f"{self.agent_name}: {self.error_message}"
@@ -476,7 +482,7 @@ class TestCoderAgent(Agent[TestCoderState, TestGeneratorPrompts]):
         self.last_visited_node = self.write_skeleton_node_name
 
         try:
-            for path, function_skeleton in self.current_code_generation['functions_skeleton'].items():
+            for path, function_skeleton in self.current_code_generation.functions_skeleton.items():
                 
                 logger.info(f"----{self.agent_name}: Started writing the skeleton to the file at the path: {path}.----")
     
@@ -532,7 +538,7 @@ class TestCoderAgent(Agent[TestCoderState, TestGeneratorPrompts]):
         self.last_visited_node = self.write_generated_code_node_name
 
         try:
-            for path, code in self.current_code_generation['test_code'].items():
+            for path, code in self.current_code_generation.test_code.items():
                 
                 logger.info(f"----{self.agent_name}: Started writing the code to the file at the path: {path}.----")
     

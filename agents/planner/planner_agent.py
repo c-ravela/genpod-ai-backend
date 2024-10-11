@@ -138,7 +138,7 @@ class PlannerAgent(Agent[PlannerState, PlannerPrompts]):
                         "context": state['context'],
                         "feedback": self.error_messages
                     },
-                    'json'
+                    'string'
                 )
 
                 backlogs_list = ast.literal_eval(llm_output.response)
@@ -172,32 +172,33 @@ class PlannerAgent(Agent[PlannerState, PlannerPrompts]):
                 try:
                     logger.info("----Now Working on Generating detailed requirements for the backlog----")
                     logger.info("Backlog: %s", backlog)
+
+                    if state['current_task'].task_status == Status.RESPONDED:
+                        context = f"{state['context']}\n{state['current_task'].additional_info}"
+                    else:
+                        context = state['context']
+
                     llm_output = self.llm.invoke(self.prompts.detailed_requirements_prompt, {
                             "backlog": backlog, 
                             "deliverable": state['current_task'].description, 
-                            "context": state['context'], 
+                            "context": context, 
                             "feedback": self.error_messages
                         },
-                        'json'
+                        'string'
                     )
 
-                    # # Let's clean the response to remove json prefix that llm sometimes appends to the actual text
-                    # # Strip whitespace from the beginning and end
-                    # cleaned_response = response.content.strip()
-                    # # Remove single-line comments
-                    # # cleaned_response = re.sub(r'//.*$', '', cleaned_response, flags=re.MULTILINE)
-                    # # Remove multi-line comments
-                    # # cleaned_response = re.sub(r'/\*.*?\*/', '', cleaned_response, flags=re.DOTALL)
-                    
-                    # # Check if the text starts with ```json and ends with ```
-                    # if cleaned_response.startswith('```json') and cleaned_response.endswith('```'):
-                    #     # Remove the ```json prefix and ``` suffix
-                    #     cleaned_json = cleaned_response.removeprefix('```json').removesuffix('```').strip()
-                    # else:
-                    #     # If not enclosed in code blocks, use the text as is
-                    #     cleaned_json = cleaned_response
+                    # Let's clean the response to remove json prefix that llm sometimes appends to the actual text
+                    # Strip whitespace from the beginning and end
+                    cleaned_response = llm_output.response.strip()
+                    # Check if the text starts with ```json and ends with ```
+                    if cleaned_response.startswith('```json') and cleaned_response.endswith('```'):
+                        # Remove the ```json prefix and ``` suffix
+                        cleaned_json = cleaned_response.removeprefix('```json').removesuffix('```').strip()
+                    else:
+                        # If not enclosed in code blocks, use the text as is
+                        cleaned_json = cleaned_response
 
-                    parsed_response: dict = json.loads(llm_output.response)
+                    parsed_response: dict = json.loads(cleaned_json)
                     logger.info("response from planner ", parsed_response)
 
                     if "question" in parsed_response.keys():

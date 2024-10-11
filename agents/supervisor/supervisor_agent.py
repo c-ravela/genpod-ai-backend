@@ -837,7 +837,7 @@ class SupervisorAgent(Agent[SupervisorState, SupervisorPrompts]):
 
         return state
 
-    def call_reviwer(self, state: SupervisorState) -> SupervisorState:
+    def call_reviewer(self, state: SupervisorState) -> SupervisorState:
         """
         """
         
@@ -950,7 +950,7 @@ class SupervisorAgent(Agent[SupervisorState, SupervisorPrompts]):
                     logger.info(f"Delegator: Invoking call_test_code_generator due to Project Status: {PStatus.EXECUTING} and PlannedTask Status: {Status.NEW}.")
                     return 'call_coder'
             else:
-                if state['current_task'].task_status == Status.NEW:
+                if state['current_task'].task_status == Status.NEW or state['current_task'].task_status == Status.RESPONDED:
                     logger.info(f"Delegator: Invoking call_planner due to Project Status: {PStatus.EXECUTING} and Task Status: {Status.NEW}.")
                     return 'call_planner'
             

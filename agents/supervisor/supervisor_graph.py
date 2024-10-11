@@ -27,7 +27,7 @@ class SupervisorWorkflow(Graph[SupervisorAgent]):
         supervisor_workflow.add_node("kickoff", self.agent.instantiate_state)
         supervisor_workflow.add_node("Architect", self.agent.call_architect)
         supervisor_workflow.add_node("Coder", self.agent.call_coder)
-        supervisor_workflow.add_node("Reviewer", self.agent.call_reviwer)
+        supervisor_workflow.add_node("Reviewer", self.agent.call_reviewer)
         supervisor_workflow.add_node("RAG", self.agent.call_rag)
         supervisor_workflow.add_node("Planner", self.agent.call_planner)
         supervisor_workflow.add_node("update_state", self.agent.update_state)

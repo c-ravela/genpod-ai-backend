@@ -138,7 +138,7 @@ class ArchitectAgent(Agent[ArchitectState, ArchitectPrompts]):
         logger.info(f"----{self.agent_name}: Initiating request for additional information----")
 
         self.is_additional_info_requested = True
-        self.state['current_task'].question = response['question_for_additional_info']
+        self.state['current_task'].question = response.question_for_additional_info
         self.state['current_task'].task_status = Status.AWAITING
     
     def update_requirements_overview(self, key: str, phase: str, response: TaskOutput) -> None:
@@ -152,12 +152,12 @@ class ArchitectAgent(Agent[ArchitectState, ArchitectPrompts]):
         """
         logger.info(f"----{self.agent_name}: Modifying key: {key} in requirements overview----")
 
-        if not response['is_add_info_needed']:
+        if not response.is_add_info_needed:
             self.add_message((
                 ChatRoles.USER,
                 f"{self.agent_name}: {phase} is now ready and prepared."
             ))
-            self.state['requirements_document'][key] = response['content']
+            self.state['requirements_document'][key] = response.content
 
             # update to next phase
             self.generation_step += 1
@@ -260,7 +260,7 @@ class ArchitectAgent(Agent[ArchitectState, ArchitectPrompts]):
         elif self.state["current_task"].task_status == Status.AWAITING:
             self.mode = "information_gathering"
 
-        return {**self.state}
+        return self.state
 
     def requirements_node(self, state: ArchitectState) -> ArchitectState:
         """
@@ -488,7 +488,7 @@ class ArchitectAgent(Agent[ArchitectState, ArchitectPrompts]):
         logger.info(f"----{self.agent_name}: Initiating the process of Tasks Separation----")
 
         self.last_visited_node = self.tasks_separation_node_name
-        self.state={**state}
+        self.state=state
 
         try:
             llm_output = self.llm.invoke_with_pydantic_model(self.prompts.tasks_separation_prompt, {
