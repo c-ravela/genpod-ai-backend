@@ -6,7 +6,7 @@ default:
   # Default LLM configuration, used when agent-specific values are not set
   llm_config:
     provider: 'openai'
-    model: 'chatgpt-4o-latest'
+    model: 'gpt-4o-2024-08-06'
     config:
       temperature: 0.3
       max_retries: 4
@@ -49,6 +49,11 @@ providers:
     name: 'anthropic'
     setting:
       api_key: '$ANTHROPIC_API_KEY'
+      models:
+        claude_3_5_sonnet_20240620:
+          name: 'claude-3-5-sonnet-20240620'
+          description: ''
+          api_key: ''
 
 # Configuration for project agents and their LLM settings
 agents:
@@ -59,12 +64,6 @@ agents:
   coder:
     description: 'Writes and optimizes code based on the architecture, focusing on implementing functionality with clean coding practices.'
   rag:
-    llm_config:
-      provider: 'ollama'
-      model: 'llama3'
-      config:
-        temperature: 0.3
-        keep_alive: True
     description: 'Responsible for retrieval-augmented generation tasks, combining data retrieval with language generation for enhanced accuracy.'
   planner:
     description: 'Manages project planning, timelines, and task prioritization, ensuring smooth progress and resource allocation.'
