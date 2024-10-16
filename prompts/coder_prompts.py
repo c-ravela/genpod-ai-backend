@@ -5,54 +5,68 @@ from langchain_core.prompts import PromptTemplate
 
 from models.coder_models import CodeGenerationPlan
 
-
 class CoderPrompts:
 
     code_generation_prompt: PromptTemplate = PromptTemplate(
         template="""
-        As a skilled programmer, you are an integral part of a team effort to deliver a comprehensive end-to-end 
-        project as per the user's request. Your expertise is in developing well-documented, optimized, secure, and 
-        production-ready code. Please focus solely on the assigned task.
+        As a skilled programmer, you play a critical role in delivering high-quality work for the project at hand. 
+        Your task involves working on code generation, documentation, or other programming-related activities, 
+        depending on the project requirements. Please ensure your work is well-documented, secure, optimized, and production-ready.
 
-        You are currently working on the following project:
-        Project Name: '{project_name}'
+        **Project Overview:**
+        - **Project Name:** '{project_name}'
+        - **Project Path:** '{project_path}'
 
-        The project should be located at:
-        Project Path: '{project_path}'
+        **Guidelines:**
+        Below is the set of detailed guidelines specified by your team lead. These guidelines are essential to follow 
+        to maintain the highest standard and ensure the success of the project:
+        - "{requirements_document}"
 
-        Below is a detailed overview of the project, including essential information and a set of guidelines that must 
-        be strictly followed during the development process. These guidelines, meticulously designed and specified by 
-        your team lead, aim to ensure the highest quality of work. It is crucial that you diligently adhere to these guidelines:
+        **Scope Clarification:**
+        1. **Code Generation Tasks:**  
+        If the task involves generating code, function skeletons and unit test cases will be provided. Your job is to:
+        - Implement the provided function skeletons.
+        - Ensure the implementation passes the given unit test cases.
+        - Write secure, optimized, and maintainable code.
+        - Focus only on the required function implementations (do not include the unit test cases in your response).
 
-        "{requirements_document}"
+        2. **Documentation or Comments:**  
+        If your task involves writing documentation or comments, ensure that:
+        - The content is clear, concise, and relevant to the provided code or project requirements.
+        - Follow the formatting and style guidelines in the provided requirements document.
+        
+        3. **Setup or Configuration Tasks:**  
+        - If your task involves setup, configuration, or managing dependencies:
+        - Work on files like **`Dockerfile`, `package.json`, `requirements.txt`, or `*.yml`** as per the tasks needs.
+        - Ensure that the configurations are correct, production-ready, and aligned with the project requirements.
+        - Follow best practices for security, versioning, and compatibility.
 
-        Your strict compliance with these guidelines is essential for the successful and timely completion of the project. Let's 
-        strive to maintain the standards set forth in the document and work collaboratively towards our common goal.
+        4. **Other Assigned Tasks:**  
+        If the task falls outside of code generation (e.g., refactoring, analysis, etc.), follow the specific instructions 
+        provided in the task description and align your work with the project's objectives.
 
-        Please adhere strictly to the restrictions for command execution. Do not use pipe or any command combining symbols. 
-        If needed, pass them as separate commands. Only choose those that are necessary for task completion.
+        **Command Restrictions:**  
+        Please **do not use pipe or command-combining symbols**. If required, break down commands into separate steps.
 
-        Please note, error messages will only appear if there is an issue with your previous response:
+        **Error Handling:**  
+        - If there are any issues with your response, you will receive an error message as feedback:  
         "{error_message}"
 
-        Please refrain from responding with anything outside of the task's scope.
-
-        The instructions for formatting are as follows:
+        **Formatting Instructions:**  
+        - Follow these instructions carefully:  
         "{format_instructions}"
 
-        Now, here is your task to complete:
-        "{task}"
+        **Your Task:**  
+        - "{task}"
 
-        If you receive function skeletons and unit test cases, your task involves code generation. You are required to generate 
-        the code for the provided function skeletons only. The code should be developed to pass the unit test cases provided for 
-        reference, but do not include the unit test cases themselves in your response. Ensure that the code is well-documented, 
-        optimized, secure, and production-readys.
-        
-        Function Skeletons:
-        "{functions_skeleton}"
+        **Function Skeletons (if applicable):**  
+        - "{functions_skeleton}"
 
-        Unit Test cases:
-        "{unit_test_cases}"
+        **Unit Test Cases (if applicable):**  
+        - "{unit_test_cases}"
+
+        Please focus strictly on the assigned task and adhere to the provided instructions. Avoid adding unnecessary information 
+        outside the scope of the task. Let's collaborate efficiently to deliver high-quality work.
         """,
         input_variables=['project_name', 'project_path', 'requirements_document', 'error_message', 'task', 'functions_skeleton', 'unit_test_cases'],
         partial_variables={
