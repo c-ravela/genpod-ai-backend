@@ -5,6 +5,7 @@ from langchain_core.prompts import PromptTemplate
 
 from models.coder_models import CodeGenerationPlan
 
+
 class CoderPrompts:
 
     code_generation_prompt: PromptTemplate = PromptTemplate(
