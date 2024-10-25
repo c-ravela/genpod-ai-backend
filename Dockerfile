@@ -1,5 +1,5 @@
 # Base Image
-FROM python:3.12.6
+FROM python:3.12.7
 
 # Set the working directory in the container
 WORKDIR /opt/genpod
@@ -15,7 +15,7 @@ RUN apt-get update && \
     sqlite3 && \
     rm -rf /var/lib/apt/lists/* && \
     pip install --no-cache-dir -r requirements.txt && \
-    pip install --no-cache-dir semgrep
+    pip install --no-cache-dir semgrep==1.93.0
 
 # Copy the rest of the application files
 COPY . .
