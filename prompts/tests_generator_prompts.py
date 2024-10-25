@@ -5,7 +5,6 @@ from langchain.output_parsers import PydanticOutputParser
 from langchain_core.prompts import PromptTemplate
 
 from models.tests_generator_models import (FileFunctionSignatures,
-                                           FunctionSkeleton,
                                            TestCodeGeneration)
 
 
@@ -32,7 +31,9 @@ class TestGeneratorPrompts:
         "{error_message}"
 
         The instructions for formatting are as follows:
-        {format_instructions}
+        <instructions>
+            {format_instructions}
+        </instructions>
 
         Format the files to be created as a list of strings. For example:
         "[file_path1, file_path2, file_path3, ..., file_pathN]"
@@ -71,7 +72,9 @@ class TestGeneratorPrompts:
         "{error_message}"
 
         The instructions for formatting are as follows:
-        {format_instructions}
+        <instructions>
+            {format_instructions}
+        </instructions>
 
         Please ensure that the function description is clear and detailed, specifying the exact steps or logic that need to be implemented within the function. 
 
@@ -83,7 +86,7 @@ class TestGeneratorPrompts:
         """,
         input_variables=['project_name', 'project_path', 'requirements_document', 'error_message', 'task' ],
         partial_variables= {
-            "format_instructions": PydanticOutputParser(pydantic_object=FunctionSkeleton).get_format_instructions()
+            "format_instructions": PydanticOutputParser(pydantic_object=FileFunctionSignatures).get_format_instructions()
         }
     )
 
@@ -123,9 +126,9 @@ class TestGeneratorPrompts:
 
         **Formatting Instructions:**
         Ensure to follow these formatting instructions when defining the function signature:
-        ```
-        {format_instructions}
-        ```
+        <instructions>
+            {format_instructions}
+        </instructions>
 
         **Instructions:**
         - Clearly describe the function, including its purpose, parameters, return types, and any specific logic that needs to be implemented.
@@ -181,10 +184,10 @@ class TestGeneratorPrompts:
 
         **Formatting Instructions:**
         Follow these formatting instructions when defining the unit test cases:
-        ```
-        {format_instructions}
-        ```
-
+        <instructions>
+            {format_instructions}
+        </instructions>
+        
         **Function Signatures:**
         Here are the function signatures dictionary, where the key contains the path for each function, 
         and the value includes the function skeleton, which consists of the function name, input parameters, 

@@ -5,6 +5,7 @@ from langchain_core.prompts import PromptTemplate
 
 from models.coder_models import CodeGenerationPlan
 
+
 class CoderPrompts:
 
     code_generation_prompt: PromptTemplate = PromptTemplate(
@@ -54,8 +55,10 @@ class CoderPrompts:
 
         **Formatting Instructions:**  
         - Follow these instructions carefully:  
-        "{format_instructions}"
-
+        <instructions>
+            {format_instructions}
+        </instructions>
+        
         **Your Task:**  
         - "{task}"
 
@@ -110,7 +113,10 @@ class CoderPrompts:
         - Ensure your solution adheres to the project's guidelines and requirements.
         
         Please adhere strictly to the following format when submitting your response:
-        "{format_instructions}"
+        <instructions>
+            {format_instructions}
+        </instructions>
+
         """,
         input_variables=['project_name', 'project_path', 'error_message', 'issue', 'file_path', 'file_content', 'function_signatures', 'unit_test_code'],
         partial_variables={
