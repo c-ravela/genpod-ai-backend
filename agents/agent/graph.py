@@ -53,12 +53,10 @@ class Graph(Generic[GenericAgent]):
             raise RuntimeError("Graph has already been compiled.")
 
     def display_graph(self) -> None:
-        """
-        Displays the graph visually. The graph is rendered as an image and shown.
-        """
+        """Displays the graph visually. The graph is rendered as an image and shown."""
         if self.app is None:
             raise RuntimeError("Graph has not been compiled yet.")
-        
+
         try:
             img = Image.open(io.BytesIO(self.app.get_graph().draw_mermaid_png()))
             img.show()
