@@ -92,7 +92,8 @@ class ReviewerOutput(BaseModel):
         for item in file_issues:
             if not isinstance(item, dict):
                 raise ValueError('Each item in file_issues must be a dictionary.')
-             
+
+        if not isinstance(item, FileIssue):  
             try:
                 FileIssue(**item)
             except ValueError as e:
