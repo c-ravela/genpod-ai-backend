@@ -9,7 +9,7 @@ from models.constants import ChatRoles, PStatus
 from models.models import (Issue, IssuesQueue, PlannedIssue,
                            PlannedIssuesQueue, PlannedTask, PlannedTaskQueue,
                            RequirementsDocument, Task, TaskQueue)
-from models.tests_generator_models import FunctionSkeleton
+from models.tests_generator_models import FileFunctionSignatures
 
 
 class SupervisorState(TypedDict):
@@ -145,7 +145,7 @@ class SupervisorState(TypedDict):
     ]
 
     # @out
-    human_feedback:  Annotated[
+    human_feedback: Annotated[
         list[tuple[str, str]], 
         State.inout_field(
             "A list human inputs given during human in the loop process"
@@ -153,8 +153,8 @@ class SupervisorState(TypedDict):
     ]
 
     # @in
-    functions_skeleton:Annotated[
-        FunctionSkeleton,
+    functions_skeleton: Annotated[
+        FileFunctionSignatures,
         State.in_field(
             "The well detailed function skeleton for the functions that are in the code."
         )
