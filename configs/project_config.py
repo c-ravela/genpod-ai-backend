@@ -14,7 +14,10 @@ SUPPORTED_LLMS = {
     'openai': [
         'chatgpt-4o-latest',
         'gpt-4o-2024-08-06',
-        'gpt-4o-2024-05-13'
+        'gpt-4o-2024-05-13',
+        'o1-preview-2024-09-12',
+        'o1-mini-2024-09-12',
+        'gpt-3.5-turbo'
     ],
     'ollama': [
         'llama3'
@@ -211,7 +214,24 @@ class AgentInfo:
             thread_id (int): The thread ID to be set.
         """
         self.thread_id = thread_id
-      
+    
+    def __str__(self) -> str:
+        """
+        Returns a string representation of the AgentInfo instance.
+        
+        Returns:
+            str: A formatted string describing the agent's information.
+        """
+        # Build a string representation of the agent's core information.
+        return (
+            f"Agent Name: {self.agent_name}\n"
+            f"Agent ID: {self.agent_id}\n"
+            f"Alias: {self.alias}\n"
+            f"Description: {self.description}\n"
+            f"Thread ID: {self.thread_id}\n"
+            f"LLM Associated: {self.llm}"
+        )
+
 class ProjectGraphs(Enum):
     """
     Enum that holds all the graphs used by the project.
