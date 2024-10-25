@@ -5,7 +5,6 @@ The Coder agent is responsible for completing tasks in a project. The output of
 the Coder agent includes information about the steps to complete a task, 
 the files to be created, the location of the code, the actual code.
 """
-import re
 from typing import Any, Dict
 
 from pydantic import BaseModel, Field, model_validator
@@ -193,10 +192,11 @@ class CodeGenerationPlan(BaseModel):
             if not isinstance(content, dict):
                 raise ValueError(f'Content for "{path}" must be a valid FileContent instance.')
         
-            try:
-                FileContent(**content)
-            except ValueError as e:
-                raise ValueError(f'Invalid content for file "{path}": {e}')
+            if not isinstance(content, FileContent):
+                try:
+                    FileContent(**content)
+                except ValueError as e:
+                    raise ValueError(f'Invalid content for file "{path}": {e}')
             
         return values
     
