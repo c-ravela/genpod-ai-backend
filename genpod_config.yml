@@ -77,20 +77,8 @@ agents:
     #     stream_usage: True
     description: 'Writes and optimizes code based on the architecture, focusing on implementing functionality with clean coding practices.'
   rag:
-    # llm_config:
-    #   provider: 'openai'
-    #   model: 'o1-mini-2024-09-12'
-    #   config:
-    #     temperature: 1
-    #     stream_usage: True
     description: 'Responsible for retrieval-augmented generation tasks, combining data retrieval with language generation for enhanced accuracy.'
   planner:
-    # llm_config:
-    #   provider: 'openai'
-    #   model: 'o1-mini-2024-09-12'
-    #   config:
-    #     temperature: 1
-    #     stream_usage: True
     description: 'Manages project planning, timelines, and task prioritization, ensuring smooth progress and resource allocation.'
   tests_generator:
     # llm_config:
