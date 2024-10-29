@@ -7,7 +7,8 @@ from typing_extensions import Annotated, TypedDict
 from agents.agent.state import State
 from models.coder_models import CodeGenerationPlan
 from models.constants import ChatRoles
-from models.models import Issue, PlannedIssue, PlannedTask, Task
+from models.models import (Issue, PlannedIssue, PlannedTask,
+                           RequirementsDocument, Task)
 
 
 class CoderState(TypedDict):
@@ -16,25 +17,25 @@ class CoderState(TypedDict):
 
     # @in
     project_status: Annotated[
-        str, 
+        str,
         State.in_field()
     ]
-    
-    # @in 
+
+    # @in
     project_name: Annotated[
-        str, 
+        str,
         State.in_field(
             "The name of the project."
         )
     ]
 
-    # @in 
+    # @in
     requirements_document: Annotated[
-        str, 
+        RequirementsDocument,
         State.in_field(
             "A comprehensive, well-structured document in markdown format that outlines "
-            "the project's requirements derived from the user's request. This serves as a "
-            "guide for the development process."
+            "the project's requirements derived from the user's request. This serves "
+            "as a guide for the development process."
         )
     ]
 
@@ -55,12 +56,12 @@ class CoderState(TypedDict):
 
     # @in
     license_text: Annotated[
-        str, 
+        str,
         State.in_field()
     ]
 
     # @in
-    functions_skeleton:Annotated[
+    functions_skeleton : Annotated[
         dict,
         State.in_field(
             "The well detailed function skeleton for the functions that are in the code."
@@ -69,10 +70,10 @@ class CoderState(TypedDict):
 
     # @in
     test_code: Annotated[
-        dict, 
+        dict,
         State.in_field(
-            "The complete, well-documented working unit test code that adheres to all standards "
-            "requested with the programming language, framework user requested "
+            "The complete, well-documented working unit test code that adheres to all "
+            "standards requested with the programming language, framework user requested "
         )
     ]
 
@@ -84,7 +85,7 @@ class CoderState(TypedDict):
             "members are working on."
         )
     ]
-    
+
     # @inout
     current_planned_task: Annotated[
         PlannedTask,
@@ -94,10 +95,10 @@ class CoderState(TypedDict):
         )
     ]
     
-    # @out
+    # @inout
     current_planned_issue: Annotated[
         PlannedIssue,
-        State.out_field("The current planned issue that team is working on.")
+        State.inout_field("The current planned issue that team is working on.")
     ]
 
     current_issue: Annotated[
@@ -107,14 +108,14 @@ class CoderState(TypedDict):
 
     # @inout
     messages: Annotated[
-        list[tuple[ChatRoles, str]], 
+        list[tuple[ChatRoles, str]],
         State.inout_field(
-            "A chronological list of tuples representing the conversation history between the "
-            "system, user, and AI. Each tuple contains a role identifier (e.g., 'AI', 'tool', "
-            "'user', 'system') and the corresponding message."
+            "A chronological list of tuples representing the conversation history "
+            "between the system, user, and AI. Each tuple contains a role identifier "
+            "(e.g., 'AI', 'tool', 'user', 'system') and the corresponding message."
         )
     ]
-
+    
     # @out
     code_generation_plan_list: Annotated[
         CodeGenerationPlan,
