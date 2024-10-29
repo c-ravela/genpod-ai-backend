@@ -10,6 +10,7 @@ from pydantic import BaseModel, ValidationError
 TLLMInstance = TypeVar('TLLMInstance')
 TResponse = TypeVar('TResponse', bound=BaseModel)
 
+
 class LLMMetrics:
     """Class to represent metrics related to LLM invocations."""
 
@@ -25,11 +26,13 @@ class LLMMetrics:
         self.input_tokens = it
         self.output_tokens = ot
         self.total_tokens = tt
-    
+   
     def __str__(self) -> str:
         return (
-            f'total_tokens: {self.total_tokens}, input_tokens: {self.input_tokens}, output_tokens: {self.output_tokens}'
+            f'total_tokens: {self.total_tokens}, input_tokens: {self.input_tokens}, "
+            "output_tokens: {self.output_tokens}'
         )
+
 
 class LLMOutput(Generic[TResponse]):
     """Represents the output of a language model invocation, including response and metrics."""
@@ -50,6 +53,7 @@ class LLMOutput(Generic[TResponse]):
             f'response: {self.response}'
             f'\nmetrics: {self.metrics}'
         )
+
 
 class LLM(ABC, Generic[TLLMInstance]):
     """Abstract base class for different LLM (Large Language Model) providers."""
@@ -94,7 +98,7 @@ class LLM(ABC, Generic[TLLMInstance]):
             )
         else:
             self._last_metrics = LLMMetrics(0, 0, 0)
-        
+
         return llm_response
 
     @abstractmethod
@@ -123,6 +127,8 @@ class LLM(ABC, Generic[TLLMInstance]):
                 else:
                     final_response = runnable_response
 
+                # Reset retry backoff to default after successful invocation
+                self.__current_retry_backoff = self._retry_backoff
                 return LLMOutput(final_response, self._last_metrics)
             
             except Exception as e:
@@ -136,7 +142,7 @@ class LLM(ABC, Generic[TLLMInstance]):
                     sleep(self.__current_retry_backoff)
                     self.__current_retry_backoff *= 2
 
-    def __wrap_prompt_with_instructions(self, prompt: PromptTemplate, prompt_inputs: Dict[str, Any], feedback: str = "") -> PromptTemplate:
+    def __wrap_prompt_with_instructions(self, prompt: PromptTemplate, prompt_inputs: Dict[str, Any]) -> PromptTemplate:
         """
         Wraps the user prompt with additional instructions and feedback handling.
         """
@@ -144,7 +150,7 @@ class LLM(ABC, Generic[TLLMInstance]):
         user_prompt = user_prompt.replace("{", "{{").replace("}", "}}")
 
         wrapped_prompt = PromptTemplate(
-            template=f"""
+            template="""
             Please adhere to the following instructions:
 
             1. If the prompt specifies a particular format, follow it exactly.
@@ -154,22 +160,26 @@ class LLM(ABC, Generic[TLLMInstance]):
             Note: If any format instructions are given and there was a previous error in your response,
             you will receive feedback to improve future outputs.
 
-            `{feedback.strip() if feedback else "No feedback provided."}`
+            `{feedback}`
 
-            {user_prompt}
-            
+            {formatted_user_prompt}
             """,
-            input_variables={'feedback'}
+            input_variables=['feedback'],
+            partial_variables={
+                "formatted_user_prompt": user_prompt
+            }
         )
 
         return wrapped_prompt
     
     def __str__(self):
-        return (f"LLM Provider: {self.provider}\n"
-                f"Model: {self.model}\n"
-                f"Model Config: {self.model_config}\n"
-                f"Max Retries: {self.__max_retries}\n"
-                f"Retry Backoff: {self._retry_backoff}\n"
-                f"Last Metrics: Input Tokens: {self._last_metrics.input_tokens}, "
-                f"Output Tokens: {self._last_metrics.output_tokens}, "
-                f"Total Tokens: {self._last_metrics.total_tokens}")
+        return (
+            f"LLM Provider: {self.provider}\n"
+            f"Model: {self.model}\n"
+            f"Model Config: {self.model_config}\n"
+            f"Max Retries: {self.__max_retries}\n"
+            f"Retry Backoff: {self._retry_backoff}\n"
+            f"Last Metrics: Input Tokens: {self._last_metrics.input_tokens}, "
+            f"Output Tokens: {self._last_metrics.output_tokens}, "
+            f"Total Tokens: {self._last_metrics.total_tokens}"
+        )
