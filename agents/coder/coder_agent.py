@@ -45,13 +45,13 @@ class CoderAgent(Agent[CoderState, CoderPrompts]):
 
     last_visited_node: str
     error_message: str
-
+    requirements_document: str
     current_code_generation_plan_list: List[CodeGenerationPlan]
 
     def __init__(self, agent_id: str, agent_name: str, llm: LLM) -> None:
         """
         """
-        
+       
         super().__init__(
             agent_id,
             agent_name,
@@ -149,6 +149,11 @@ class CoderAgent(Agent[CoderState, CoderPrompts]):
         self.has_code_been_written_locally = False
         self.is_license_text_added_to_files = False
         self.hasPendingToolCalls = False
+        self.requirements_document = (
+            f"{state['requirements_document'].directory_structure}\n"
+            f"{state['requirements_document'].coding_standards}\n"
+            f"{state['requirements_document'].project_license_information}"
+        )
 
         self.current_code_generation_plan_list = []
 
@@ -177,7 +182,7 @@ class CoderAgent(Agent[CoderState, CoderPrompts]):
                 llm_output = self.llm.invoke_with_pydantic_model(self.prompts.code_generation_prompt, {
                     "project_name": self.state['project_name'],
                     "project_path": os.path.join(self.state['project_path'], self.state['project_name']),
-                    "requirements_document": self.state['requirements_document'],
+                    "requirements_document": self.requirements_document,
                     "error_message": self.error_message,
                     "task": task.description,
                     "functions_skeleton": "no function sekeletons available for this task.",
@@ -233,11 +238,11 @@ class CoderAgent(Agent[CoderState, CoderPrompts]):
                     llm_output = self.llm.invoke_with_pydantic_model(self.prompts.code_generation_prompt, {
                         "project_name": self.state['project_name'],
                         "project_path": os.path.join(self.state['project_path'], self.state['project_name']),
-                        "requirements_document": self.state['requirements_document'],
+                        "requirements_document": self.requirements_document,
                         "error_message": self.error_message,
                         "task": task.description,
                         "functions_skeleton": {file_path: function_skeleton},
-                        "unit_test_cases": self.state['test_code'] 
+                        "unit_test_cases": self.state['test_code']
                     }, CodeGenerationPlan)
 
                     cleaned_response = llm_output.response
