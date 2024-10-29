@@ -5,7 +5,8 @@ from pydantic import BaseModel, Field, model_validator
 
 class FileIssue(BaseModel):
     """
-    Represents an issue found in a file. This model is used to detail problems or errors discovered during analysis.
+    Represents an issue found in a file. This model is used to detail problems or 
+    errors discovered during analysis.
     """
 
     file_path: str = Field(
@@ -33,7 +34,10 @@ class FileIssue(BaseModel):
         default=None,
         description="Suggestions for resolving the issue.",
         title="Suggestions",
-        examples=[ "Define the variable 'x' before use", "Check variable scope and initialization" ]
+        examples=[
+            "Define the variable 'x' before use", 
+            "Check variable scope and initialization"
+        ]
     )
 
     @model_validator(mode="before")
@@ -46,9 +50,11 @@ class FileIssue(BaseModel):
 
         return values
 
+
 class ReviewerOutput(BaseModel):
     """
-    Represents the output of a review process, which includes a list of issues found in files.
+    Represents the output of a review process, which includes a list of issues found in
+    files.
     """
 
     file_issues: List[FileIssue] = Field(
@@ -84,19 +90,21 @@ class ReviewerOutput(BaseModel):
         file_issues = values.get('file_issues')
 
         if file_issues is None:
-            raise ValueError('file_issues cannot be None. Provide an empty list if there are no issues.')
-        
+            raise ValueError(
+                'file_issues cannot be None. Provide an empty list if there are no issues.'
+            )
+
         if not isinstance(file_issues, list):
             raise ValueError('file_issues must be a list')
-        
+       
         for item in file_issues:
             if not isinstance(item, dict):
                 raise ValueError('Each item in file_issues must be a dictionary.')
 
-        if not isinstance(item, FileIssue):  
-            try:
-                FileIssue(**item)
-            except ValueError as e:
-                raise ValueError(f'Invalid item in file_issues: {e}')
+            if not isinstance(item, FileIssue):
+                try:
+                    FileIssue(**item)
+                except ValueError as e:
+                    raise ValueError(f'Invalid item in file_issues: {e}')
 
         return values
