@@ -49,19 +49,19 @@ class SupervisorWorkflow(Graph[SupervisorAgent]):
                                                       "call_supervisor": 'Supervisor',
                                                       "update_state" : "update_state",
                                                       "Human" : 'Human',
-                                                      "call_test_code_generator":"TestGenerator"
+                                                      "call_test_code_generator" : "TestGenerator"
                                                    })
-        supervisor_workflow.add_edge("RAG","Supervisor")
+        supervisor_workflow.add_edge("RAG", "Supervisor")
         supervisor_workflow.add_edge("Reviewer", "Supervisor")
-        supervisor_workflow.add_edge("Architect","Supervisor")
-        supervisor_workflow.add_edge("Planner","Supervisor")
-        supervisor_workflow.add_edge("Coder","Supervisor")
-        supervisor_workflow.add_edge("TestGenerator","Supervisor")
-        supervisor_workflow.add_edge("Human","Supervisor")
+        supervisor_workflow.add_edge("Architect", "Supervisor")
+        supervisor_workflow.add_edge("Planner", "Supervisor")
+        supervisor_workflow.add_edge("Coder", "Supervisor")
+        supervisor_workflow.add_edge("TestGenerator", "Supervisor")
+        supervisor_workflow.add_edge("Human", "Supervisor")
         supervisor_workflow.add_edge("update_state", END)
-        
+       
         return supervisor_workflow
-    
+   
     def get_current_state(self):
-        """ Returns the current state dictionary of the agent """
+        """Returns the current state dictionary of the agent"""
         return self.agent.state
