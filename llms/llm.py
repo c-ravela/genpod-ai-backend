@@ -29,8 +29,8 @@ class LLMMetrics:
    
     def __str__(self) -> str:
         return (
-            f'total_tokens: {self.total_tokens}, input_tokens: {self.input_tokens}, "
-            "output_tokens: {self.output_tokens}'
+            f"total_tokens: {self.total_tokens}, input_tokens: {self.input_tokens}, "
+            f"output_tokens: {self.output_tokens}"
         )
 
 
@@ -138,7 +138,7 @@ class LLM(ABC, Generic[TLLMInstance]):
                     self.__current_retry_backoff = self._retry_backoff
                     raise RuntimeError(f"LLM invocation failed after {self.__max_retries} attempts: {e}")
                 else:
-                    print(f"Invocation failed (attempt {attempt}/{self.__max_retries}). Retrying in {self.__current_retry_backoff} seconds...")
+                    # print(f"Invocation failed (attempt {attempt}/{self.__max_retries}). Retrying in {self.__current_retry_backoff} seconds...")
                     sleep(self.__current_retry_backoff)
                     self.__current_retry_backoff *= 2
 
