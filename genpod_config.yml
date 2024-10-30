@@ -9,6 +9,9 @@ default:
     model: 'gpt-4o-2024-08-06'
     config:
       temperature: 0.3
+      model_kwargs:
+        top_p: 0.4
+        top_k: 0.4
       max_retries: 4
       streaming: True
   max_retries: 3 # Maximum retries for internal handling, not specific to any provider
