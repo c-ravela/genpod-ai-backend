@@ -536,28 +536,20 @@ class RequirementsDocument(BaseModel):
         return f"""
 # Project Requirements Document
 
-## Project Overview
 {self.project_overview}
 
-## Project Architecture
 {self.project_architecture}
 
-## Directory Structure
 {self.directory_structure}
 
-## Microservices Architecture
 {self.microservices_architecture}
 
-## Tasks Overview
 {self.tasks_overview}
 
-## Coding Standards
 {self.coding_standards}
 
-## Implementation Process
 {self.implementation_process}
 
-## Project License Information
 {self.project_license_information}
         """
 
