@@ -254,18 +254,20 @@ class PlannerAgent(Agent[PlannerState, PlannerPrompts]):
         logger.info('Wrote down %d work packages into the project folder during the current session. Total files written during the current run %d', files_written, total_files_written)
 
         return state
-    
+
     def issues_preparation_node(self, state: PlannerState) -> PlannerState:
         """
         """
-        state['planned_tasks'] = PlannedIssuesQueue()
-        
-        while(True):
+        state['planned_issues'] = PlannedIssuesQueue()
+       
+        while True:
             try:
                 logger.info(f"{self.agent_name}: Preparing planned issues for issue with id: {state['current_issue'].issue_id}.")
                 logger.info(f"Issue: {state['current_issue']}")
 
-                llm_output = self.llm.invoke_with_pydantic_model(self.prompts.issues_segregation_prompt, {
+                llm_output = self.llm.invoke_with_pydantic_model(
+                    self.prompts.issues_segregation_prompt,
+                    {
                         "issue_details": state['current_issue'].issue_details(),
                         "file_content": FS.read_file(state['current_issue'].file_path)
                     },
@@ -286,14 +288,14 @@ class PlannerAgent(Agent[PlannerState, PlannerPrompts]):
                 )
 
                 state['planned_issues'].add_item(planned_issue)
-                
+
                 self.error_count = 0
                 self.error_messages = []
 
-                break # while loop exit 
+                break  # while loop exit
             except Exception as e:
                 self.error_count += 1
-                
+
                 logger.error(e)
                 self.error_messages.append(e)
 
@@ -303,7 +305,7 @@ class PlannerAgent(Agent[PlannerState, PlannerPrompts]):
                     return state
             except FileNotFoundError as ffe:
                 logger.error(f"{self.agent_name}: Error Occured at resolve issue: ===>{type(ffe)}<=== {ffe}.----")
-                
+              
         state['current_issue'].issue_status = Status.INPROGRESS
 
         return state
