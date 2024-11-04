@@ -117,20 +117,64 @@ class ArchitectPrompts:
 
     architecture_prompt: PromptTemplate = PromptTemplate(
         template="""
-        Based on the project overview, describe the high-level architecture for this 
-        microservice-based project. Include:
-        Project Overview: "{project_overview}"
-        Additional information: "{additional_information}"
+        Based on the project overview provided, describe a high-level architecture for
+        this microservice-based project, focusing on the following key aspects:
 
-        1. A diagram or detailed description of the microservice architecture
-        2. Key components, data models and their interactions
-        3. Data flow between services
-        4. External integrations or APIs
-        5. Scalability and reliability considerations
+        - **Project Overview:** "{project_overview}"
+        - **Additional Information:** "{additional_information}"
 
-        Format your response in markdown, starting with a "## Architecture" heading.
+        ### Requirements:
 
-        output format instructions:
+        1. **High-Level Diagram with Description**:
+        - Provide a text-based diagram representing the high-level architecture of the
+          microservice.
+        - The diagram should illustrate the flow from client requests through various
+          layers, including the API gateway, business logic, data access layer, and
+          database.
+        - Clearly label each component to show how requests are processed and data is
+          managed within the system.
+        - Follow the diagram with a concise description of each component's role and
+          interactions within the architecture.
+
+        2. **Key Components, Data Models, and Interactions**:
+        - List and describe the key components in the architecture and their 
+          responsibilities.
+        - Define the primary data models, including any critical fields and 
+          relationships between models.
+        - Explain how data flows between components, and specify the protocols or 
+          methods used for inter-service communication.
+
+        3. **Data Flow Between Services**:
+        - Provide a clear explanation of how data flows between services, from the
+          initiation of a request to the final response.
+        - Highlight any asynchronous or synchronous communication, including 
+          considerations for message queues, pub/sub patterns, or HTTP/REST calls.
+
+        4. **External Integrations or APIs**:
+        - Identify any external systems or APIs integrated within this architecture, 
+          along with the purpose and function of each integration.
+        - Specify how these integrations impact the data flow and any special handling
+          required to ensure security and reliability.
+   
+        5. **Scalability and Reliability Considerations**:
+        - Outline strategies for horizontal or vertical scaling, load balancing, and redundancy.
+        - Describe reliability mechanisms, such as retries, failover systems, and data
+          replication, to ensure high availability.
+        - Mention trade-offs based on the CAP theorem where relevant.
+
+        6. **CAP Theorem Application**:
+        - Discuss how the principles of the CAP theorem (Consistency, Availability, and
+          Partition Tolerance) apply to this architecture.
+        - Indicate any prioritization or trade-offs made to achieve specific project
+          goals, with examples.
+
+        ### Response Format:
+
+        - Format your response in markdown, beginning with a "## Architecture" heading.
+        - Each requirement should be addressed under clearly labeled subheadings.
+        - Use bullet points or numbered lists to present detailed descriptions and avoid lengthy paragraphs.
+
+        ### Output Format Instructions:
         {format_instructions}
         """,
         input_variables=['project_overview', 'additional_information'],
