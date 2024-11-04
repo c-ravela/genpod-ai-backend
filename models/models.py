@@ -20,7 +20,7 @@ TQueue = TypeVar('TQueue', bound='Queue')
 
 class Queue(BaseModel, Generic[QueueType]):
     """
-    A base class to manage a queue of items with an index to keep track of the next 
+    A base class to manage a queue of items with an index to keep track of the next
     item to process.
     """
 
@@ -37,7 +37,7 @@ class Queue(BaseModel, Generic[QueueType]):
     def add_item(self, item: QueueType) -> None:
         """
         Adds a new item to the end of the queue.
-       
+
         Args:
             item (QueueType): The item to be added.
         """
@@ -46,7 +46,7 @@ class Queue(BaseModel, Generic[QueueType]):
     def extend(self: TQueue, queue: TQueue) -> None:
         """
         Extends the current queue with the items from another queue of the same type.
-       
+
         Args:
             other (TQueue): Another instance of the same Queue subclass.
         """
@@ -55,7 +55,7 @@ class Queue(BaseModel, Generic[QueueType]):
     def get_next_item(self) -> Optional[QueueType]:
         """
         Retrieves and advances to the next item in the queue.
-       
+
         Returns:
             Optional[QueueType]: The next item in the queue, or None if no items are
             left.
@@ -64,13 +64,13 @@ class Queue(BaseModel, Generic[QueueType]):
             item = self.items[self.next]
             self.next += 1
             return item
-       
+
         return None
 
     def get_all_items(self) -> List[QueueType]:
         """
         Returns a list of all items in the queue.
-       
+
         Returns:
             List[QueueType]: A list containing all items in the queue.
         """
@@ -79,30 +79,30 @@ class Queue(BaseModel, Generic[QueueType]):
     def update_item(self, updated_item: QueueType) -> None:
         """
         Updates an existing item in the queue with the new values from the updated_item.
-       
+
         This method must be implemented by subclasses.
-      
+
         Args:
             updated_item (QueueType): The updated item with new values.
-      
+
         Raises:
             NotImplementedError: If this method is not overridden in a subclass.
         """
         raise NotImplementedError("Subclasses must implement this method.")
-  
+
     def has_pending_items(self) -> bool:
         """
         Checks if there are any pending items that have not yet been processed.
-     
+
         Returns:
             bool: True if there are unprocessed items, False otherwise.
         """
         return self.next < len(self.items)
-  
+
     def __str__(self) -> str:
         """
         Returns a string representation of the Queue.
-       
+
         Returns:
             str: A string representing the current items and the index of the next item.
         """
@@ -111,7 +111,7 @@ class Queue(BaseModel, Generic[QueueType]):
     def __iter__(self) -> Iterator[QueueType]:
         """
         Returns an iterator over the items in the queue.
-       
+
         Returns:
             Iterator[QueueType]: An iterator for the items in the queue.
         """
@@ -120,13 +120,13 @@ class Queue(BaseModel, Generic[QueueType]):
     def __len__(self) -> int:
         """
         Returns the number of items in the queue.
-      
+
         Returns:
             int: The number of items in the queue.
         """
         return len(self.items)
 
-  
+
 class Task(BaseModel):
     """
     A data model representing a task and its current state within a project
@@ -167,14 +167,14 @@ class Task(BaseModel):
 
 class TaskQueue(Queue[Task]):
     """A queue specifically for Task objects."""
-   
+
     def update_item(self, updated_task: Task) -> None:
         """
         Updates an existing task in the queue with the new values from the updated_task.
 
         Args:
             updated_task (Task): The updated Task object with new values.
-       
+
         Raises:
             ValueError: If the task to be updated is not found in the queue.
         """
@@ -301,8 +301,8 @@ class Issue(BaseModel):
         default=None,
         description="Suggestions for resolving the issue.",
         title="Suggestions",
-        examples=[ 
-            "Define the variable 'x' before use", 
+        examples=[
+            "Define the variable 'x' before use",
             "Check variable scope and initialization"
         ]
     )
@@ -311,20 +311,20 @@ class Issue(BaseModel):
         """Return a formatted string representing the actual issue details."""
         details = f"Issue: {self.description}\n"
         details += f"File: {self.file_path}\n"
-      
+
         if self.line_number:
             details += f"Line: {self.line_number}\n"
-     
+
         if self.suggestions:
             suggestions_str = "\n".join(self.suggestions)
             details += f"Suggestions:\n{suggestions_str}\n"
-   
+
         return details
 
 
 class IssuesQueue(Queue[Issue]):
     """
-    A specialized queue for managing issues, allowing updates to existing 
+    A specialized queue for managing issues, allowing updates to existing
     issues within the queue.
     """
 
@@ -333,11 +333,11 @@ class IssuesQueue(Queue[Issue]):
         Update an existing issue in the queue with the provided updated issue.
 
         Args:
-            updated_issue (Issue): The updated issue to replace the existing 
+            updated_issue (Issue): The updated issue to replace the existing
             issue in the queue.
 
         Raises:
-            ValueError: If the issue with the specified ID is not found in the 
+            ValueError: If the issue with the specified ID is not found in the
             queue.
         """
         for i, issue in enumerate(self.items):
@@ -406,7 +406,7 @@ class PlannedIssue(BaseModel):
         description="Suggestions for resolving the issue.",
         title="Suggestions",
         examples=[
-            "Define the variable 'x' before use", 
+            "Define the variable 'x' before use",
             "Check variable scope and initialization"
         ]
     )
@@ -414,13 +414,13 @@ class PlannedIssue(BaseModel):
     function_signatures: FileFunctionSignatures = Field(
         description="The skeleton or template of the function that needs to be "
                     "implemented.",
-        default="",
+        default=FileFunctionSignatures(function_signatures={}),
         examples=["def function_name(args): pass"]
     )
 
     test_code: dict[str, str] = Field(
         description="The generated unit test code for the function.",
-        default="",
+        default={},
         examples=["def test_function_name(): assert function_name() == expected_output"]
     )
 
@@ -441,7 +441,7 @@ class PlannedIssue(BaseModel):
 
 class PlannedIssuesQueue(Queue[PlannedIssue]):
     """
-    A specialized queue for managing issues, allowing updates to existing issues 
+    A specialized queue for managing issues, allowing updates to existing issues
     within the queue.
     """
 
