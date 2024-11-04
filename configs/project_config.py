@@ -149,8 +149,11 @@ class DefaultConfig(BaseModel):
     
     llm_config: LLMConfig
     max_retries: int = Field(ge=1, required=True)
-    retry_backoff: int  = Field(ge=0, required=True)
+    retry_backoff: int = Field(ge=0, required=True)
     max_graph_recursion_limit: Optional[int] = Field(ge=1, required=True)
+    user_input_path: str = Field(required=True)
+    project_output_path: str = Field(required=True)
+
 
 class GenpodConfig(BaseModel):
     """Configuration for the Genpod project."""
@@ -506,6 +509,8 @@ class ProjectConfig:
     vector_db_collections: Dict[str, str] =  {
             'MISMO-version-3.6-docs': os.path.join(os.getcwd(), "vector_collections")
     }
+    user_input_path: str
+    project_output_path: str
     vector_collections_name: str
     max_graph_recursion_limit: int
     __config_path: str
@@ -545,6 +550,8 @@ class ProjectConfig:
         """
 
         self.vector_collections_name = self.__genpod_config.vector_collections_name
+        self.user_input_path = self.__genpod_config.default.user_input_path
+        self.project_output_path = self.__genpod_config.default.project_output_path
         self.__set__max_graph_recursion_limit()
         self.__update__agents()
         
