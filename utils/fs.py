@@ -1,6 +1,10 @@
 import os
 from datetime import datetime
 
+from typing import List, Dict
+import json
+from enum import Enum
+from pydantic import BaseModel
 
 def create_directory_with_timestamp(parent_directory: str) -> str:
     """
@@ -25,3 +29,17 @@ def create_directory_with_timestamp(parent_directory: str) -> str:
         os.makedirs(new_directory_path)
 
     return new_directory_path
+
+def read_file(path: str) -> str:
+    """
+    Reads the entire content of a text file at the specified path and returns it as a string.
+
+    Parameters:
+    path (str): The path to the text file to be read.
+
+    Returns:
+    str: The content of the file as a single string.
+    """
+
+    with open(path, 'r') as file:
+        return file.read()
