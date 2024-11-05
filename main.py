@@ -13,6 +13,7 @@ from database.database import Database
 from genpod.team import TeamMembers
 from utils.logs.logging_utils import logger
 from utils.time import get_timestamp
+from utils.fs import read_file
 
 print(
     "\n\nWe greatly appreciate your interest! Please note that we are in the "
@@ -55,14 +56,8 @@ if __name__ == "__main__":
     # Tables are created only if they doesn't exist
     db.setup_db()
 
-    PROJECT_INPUT = """
-    Project Overview:
-    I want to develop a Title Requests Micro-service adhering to MISMO v3.6 standards
-    to handle get_title service using GET REST API Call in .NET
-    Utilize a MongoDB database (using the provided connection details:
-    \"mongodb://localhost:27017/titlerequest\").
-    Host the application at "https://crbe.com".
-    """
+    PROJECT_INPUT = read_file(config.user_input_path)
+    logger.info("Project Input: %s", PROJECT_INPUT)
 
     LICENSE_URL = (
         "https://raw.githubusercontent.com/intelops/tarian-detector/"
@@ -73,8 +68,8 @@ if __name__ == "__main__":
         "Organization created CRBE"
     )
 
-    PROJECT_PATH = set_project_path(timestamp=TIME_STAMP)
-    logger.info("Project is being saved at location: %s", PROJECT_PATH)
+    PROJECT_PATH = set_project_path(config.project_output_directory, TIME_STAMP)
+    logger.debug("Project is being saved at location: %s", PROJECT_PATH)
 
     # Database insertion - START
     # insert the record for the project being generated in database
