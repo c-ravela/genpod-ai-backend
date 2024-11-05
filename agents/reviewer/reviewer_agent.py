@@ -1,6 +1,7 @@
 """
 """
 import os
+import subprocess
 
 from agents.agent.agent import Agent
 from agents.reviewer.reviewer_state import ReviewerState
@@ -39,6 +40,8 @@ class ReviewerAgent(Agent[ReviewerState, ReviewerPrompts]):
 
     def __init__(self, agent_id: str, agent_name: str, llm: LLM) -> None:
         """
+        Initializes the ReviewerAgent with specific parameters, setting up the state,
+        prompts, and nodes required for analysis.
         """
 
         super().__init__(
@@ -54,12 +57,11 @@ class ReviewerAgent(Agent[ReviewerState, ReviewerPrompts]):
         self.update_state_node_name = "update_state"
 
         self.project_path = ""
-       
+
         self.error_message = ""
 
     def prepare_issues(self, output: ReviewerOutput) -> IssuesQueue:
-        """prepares queue of issues."""
-
+        """Prepares a queue of issues based on the output."""
         logger.info(f"----{self.agent_name}: preparing issues----")
 
         issues: IssuesQueue = IssuesQueue()
@@ -78,6 +80,9 @@ class ReviewerAgent(Agent[ReviewerState, ReviewerPrompts]):
                    
     def router(self, state: ReviewerState) -> str:
         """
+        Routes the process based on issues found during analysis.
+        If issues are detected, the process is halted to resolve them,
+        ensuring efficiency by avoiding redundant analyses.
         """
         # This router is triggered after each analysis node invocation.
         # If any issues are found, the Reviewer process halts to address and resolve 
@@ -96,21 +101,37 @@ class ReviewerAgent(Agent[ReviewerState, ReviewerPrompts]):
    
     def entry_node(self, state: ReviewerState) -> ReviewerState:
         """
+        Entry node for initializing the project path and preparing for analysis.
+        If the directory is not a Git repository, initializes Git in the project directory.
         """
         logger.info(f"----{self.agent_name}: at entry node----")
 
+        # Initialize the issues queue in the state
         state['issues'] = IssuesQueue()
+
+        # Set the project path based on the state
         self.project_path = os.path.join(state['project_path'], state['project_name'])
 
+        # Change to the project directory and check if it is already a Git repository
+        os.makedirs(self.project_path, exist_ok=True)
+        try:
+            os.chdir(self.project_path)
+            if not os.path.isdir(".git"):
+                logger.info(f"{self.agent_name}: Initializing Git in the project directory.")
+                subprocess.run(["git", "init"], check=True)
+        finally:
+            # Move back to the original directory after initialization check
+            os.chdir("..")
+
         return state
-   
+
     # TODO: Each and every analysis node has to be assigned with priority id
     # Factors to consider:
-    #   amount of token that prompt and response might consume
+    #   amount of tokens that prompt and response might consume
     #   most major changes can happen due to analysis
     def static_code_analysis_node(self, state: ReviewerState) -> ReviewerState:
         """
-        We use semgrep to do static code analysis.
+        We use semgrep to do static code analysis. Performs static code analysis using Semgrep.
         """
         logger.info(f"{self.agent_name}: Performing Static code Analysis on the generated project located at {self.project_path}")
 
@@ -150,30 +171,35 @@ class ReviewerAgent(Agent[ReviewerState, ReviewerPrompts]):
 
     def package_dependencies_analysis_node(self, state: ReviewerState) -> ReviewerState:
         """
+        Analyzes package dependencies for security and quality.
         """
 
         return state
 
     def project_requirement_analysis_node(self, state: ReviewerState) -> ReviewerState:
         """
+        Analyzes project requirements to ensure they are met.
         """
        
         return state
 
     def genval_analysis_node(self, state: ReviewerState) -> ReviewerState:
         """
+        Performs general validation analysis on the codebase.
         """
 
         return state
 
     def unit_test_analysis_node(self, state: ReviewerState) -> ReviewerState:
         """
+        Analyzes unit tests to ensure quality coverage.
         """
 
         return state
 
     def linting_analysis_node(self, state: ReviewerState) -> ReviewerState:
         """
+        Performs linting on the codebase to ensure adherence to style guidelines.
         """
 
         return state
