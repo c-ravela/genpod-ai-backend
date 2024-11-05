@@ -11,12 +11,13 @@ default:
       temperature: 0.3
       model_kwargs:
         top_p: 0.4
-        top_k: 0.4
       max_retries: 4
       streaming: True
   max_retries: 3 # Maximum retries for internal handling, not specific to any provider
   retry_backoff: 3 # Time (in seconds) to wait before retrying a request
   max_graph_recursion_limit: 1000
+  user_input_path: /path/to/user_input/textfile.txt
+  project_output_directory: /directory/path/to/project/output
 
 # Configuration for supported LLM providers and their respective models
 providers:
@@ -71,24 +72,21 @@ agents:
   supervisor: 
     description: 'Oversees and coordinates the task execution of other agents, ensuring efficiency and alignment with goals.'
   architect:
+    llm_config:
+      provider: 'openai'
+      model: 'gpt-4o-2024-08-06'
+      config:
+        temperature: 0.5
+        max_retries: 4
+        streaming: True
     description: 'Designs the high-level system and architecture, responsible for creating requirements for project.'
   coder:
-    # llm_config:
-    #   provider: 'anthropic'
-    #   model: 'claude-3-5-sonnet-20240620'
-    #   config:
-    #     stream_usage: True
     description: 'Writes and optimizes code based on the architecture, focusing on implementing functionality with clean coding practices.'
   rag:
     description: 'Responsible for retrieval-augmented generation tasks, combining data retrieval with language generation for enhanced accuracy.'
   planner:
     description: 'Manages project planning, timelines, and task prioritization, ensuring smooth progress and resource allocation.'
   tests_generator:
-    # llm_config:
-    #   provider: 'anthropic'
-    #   model: 'claude-3-5-sonnet-20240620'
-    #   config:
-    #     stream_usage: True
     description: 'Generates and validates test cases to ensure that code meets the required standards and passes all quality checks.'
   human:
     description: 'Represents human interactions and decisions in the loop, handling tasks that require human oversight or creative judgment.'
@@ -96,4 +94,4 @@ agents:
     description: 'Performs code reviews, suggests improvements, and ensures that all outputs meet quality and performance standards.'
 
 vector_collections_name: "MISMO-version-3.6-docs"
-max_graph_recursion_limit: 750
+max_graph_recursion_limit: 1500
