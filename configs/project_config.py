@@ -1,15 +1,174 @@
-"""
-Constants used by the project.
-"""
 import os
 from dataclasses import dataclass
-from enum import Enum, EnumType
-from typing import Any, Dict, Union
+from enum import Enum
+from typing import Any, Dict, Optional, Tuple, Union
 
-from dotenv import load_dotenv
-from langchain_openai import ChatOpenAI
+from pydantic import BaseModel, Field, field_validator
 
-load_dotenv()
+from llms.factory import llm_factory
+from llms.llm import LLM
+from utils.yaml_utils import read_yaml
+
+# Supported LLMs categorized by provider
+SUPPORTED_LLMS = {
+    'openai': [
+        'chatgpt-4o-latest',
+        'gpt-4o-2024-08-06',
+        'gpt-4o-2024-05-13',
+        'o1-preview-2024-09-12',
+        'o1-mini-2024-09-12',
+        'gpt-3.5-turbo'
+    ],
+    'ollama': [
+        'llama3'
+    ],
+    'anthropic': [
+        'claude-3-5-sonnet-20240620',
+        'claude-instant-1.2'
+    ]
+}
+
+def check_provider(provider: str) -> None:
+    """
+    Checks if the specified provider is supported.
+
+    Args:
+        provider (str): The name of the provider to check.
+
+    Raises:
+        ValueError: If the provider is not supported.
+    """
+    if provider not in SUPPORTED_LLMS:
+        raise ValueError(f"Unsupported provider: {provider}. Supported providers are: {list(SUPPORTED_LLMS.keys())}")
+
+def check_model(provider: str, model: str) -> None:
+    """
+    Checks if the specified model is supported for the given provider.
+
+    Args:
+        provider (str): The name of the provider.
+        model (str): The name of the model.
+
+    Raises:
+        ValueError: If the model is not supported for the provider.
+    """
+    if model not in SUPPORTED_LLMS.get(provider, []):
+        raise ValueError(f"Unsupported model: {model} for provider {provider}. Supported models for {provider} are: {SUPPORTED_LLMS[provider]}")
+    
+class LLMConfig(BaseModel):
+    """Configuration for a specific LLM."""
+    provider: str
+    model: str
+    config: Dict[str, Any] = Field(default_factory=dict)
+
+    @field_validator('provider')
+    def validate_provider(cls, value):
+        """
+        Validates the provider field to ensure it is supported.
+
+        Args:
+            cls: The class reference.
+            value (str): The provider to validate.
+
+        Returns:
+            str: The validated provider.
+
+        Raises:
+            ValueError: If the provider is not supported.
+        """
+        check_provider(value)
+        return value
+
+    @field_validator('model')
+    def validate_model(cls, value, values):
+        """
+        Validates the model field based on the selected provider.
+
+        Args:
+            cls: The class reference.
+            value (str): The model to validate.
+            values (Dict[str, Any]): The other fields in the model to access provider.
+
+        Returns:
+            str: The validated model.
+
+        Raises:
+            ValueError: If the model is not supported for the provider.
+        """
+        provider = values.data.get('provider')
+        check_model(provider, value)
+        return value
+
+class ProviderModelConfig(BaseModel):
+    """Configuration for a specific provider's model."""
+    
+    name: str
+    description: str
+    api_key: str = Field(required=False, default=None)
+
+class ProviderSetting(BaseModel):
+    """Settings for a provider."""
+    
+    api_key: str = Field(required=False, default=None)
+    max_retries: int = Field(ge=1, required=False, default=None)
+    retry_backoff: int  = Field(ge=0, required=False, default=None)
+
+class ProviderConfig(BaseModel):
+    """Configuration for a specific provider."""
+
+    name: str
+    setting: ProviderSetting = Field(default=None)
+    models: dict[str, ProviderModelConfig] = Field(default=None)
+
+    @field_validator("name")
+    def validate_name(cls, value):
+        """
+        Validates the provider name.
+
+        Args:
+            cls: The class reference.
+            value (str): The provider name to validate.
+
+        Returns:
+            str: The validated provider name.
+
+        Raises:
+            ValueError: If the provider name is not supported.
+        """
+        check_provider(value)
+        return value
+
+
+class AgentConfig(BaseModel):
+    """Configuration for an agent."""
+
+    description: str
+    llm_config: LLMConfig = Field(required=False, default=None)
+
+
+class DefaultConfig(BaseModel):
+    """Default configuration settings for the project."""
+    
+    llm_config: LLMConfig
+    max_retries: int = Field(ge=1, required=True)
+    retry_backoff: int = Field(ge=0, required=True)
+    max_graph_recursion_limit: Optional[int] = Field(ge=1, required=True)
+    user_input_path: str = Field(required=True)
+    project_output_directory: str = Field(required=True)
+
+
+class GenpodConfig(BaseModel):
+    """Configuration for the Genpod project."""
+    
+    default: DefaultConfig
+    providers: Dict[str, ProviderConfig]
+    agents: Dict[str, AgentConfig]
+    vector_collections_name: str
+    max_graph_recursion_limit: Optional[int] = Field(
+        ge=1, 
+        required=False, 
+        default=None
+    )
 
 @dataclass
 class GraphInfo:
@@ -26,95 +185,31 @@ class GraphInfo:
 @dataclass
 class AgentInfo:
     """
-   Class that holds information about an agent.
+    Class that holds information about an agent.
 
     Attributes:
         agent_name (str): The name of the agent.
         agent_id (str): The unique identifier of the agent.
         alias (Optional[str]): An optional alias for the agent.
         description (Optional[str]): An optional description of the agent.
+        thread_id (Union[int, None]): The ID of the thread associated with the agent, if any.
+        llm (LLM): The LLM instance associated with the agent.
     """
-
     agent_name: str
     agent_id: str
     alias: str = ""
     description: str = ""
-
-class LLMConfig:
-    """
-    Configuration for a Language Model (LLM).
-
-    This class encapsulates the settings required to initialize an LLM instance.
-
-    Attributes:
-        model (str): The model name or identifier.
-        temperature (float): The temperature setting for the model's responses.
-        max_retries (int): The maximum number of retries for the model.
-        streaming (bool): Whether streaming is enabled for the model.
-        model_kwargs (Dict[str, Any]): Additional keyword arguments for the model.
-    """
-
-    def __init__(self, model: str, temperature: float, max_retries: int, streaming: bool, model_kwargs: Dict[str, Any]):
+    thread_id: Union[int, None] = None
+    llm: LLM = None
+  
+    def set_llm(self, l: LLM) -> None:
         """
-        Initializes the LLM configuration with the given parameters.
+        Sets the thread ID for this agent.
 
         Args:
-            model (str): The model name or identifier.
-            temperature (float): The temperature setting for the model's responses.
-            max_retries (int): The maximum number of retries for the model.
-            streaming (bool): Whether streaming is enabled for the model.
-            model_kwargs (Dict[str, Any]): Additional keyword arguments for the model.
+            thread_id (int): The thread ID to be set.
         """
-        self.model = model
-        self.temperature = temperature
-        self.max_retries = max_retries
-        self.streaming = streaming
-        self.model_kwargs = model_kwargs
-
-    def create_llm(self) -> ChatOpenAI:
-        """
-        Creates and returns an instance of the configured LLM.
-
-        Returns:
-            ChatOpenAI: An instance of ChatOpenAI.
-
-        Raises:
-            ValueError: If the model configuration is not supported or is not for ChatOpenAI.
-        """
-        if self.model.startswith("gpt"):
-            return ChatOpenAI(
-                model=self.model,
-                temperature=self.temperature,
-                max_retries=self.max_retries,
-                streaming=self.streaming,
-                model_kwargs=self.model_kwargs
-            )
-        else:
-            raise ValueError(f"Unsupported model configuration: {self.model}. Only ChatOpenAI is currently supported.")
-        
-class AgentConfig(AgentInfo):
-    """
-    Configuration for an agent, including its LLM settings and an optional thread ID.
-
-    Attributes:
-        agent_name (str): The name of the agent.
-        agent_id (str): The unique identifier of the agent.
-        llm (ChatOpenAI): The LLM instance associated with the agent.
-        thread_id (Union[int, None]): Optional thread ID for the agent.
-    """
-
-    def __init__(self, agent_name: str, agent_id: str, llm_config: LLMConfig) -> None:
-        """
-        Initializes the agent configuration with the given parameters.
-
-        Args:
-            agent_name (str): The name of the agent.
-            agent_id (str): The unique identifier of the agent.
-            llm_config (LLMConfig): The LLM configuration for this agent.
-        """
-        super().__init__(agent_name, agent_id)
-        self.llm: ChatOpenAI = llm_config.create_llm()
-        self.thread_id: Union[int, None] = None
+        self.llm = l
 
     def set_thread_id(self, thread_id: int) -> None:
         """
@@ -124,6 +219,23 @@ class AgentConfig(AgentInfo):
             thread_id (int): The thread ID to be set.
         """
         self.thread_id = thread_id
+    
+    def __str__(self) -> str:
+        """
+        Returns a string representation of the AgentInfo instance.
+        
+        Returns:
+            str: A formatted string describing the agent's information.
+        """
+        # Build a string representation of the agent's core information.
+        return (
+            f"Agent Name: {self.agent_name}\n"
+            f"Agent ID: {self.agent_id}\n"
+            f"Alias: {self.alias}\n"
+            f"Description: {self.description}\n"
+            f"Thread ID: {self.thread_id}\n"
+            f"LLM Associated: {self.llm}"
+        )
 
 class ProjectGraphs(Enum):
     """
@@ -139,14 +251,15 @@ class ProjectGraphs(Enum):
         modernizer (GraphInfo): Information about the Knowledge Graph Generator Graph.
         reviewer (GraphInfo): Information about the Code Reviewer Graph.
     """
-    supervisor = GraphInfo("Project Supervisor Graph", "GRPH_01_SUP")
-    architect = GraphInfo("Solution Architect Graph", "GRPH_02_ARC")
-    coder = GraphInfo("Software Engineer Graph", "GRPH_03_ENG")
-    rag = GraphInfo("Document Repository Manager Graph", "GRPH_04_RAG")
-    planner = GraphInfo("Project Planner Graph", "GRPH_05_PLN")
-    tests_generator = GraphInfo("Unit Tester Graph", "GRPH_06_TST")
-    modernizer = GraphInfo("Knowledge Graph Generator Graph", "GRPH_07_MOD")
-    reviewer = GraphInfo("Code Reviewer Graph", "GRPH_08_REV")
+
+    supervisor: GraphInfo = GraphInfo("Project Supervisor Graph", "GRPH_01_SUP")
+    architect: GraphInfo = GraphInfo("Solution Architect Graph", "GRPH_02_ARC")
+    coder: GraphInfo = GraphInfo("Software Engineer Graph", "GRPH_03_ENG")
+    rag: GraphInfo = GraphInfo("Document Repository Manager Graph", "GRPH_04_RAG")
+    planner: GraphInfo = GraphInfo("Project Planner Graph", "GRPH_05_PLN")
+    tests_generator: GraphInfo = GraphInfo("Unit Tester Graph", "GRPH_06_TST")
+    modernizer: GraphInfo = GraphInfo("Knowledge Graph Generator Graph", "GRPH_07_MOD")
+    reviewer: GraphInfo = GraphInfo("Code Reviewer Graph", "GRPH_08_REV")
 
     @property
     def graph_name(self) -> str:
@@ -184,66 +297,66 @@ class ProjectAgents(Enum):
         reviwer (AgentInfo): Information about the code reviewing agent
     """
 
-    supervisor = AgentInfo(
-        "Project Supervisor", 
-        "SUP_01",
+    supervisor: AgentInfo = AgentInfo(
+        agent_name="Project Supervisor", 
+        agent_id="SUP_01",
         alias="supervisor",
         description="Coordinates with the team, assigns tasks, and guides the team toward successful project completion."
     )
 
-    architect = AgentInfo(
-        "Solution Architect", 
-        "ARC_02",
+    architect: AgentInfo = AgentInfo(
+        agent_name="Solution Architect", 
+        agent_id="ARC_02",
         alias="architect",
         description="Defines the project requirements and outlines the architectural framework."
     )
 
-    coder = AgentInfo(
-        "Software Engineer", 
-        "ENG_03",
+    coder: AgentInfo = AgentInfo(
+        agent_name="Software Engineer", 
+        agent_id="ENG_03",
         alias="coder",
         description="Develops and writes code to the tasks assigned."
     )
 
-    rag = AgentInfo(
-        "Document Repository Manager", 
-        "RAG_04",
+    rag: AgentInfo = AgentInfo(
+        agent_name="Document Repository Manager", 
+        agent_id="RAG_04",
         alias="rag",
         description="Oversees the vector database, manages document and file storage, and provides relevant information in response to queries."
     )
 
-    planner = AgentInfo(
-        "Project Planner", 
-        "PLN_05",
+    planner: AgentInfo = AgentInfo(
+        agent_name="Project Planner", 
+        agent_id="PLN_05",
         alias="planner",
         description="Creates detailed plans for task execution, based on requirements provided."
     )
 
-    tests_generator = AgentInfo(
-        "Unit Tester", 
-        "TST_06",
+    tests_generator: AgentInfo = AgentInfo(
+        agent_name="Unit Tester", 
+        agent_id="TST_06",
         alias="tests_generator",
         description="Develops and executes unit test cases to ensure code quality and functionality."
     )
 
-    modernizer = AgentInfo(
-        "Knowledge Graph Generator", 
-        "MOD_07",
+    modernizer: AgentInfo = AgentInfo(
+        agent_name="Knowledge Graph Generator", 
+        agent_id="MOD_07",
         alias="modernizer",
         description="Generates and maintains the knowledge graph for the project, facilitating data relationships and insights."
     )
 
     human = AgentInfo(
-        "Human Intervention Specialist", 
-        "HUM_08",
+        agent_name="Human Intervention Specialist", 
+        agent_id="HUM_08",
         alias="human",
         description="Provides assistance and oversight when automated systems encounter issues or produce unreliable results."
     )
 
-    reviewer = AgentInfo(
-        "Code Reviewer",
-        "REV_09",
-        alias="reviwer",
+    reviewer: AgentInfo = AgentInfo(
+        agent_name="Code Reviewer",
+        agent_id="REV_09",
+        alias="reviewer",
         description="Responsible for evaluating code quality and ensuring adherence to coding standards. This includes reviewing code for clean code principles, naming conventions, and compliance with both internal and external standards."
     )
 
@@ -287,107 +400,102 @@ class ProjectAgents(Enum):
         """
         return self.value.description
     
-AGENTS_CONFIG: Dict[str, AgentConfig] = {
-    ProjectAgents.supervisor.agent_id: AgentConfig(
-        ProjectAgents.supervisor.agent_name,
-        ProjectAgents.supervisor.agent_id,
-        LLMConfig(
-            model="gpt-4o-2024-05-13",
-            temperature=0,
-            max_retries=5,
-            streaming=False,
-            model_kwargs={"seed": 4000, "top_p": 0.8}
-        )
-    ),
-    ProjectAgents.architect.agent_id: AgentConfig(
-        ProjectAgents.architect.agent_name,
-        ProjectAgents.architect.agent_id,
-        LLMConfig(
-            model="gpt-4o-2024-05-13",
-            temperature=0.3,
-            max_retries=5,
-            streaming=True,
-            model_kwargs={"seed": 4000, "top_p": 0.4}
-        )
-    ),
-    ProjectAgents.coder.agent_id: AgentConfig(
-        ProjectAgents.coder.agent_name,
-        ProjectAgents.coder.agent_id,
-        LLMConfig(
-            model="gpt-4o-2024-05-13",
-            temperature=0.3,
-            max_retries=5,
-            streaming=True,
-            model_kwargs={"seed": 4000, "top_p": 0.4}
-        )
-    ),
-    ProjectAgents.rag.agent_id: AgentConfig(
-        ProjectAgents.rag.agent_name,
-        ProjectAgents.rag.agent_id,
-        LLMConfig(
-            model="gpt-4o-2024-05-13",
-            temperature=0,
-            max_retries=5,
-            streaming=True,
-            model_kwargs={"seed": 4000, "top_p": 0.3}
-        )
-    ),
-    ProjectAgents.planner.agent_id: AgentConfig(
-        ProjectAgents.planner.agent_name,
-        ProjectAgents.planner.agent_id,
-        LLMConfig(
-            model="gpt-4o-2024-05-13",
-            temperature=0.3,
-            max_retries=5,
-            streaming=True,
-            model_kwargs={"seed": 4000, "top_p": 0.6}
-        )
-    ),
-    ProjectAgents.tests_generator.agent_id: AgentConfig(
-        ProjectAgents.tests_generator.agent_name,
-        ProjectAgents.tests_generator.agent_id,
-        LLMConfig(
-            model="gpt-4o-2024-05-13",
-            temperature=0.3,
-            max_retries=5,
-            streaming=True,
-            model_kwargs={"seed": 4000, "top_p": 0.4}
-        )
-    ),
-    ProjectAgents.modernizer.agent_id: AgentConfig(
-        ProjectAgents.modernizer.agent_name,
-        ProjectAgents.modernizer.agent_id,
-        LLMConfig(
-            model="gpt-4o-2024-05-13",
-            temperature=0.3,
-            max_retries=5,
-            streaming=True,
-            model_kwargs={"seed": 4000, "top_p": 0.6}
-        )
-    ),
-    ProjectAgents.human.agent_id: AgentConfig(
-        ProjectAgents.human.agent_name,
-        ProjectAgents.human.agent_id,
-        LLMConfig(
-            model="gpt-4o-2024-05-13",
-            temperature=0.3,
-            max_retries=5,
-            streaming=True,
-            model_kwargs={"seed": 4000, "top_p": 0.6}
-        )
-    ),
-    ProjectAgents.reviewer.agent_id: AgentConfig(
-        ProjectAgents.reviewer.agent_name,
-        ProjectAgents.reviewer.agent_id,
-        LLMConfig(
-            model="gpt-4o-2024-05-13",
-            temperature=0.3,
-            max_retries=5,
-            streaming=True,
-            model_kwargs={"seed": 4000, "top_p": 0.2}
-        )
-    )
-}
+    @property
+    def thread_id(self) -> int:
+        """
+        Returns the thread_id associated with the agent.
+
+        Returns:
+            LLM: The thread_id instance associated with the agent.
+        """
+        return self.value.thread_id
+    
+    @property
+    def llm(self) -> LLM:
+        """
+        Returns the LLM associated with the agent.
+
+        Returns:
+            LLM: The LLM instance associated with the agent.
+        """
+        return self.value.llm
+    
+    @classmethod
+    def get_agent(cls, alias: str) -> AgentInfo:
+        """
+        Retrieve an agent's information by its alias.
+
+        Args:
+            alias (str): The alias of the agent.
+
+        Returns:
+            AgentInfo: The corresponding AgentInfo object.
+        """
+
+        return cls[alias]
+    
+    @classmethod
+    def get_agent_by_id(cls, agent_id: str) -> Optional[AgentInfo]:
+        """
+        Retrieve an agent's information by its ID.
+
+        Args:
+            agent_id (str): The unique identifier of the agent.
+
+        Returns:
+            Optional[AgentInfo]: The corresponding AgentInfo object, or None if not found.
+        """
+        for agent in cls:
+            if agent.value.agent_id == agent_id:
+                return agent.value
+        return None
+    
+    @classmethod
+    def has_agent(cls, alias: str) -> bool:
+        """
+        Check if the alias exists in the ProjectAgents enum.
+
+        Args:
+            alias (str): The alias of the agent.
+
+        Returns:
+            bool: True if the alias exists, False otherwise.
+        """
+        return any(agent.alias == alias for agent in cls)
+    
+    def set_llm(self, llm: LLM) -> None:
+        """
+        Set the LLM instance for the agent.
+
+        Args:
+            llm (LLM): The LLM instance to be associated with the agent.
+
+        Returns:
+            None
+        """
+        self.value.set_llm(llm)
+
+    def set_thread_id(self, thread_id: int) -> None:
+        """
+        Set the thread ID for the agent.
+
+        Args:
+            thread_id (int): The thread ID to be associated with the agent.
+
+        Returns:
+            None
+        """
+        self.value.set_thread_id(thread_id)
+    
+    def __iter__(self):
+        """
+        Custom iterator to return each enum member's agent info.
+
+        Yields:
+            AgentInfo: Yields each AgentInfo object from the enum.
+        """
+        for agent in ProjectAgents:
+            yield agent.value
 
 class ProjectConfig:
     """
@@ -395,104 +503,101 @@ class ProjectConfig:
 
     Attributes:
         agents (Enum): Enum containing all project agents.
-        agents_config (Dict[str, AgentConfig]): Dictionary mapping agent IDs to their configurations.
         vector_db_collections (Dict[str, str]): Dictionary mapping vector DB collection names to their paths.
     """
 
-    def __init__(self) -> None:
+    graphs: ProjectGraphs
+    agents: ProjectAgents
+    vector_db_collections: Dict[str, str] =  {
+            'MISMO-version-3.6-docs': os.path.join(os.getcwd(), "vector_collections")
+    }
+    user_input_path: str
+    project_output_directory: str
+    vector_collections_name: str
+    max_graph_recursion_limit: int
+    __config_path: str
+    __genpod_config: GenpodConfig
+
+    def __init__(self, config_path: str) -> None:
         """
         Initializes the project configuration with predefined agents, their configurations,
         and vector database collection paths.
         """
+
         self.graphs = ProjectGraphs
         self.agents = ProjectAgents
-        self.agents_config = AGENTS_CONFIG
-        self.collection_name = "MISMO-version-3.6-docs"
-        self.vector_db_collections = {
-            'MISMO-version-3.6-docs': os.path.join(os.getcwd(), "vector_collections")
-        }
-    
-    def __str__(self) -> str:
+        self.__config_path = config_path
+
+    def load_config(self) -> None:
         """
-        Returns a detailed string representation of the ProjectConfig instance.
+        Loads the configuration data from a YAML file and updates the project settings accordingly.
+        
+        This method reads the YAML configuration from the file path specified during initialization, 
+        parses the configuration into the internal `GenpodConfig` structure, and applies the configurations 
+        by calling the appropriate update methods.
+        """
+        try:
+            __yaml_data =  read_yaml(self.__config_path)
+        except FileNotFoundError:
+            raise FileNotFoundError(f"Configuration file not found at {self.__config_path}.")
+        except Exception as e:
+            raise ValueError(f"Error parsing YAML config: {e}")
+    
+        self.__genpod_config = GenpodConfig(**__yaml_data)
+        self.__update_config()
+
+    def __update_config(self) -> None:
+        """
+        Updates the project settings based on the loaded configuration data.
+        """
+
+        self.vector_collections_name = self.__genpod_config.vector_collections_name
+        self.user_input_path = self.__genpod_config.default.user_input_path
+        self.project_output_directory = self.__genpod_config.default.project_output_directory
+        self.__set__max_graph_recursion_limit()
+        self.__update__agents()
+        
+    def __set__max_graph_recursion_limit(self):
+        """
+        Sets the maximum recursion limit for graphs, using values from the configuration.
+        """
+
+        if self.__genpod_config.max_graph_recursion_limit:
+            self.max_graph_recursion_limit = self.__genpod_config.max_graph_recursion_limit
+        else:
+            self.max_graph_recursion_limit = self.__genpod_config.default.max_graph_recursion_limit
+    
+    def __update__agents(self) -> None:
+        """
+        Sets LLM instances for agents based on their configurations.
+        """
+
+        for agent, config in self.__genpod_config.agents.items():
+            if not self.agents.has_agent(agent):
+                raise ValueError(f"Agent {agent} not found in ProjectAgents.")
+
+            llm_config = config.llm_config or self.__genpod_config.default.llm_config
+            provider_config = self.__genpod_config.providers[llm_config.provider]
+            max_retries, retry_backoff = self.__get_retry_settings(provider_config, self.__genpod_config.default)
+
+            provider = llm_config.provider
+            model = llm_config.model
+            model_config = llm_config.config
+
+            llm_instance = llm_factory(provider, model, model_config, max_retries, retry_backoff)
+            self.agents.get_agent(agent).set_llm(llm_instance)
+
+    def __get_retry_settings(self, provider_config: ProviderConfig, default_config: DefaultConfig) -> Tuple[int, float]:
+        """
+        Helper method to extract retry settings for LLM configuration.
+
+        Args:
+            provider_config: Provider-specific configuration.
+            default_config: Default configuration values.
 
         Returns:
-            str: A structured string representation of the ProjectConfig instance, showing its attributes and their values.
+            Tuple[int, float]: max_retries and retry_backoff values.
         """
-        def format_enum(enum_type: Enum) -> str:
-            """
-            Formats the enum members and their values for output.
-
-            Args:
-                enum_type (EnumMeta): The enum type to format.
-
-            Returns:
-                str: A formatted string of enum members and their values.
-            """
-            return "\n".join(f"  {name}: {member.value}" for name, member in enum_type.__members__.items())
-
-        def format_agent_config(config: Any) -> str:
-            """
-            Formats the AgentConfig object for output.
-
-            Args:
-                config (Any): The AgentConfig object to format.
-
-            Returns:
-                str: A formatted string representation of the AgentConfig object.
-            """
-            if isinstance(config, AgentConfig):
-                llm_info = (
-                    f"client=<client_instance> "
-                    f"async_client=<async_client_instance> "
-                    f"model_name='{config.llm.model_name}' "
-                    f"temperature={config.llm.temperature} "
-                    f"model_kwargs={config.llm.model_kwargs} "
-                    f"openai_api_key=SecretStr('**********') "
-                    f"openai_proxy='{config.llm.openai_proxy}' "
-                    f"max_retries={config.llm.max_retries} "
-                    f"streaming={config.llm.streaming}"
-                )
-                return (f"AgentConfig(\n"
-                        f"  agent_name='{config.agent_name}',\n"
-                        f"  agent_id='{config.agent_id}',\n"
-                        f"  llm={llm_info},\n"
-                        f"  thread_id={getattr(config, 'thread_id', 'None')}\n"
-                        f")")
-            return str(config)
-
-        def format_value(value: Any) -> str:
-            """
-            Formats the value for output. Handles dictionaries, lists, enums, and custom objects specifically.
-
-            Args:
-                value (Any): The value to format.
-
-            Returns:
-                str: A formatted string representation of the value.
-            """
-            if isinstance(value, EnumType):
-                return format_enum(value)
-            elif isinstance(value, dict):
-                return "\n".join(f"  {k}:\n{format_value(v)}" for k, v in value.items())
-            elif isinstance(value, list):
-                return "\n".join(f"  - {format_value(v)}" for v in value)
-            elif isinstance(value, AgentConfig):
-                return format_agent_config(value)
-            else:
-                return str(value)
-
-        attributes = vars(self)
-        formatted_attributes = {
-            key: format_value(value) for key, value in attributes.items()
-        }
-        
-        # Create a more informative string representation
-        return (
-            "Project Configuration:\n"
-            "====================\n" +
-            "\n".join(
-                f"{key}:\n{value}" if isinstance(value, (dict, list)) else f"{key}: {value}"
-                for key, value in formatted_attributes.items()
-            )
-        )
+        max_retries = provider_config.setting.max_retries or default_config.max_retries
+        retry_backoff = provider_config.setting.retry_backoff or default_config.retry_backoff
+        return max_retries, retry_backoff

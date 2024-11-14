@@ -4,16 +4,16 @@ from langgraph.graph import END, StateGraph
 from agents.agent.graph import Graph
 from agents.supervisor.supervisor_agent import SupervisorAgent
 from agents.supervisor.supervisor_state import SupervisorState
-from configs.project_config import ProjectGraphs
+from llms.llm import LLM
 
 
 class SupervisorWorkflow(Graph[SupervisorAgent]):
-    def __init__(self, llm: ChatOpenAI, persistance_db_path: str):
+    def __init__(self, graph_id: str, graph_name: str, agent_id: str, agent_name: str, llm: LLM, persistance_db_path: str):
     
         super().__init__(
-            ProjectGraphs.supervisor.graph_id,
-            ProjectGraphs.supervisor.graph_name, 
-            SupervisorAgent(llm),
+            graph_id,
+            graph_name,
+            SupervisorAgent(agent_id, agent_name, llm),
             persistance_db_path
         )
 
@@ -27,6 +27,7 @@ class SupervisorWorkflow(Graph[SupervisorAgent]):
         supervisor_workflow.add_node("kickoff", self.agent.instantiate_state)
         supervisor_workflow.add_node("Architect", self.agent.call_architect)
         supervisor_workflow.add_node("Coder", self.agent.call_coder)
+        supervisor_workflow.add_node("Reviewer", self.agent.call_reviewer)
         supervisor_workflow.add_node("RAG", self.agent.call_rag)
         supervisor_workflow.add_node("Planner", self.agent.call_planner)
         supervisor_workflow.add_node("update_state", self.agent.update_state)
@@ -44,21 +45,23 @@ class SupervisorWorkflow(Graph[SupervisorAgent]):
                                                       "call_coder" : "Coder",
                                                       "call_rag" : "RAG",
                                                       "call_planner" : "Planner",
+                                                      "call_reviewer": "Reviewer",
                                                       "call_supervisor": 'Supervisor',
                                                       "update_state" : "update_state",
                                                       "Human" : 'Human',
-                                                      "call_test_code_generator":"TestGenerator"
+                                                      "call_test_code_generator" : "TestGenerator"
                                                    })
-        supervisor_workflow.add_edge("RAG","Supervisor")
-        supervisor_workflow.add_edge("Architect","Supervisor")
-        supervisor_workflow.add_edge("Planner","Supervisor")
-        supervisor_workflow.add_edge("Coder","Supervisor")
-        supervisor_workflow.add_edge("TestGenerator","Supervisor")
-        supervisor_workflow.add_edge("Human","Supervisor")
+        supervisor_workflow.add_edge("RAG", "Supervisor")
+        supervisor_workflow.add_edge("Reviewer", "Supervisor")
+        supervisor_workflow.add_edge("Architect", "Supervisor")
+        supervisor_workflow.add_edge("Planner", "Supervisor")
+        supervisor_workflow.add_edge("Coder", "Supervisor")
+        supervisor_workflow.add_edge("TestGenerator", "Supervisor")
+        supervisor_workflow.add_edge("Human", "Supervisor")
         supervisor_workflow.add_edge("update_state", END)
-        
+       
         return supervisor_workflow
-    
+   
     def get_current_state(self):
-        """ Returns the current state dictionary of the agent """
+        """Returns the current state dictionary of the agent"""
         return self.agent.state

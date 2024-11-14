@@ -6,9 +6,10 @@ from typing_extensions import Annotated, TypedDict
 from agents.agent.state import State
 from models.coder_models import CodeGenerationPlan
 from models.constants import ChatRoles, PStatus
-from models.models import (PlannedTask, PlannedTaskQueue, RequirementsDocument,
-                           Task, TaskQueue)
-from models.tests_generator_models import FunctionSkeleton
+from models.models import (Issue, IssuesQueue, PlannedIssue,
+                           PlannedIssuesQueue, PlannedTask, PlannedTaskQueue,
+                           RequirementsDocument, Task, TaskQueue)
+from models.tests_generator_models import FileFunctionSignatures
 
 
 class SupervisorState(TypedDict):
@@ -98,6 +99,18 @@ class SupervisorState(TypedDict):
     ]
 
     # @out
+    current_issue: Annotated[
+        Issue,
+        State.out_field("This field represents the issue that is currently being worked on.")
+    ]
+
+    # @out
+    current_planned_issue: Annotated[
+        PlannedIssue,
+        State.out_field("The current planned issue that team is working on.")
+    ]
+
+    # @out
     is_rag_query_answered : Annotated[
         bool,
         State.out_field("is query answered by rag agent.")
@@ -107,6 +120,12 @@ class SupervisorState(TypedDict):
     rag_cache_queries: Annotated[
         List[str],
         State.out_field("Queries generated for rag cache")
+    ]
+
+    # @out
+    issues: Annotated[
+        IssuesQueue,
+        State.out_field("A queue of issues that have been created by the reviewer.")
     ]
 
     # @out
@@ -126,7 +145,7 @@ class SupervisorState(TypedDict):
     ]
 
     # @out
-    human_feedback:  Annotated[
+    human_feedback: Annotated[
         list[tuple[str, str]], 
         State.inout_field(
             "A list human inputs given during human in the loop process"
@@ -134,8 +153,8 @@ class SupervisorState(TypedDict):
     ]
 
     # @in
-    functions_skeleton:Annotated[
-        FunctionSkeleton,
+    functions_skeleton: Annotated[
+        FileFunctionSignatures,
         State.in_field(
             "The well detailed function skeleton for the functions that are in the code."
         )
@@ -154,6 +173,12 @@ class SupervisorState(TypedDict):
     planned_tasks: Annotated[
         PlannedTaskQueue, # This is list of work_packages created by the planner,
         State.out_field("A list of work packages planned by the planner")
+    ]
+
+    # @out
+    planned_issues: Annotated[
+        PlannedIssuesQueue, # This is list of work_packages created by the planner,
+        State.out_field("A list of planned issues")
     ]
 
     # @out

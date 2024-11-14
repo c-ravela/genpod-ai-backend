@@ -3,19 +3,19 @@ import codecs
 import json
 import os
 import re
-from typing import List
+from typing import List, Literal
 
-from langchain_core.output_parsers.json import JsonOutputParser
-from langchain_openai import ChatOpenAI
 from pydantic import ValidationError
 
 from agents.agent.agent import Agent
 from agents.planner.planner_state import PlannerState
-from configs.project_config import ProjectAgents
-from models.constants import Status
-from models.models import PlannedTask, PlannedTaskQueue
-from models.planner_models import BacklogList
+from llms.llm import LLM
+from models.constants import PStatus, Status
+from models.models import (PlannedIssue, PlannedIssuesQueue, PlannedTask,
+                           PlannedTaskQueue)
+from models.planner_models import BacklogList, Segregation
 from prompts.planner_prompts import PlannerPrompts
+from tools.file_system import FS
 from utils.logs.logging_utils import logger
 
 
@@ -23,31 +23,41 @@ class PlannerAgent(Agent[PlannerState, PlannerPrompts]):
     """
     """
     
-    def __init__(self, llm: ChatOpenAI) -> None:
+    task_breakdown_node_name: str
+    requirements_analyzer_node_name: str
+    issues_preparation_node_name: str
+    agent_response_node_name: str
+    update_state_node_name: str
+
+    # Mode explanation:
+    # 'preparing_planned_tasks': Breaking down a general task into smaller, manageable backlog planned tasks.
+    # 'preparing_planned_issues': Checking if unit test case generation is required and preparing a planned issue from the given issue.
+    mode: Literal['preparing_planned_tasks', 'preparing_planned_issues']
+    deliverable: str
+
+    def __init__(self, agent_id: str, agent_name: str, llm: LLM) -> None:
         
         super().__init__(
-            ProjectAgents.planner.agent_id,
-            ProjectAgents.planner.agent_name,
+            agent_id,
+            agent_name,
             PlannerState(),
             PlannerPrompts(),
             llm
         )
 
+        self.task_breakdown_node_name = "task_breakdown"
+        self.requirements_analyzer_node_name = "requirements_analyzer"
+        self.issues_preparation_node_name = "issues_preparation"
+        self.agent_response_node_name = "agent_response"
+        self.update_state_node_name = "update_state"
+
+        self.mode = ''
         self.error_count = 0
         self.max_retries = 3
         self.error_messages = []
         self.file_count = 0
 
         self.planned_backlogs: list[str] = []
-
-        # prompts
-        # backlog planner for each deliverable chain
-        self.backlog_plan = self.prompts.backlog_planner_prompt | self.llm
-        
-        # detailed requirements generator chain
-        self.detailed_requirements = self.prompts.detailed_requirements_prompt | self.llm
-
-        self.segregaion_chain= self.prompts.segregation_prompt| self.llm | JsonOutputParser()
 
     def write_workpackages_to_files(self, output_dir: str, planned_tasks: PlannedTaskQueue) -> tuple[int, int]:
         """
@@ -94,12 +104,28 @@ class PlannerAgent(Agent[PlannerState, PlannerPrompts]):
         return session_file_count, self.file_count
     
     def new_deliverable_check(self, state: PlannerState) -> str:
-        if state['current_task'].task_status == Status.NEW:
-            return "backlog_planner"
-        else:
-            return "requirements_developer"
+        if state['project_status'] == PStatus.EXECUTING:
+            self.mode = 'preparing_planned_tasks'
 
-    def backlog_planner(self, state: PlannerState) -> PlannerState:
+            if state['current_task'].task_status == Status.NEW:
+                return self.task_breakdown_node_name
+            else:
+                return self.requirements_analyzer_node_name
+        elif state['project_status'] == PStatus.RESOLVING:
+            self.mode = 'preparing_planned_issues'
+            self.deliverable = (
+                f"Issue Detected:\n"
+                f"-------------------------\n"
+                f"{state['current_issue'].issue_details()}\n"
+                f"Please review and address this issue promptly."
+            )
+
+            if state['current_issue'].issue_status == Status.NEW:
+                return self.issues_preparation_node_name
+            
+    # TODO - MEDIUM: We have to segeregate the backlogs into categories
+    # like Documents, Coding, Config so on. all possible options
+    def task_breakdown_node(self, state: PlannerState) -> PlannerState:
         state['planned_tasks'] = PlannedTaskQueue()
 
         while(True):
@@ -107,19 +133,15 @@ class PlannerAgent(Agent[PlannerState, PlannerPrompts]):
                 logger.info("----Working on building backlogs for the deliverable----")
                 logger.info("Deliverable: %s", state['current_task'].description)
 
-                generated_backlogs = self.backlog_plan.invoke({
-                    "deliverable": state['current_task'].description, 
-                    "context": state['context'], 
-                    "feedback": self.error_messages
-                })
+                llm_output = self.llm.invoke(self.prompts.task_breakdown_prompt, {
+                        "deliverable": state['current_task'].description,
+                        "context": state['context'],
+                        "feedback": self.error_messages
+                    },
+                    'string'
+                )
 
-                if generated_backlogs.content.startswith('```json') and generated_backlogs.content.endswith('```'):
-                    # Remove the ```json prefix and ``` suffix
-                    cleaned_generated_backlogs = generated_backlogs.content.removeprefix('```json').removesuffix('```').strip()
-                else:
-                    cleaned_generated_backlogs = generated_backlogs.content
-
-                backlogs_list = ast.literal_eval(cleaned_generated_backlogs)
+                backlogs_list = ast.literal_eval(llm_output.response)
                 
                 # Validate the response using Pydantic
                 self.planned_backlogs = BacklogList(backlogs=backlogs_list).backlogs
@@ -127,7 +149,7 @@ class PlannerAgent(Agent[PlannerState, PlannerPrompts]):
                 self.error_count = 0
                 self.error_messages = []
 
-                return state
+                break # while loop exit
             except (ValidationError, ValueError, SyntaxError) as e:
                 self.error_count += 1
                 error_message = f"Error generating backlogs: {str(e)}"
@@ -138,29 +160,36 @@ class PlannerAgent(Agent[PlannerState, PlannerPrompts]):
                 if self.error_count >= self.max_retries:
                     logger.info("Max retries reached. Halting")
                     self.error_count = 0
-                    return state
+                    
+                    break # while loop exit
+        
+        return state
 
-    def requirements_developer(self, state: PlannerState) -> PlannerState:
+    def requirements_analyzer_node(self, state: PlannerState) -> PlannerState:
+        
         for backlog in self.planned_backlogs:
             while(True):
                 try:
                     logger.info("----Now Working on Generating detailed requirements for the backlog----")
                     logger.info("Backlog: %s", backlog)
-                    response = self.detailed_requirements.invoke({
-                        "backlog": backlog, 
-                        "deliverable": state['current_task'].description, 
-                        "context": state['context'], 
-                        "feedback": self.error_messages
-                    })
+
+                    if state['current_task'].task_status == Status.RESPONDED:
+                        context = f"{state['context']}\n{state['current_task'].additional_info}"
+                    else:
+                        context = state['context']
+
+                    llm_output = self.llm.invoke(self.prompts.detailed_requirements_prompt, {
+                            "backlog": backlog, 
+                            "deliverable": state['current_task'].description, 
+                            "context": context, 
+                            "feedback": self.error_messages
+                        },
+                        'string'
+                    )
 
                     # Let's clean the response to remove json prefix that llm sometimes appends to the actual text
                     # Strip whitespace from the beginning and end
-                    cleaned_response = response.content.strip()
-                    # Remove single-line comments
-                    # cleaned_response = re.sub(r'//.*$', '', cleaned_response, flags=re.MULTILINE)
-                    # Remove multi-line comments
-                    # cleaned_response = re.sub(r'/\*.*?\*/', '', cleaned_response, flags=re.DOTALL)
-                    
+                    cleaned_response = llm_output.response.strip()
                     # Check if the text starts with ```json and ends with ```
                     if cleaned_response.startswith('```json') and cleaned_response.endswith('```'):
                         # Remove the ```json prefix and ``` suffix
@@ -195,7 +224,7 @@ class PlannerAgent(Agent[PlannerState, PlannerPrompts]):
                         }
 
                         planned_task.description = json.dumps(parsed_response)
-                        state['planned_tasks'].add_task(planned_task)
+                        state['planned_tasks'].add_item(planned_task)
 
                         logger.info("Requirements in JSON: %r", parsed_response)
 
@@ -216,24 +245,84 @@ class PlannerAgent(Agent[PlannerState, PlannerPrompts]):
                     if self.error_count >= self.max_retries:
                         logger.info("Max retries reached. Halting")
                         self.error_count = 0
+
                         return state             
         
         state['current_task'].task_status = Status.INPROGRESS
-
+            
         files_written, total_files_written = self.write_workpackages_to_files(state['project_path'], state['planned_tasks'])
         logger.info('Wrote down %d work packages into the project folder during the current session. Total files written during the current run %d', files_written, total_files_written)
 
         return state
-    
-    def generate_response(self, state: PlannerState) -> PlannerState:
-        # After attempting to handle the current task with planner chains, check the task's status.
-        # If the task status is:
-        # - Status.INPROGRESS: The planner has successfully prepared planned tasks.
-        # - Status.AWAITING: The task is waiting for some condition or input before it can proceed.
-        # - Status.NEW: An error occurred during the task execution, and it was not handled properly.
-        # In the case of Status.NEW, we need to abandon the task since it could not be successfully addressed by the planner.
-        if state['current_task'].task_status == Status.NEW:
-            state['current_task'].task_status = Status.ABANDONED
+
+    def issues_preparation_node(self, state: PlannerState) -> PlannerState:
+        """
+        """
+        state['planned_issues'] = PlannedIssuesQueue()
+       
+        while True:
+            try:
+                logger.info(f"{self.agent_name}: Preparing planned issues for issue with id: {state['current_issue'].issue_id}.")
+                logger.info(f"Issue: {state['current_issue']}")
+
+                llm_output = self.llm.invoke_with_pydantic_model(
+                    self.prompts.issues_segregation_prompt,
+                    {
+                        "issue_details": state['current_issue'].issue_details(),
+                        "file_content": FS.read_file(state['current_issue'].file_path)
+                    },
+                    Segregation
+                )
+
+                validated_response = llm_output.response
+                logger.info(f"Issue {state['current_issue'].issue_id} has been successfully segregated with the following details: {validated_response}")
+
+                planned_issue = PlannedIssue(
+                    parent_id=state['current_issue'].issue_id,
+                    status=Status.NEW,
+                    file_path=state['current_issue'].file_path,
+                    line_number=state['current_issue'].line_number,
+                    description=state['current_issue'].description,
+                    suggestions=state['current_issue'].suggestions,
+                    is_function_generation_required=validated_response.requires_function_creation
+                )
+
+                state['planned_issues'].add_item(planned_issue)
+
+                self.error_count = 0
+                self.error_messages = []
+
+                break  # while loop exit
+            except Exception as e:
+                self.error_count += 1
+
+                logger.error(e)
+                self.error_messages.append(e)
+
+                if self.error_count >= self.max_retries:
+                    logger.info(f"Maximum retry attempts reached while processing issue with ID: {state['current_issue'].issue_id}.")
+
+                    return state
+            except FileNotFoundError as ffe:
+                logger.error(f"{self.agent_name}: Error Occured at resolve issue: ===>{type(ffe)}<=== {ffe}.----")
+              
+        state['current_issue'].issue_status = Status.INPROGRESS
+
+        return state
+
+    def agent_response_node(self, state: PlannerState) -> PlannerState:
+        if self.mode == 'preparing_planned_tasks':
+            # After attempting to handle the current task with planner chains, check the task's status.
+            # If the task status is:
+            # - Status.INPROGRESS: The planner has successfully prepared planned tasks.
+            # - Status.AWAITING: The task is waiting for some condition or input before it can proceed.
+            # - Status.NEW: An error occurred during the task execution, and it was not handled properly.
+            # In the case of Status.NEW, we need to abandon the task since it could not be successfully addressed by the planner.
+            if state['current_task'].task_status == Status.NEW:
+                state['current_task'].task_status = Status.ABANDONED
+        elif self.mode == 'preparing_planned_issues':
+            if state['current_issue'].issue_status == Status.NEW:
+                state['current_issue'].issue_status = Status.ABANDONED
 
         return state
     
@@ -257,20 +346,29 @@ class PlannerAgent(Agent[PlannerState, PlannerPrompts]):
         """
         """
         logger.info(f"---- Initiating segregation ----")
+        while(True):
+            try:
+                llm_output = self.llm.invoke_with_pydantic_model(self.prompts.segregation_prompt, {
+                        "work_package": f"{workpackage_name} \n {requirements}",
+                    },
+                    Segregation
+                )
 
-        try:
-            llm_response = self.segregaion_chain.invoke({
-                "work_package": f"{workpackage_name} \n {requirements}",
-            })
+                validate_response = llm_output.response
+                
+                self.error_count = 0
+                self.error_messages = []
 
-            required_keys = ["taskType"]
-            missing_keys = [key for key in required_keys if key not in llm_response]
+                break # while loop exit
+            except Exception as e:
+                self.error_count += 1
+                
+                logger.error(e)
+                self.error_messages.append(e)
 
-            if missing_keys:
-                raise KeyError(f"Missing keys: {missing_keys} in the response. Try Again!")
-            
-            logger.info(f" task type  : {llm_response['taskType']} ; {llm_response['reason_for_classification']}")
-        except Exception as e:
-            logger.error(f"---- Error Occured at segregation: {str(e)}.----")
+                if self.error_count >= self.max_retries:
+                    logger.info(f"Maximum retry attempts reached.")
 
-        return llm_response['taskType']
+                    return
+    
+        return validate_response.requires_function_creation

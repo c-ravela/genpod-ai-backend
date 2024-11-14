@@ -3,42 +3,42 @@
 Agent graph state
 """
 
+from typing import Dict
+
 from typing_extensions import Annotated, TypedDict
 
 from agents.agent.state import State
-from models.constants import ChatRoles
-from models.models import PlannedTask, Task
-from models.tests_generator_models import FunctionSkeleton
+from models.constants import ChatRoles, PStatus
+from models.models import (Issue, PlannedIssue, PlannedTask,
+                           RequirementsDocument, Task)
+from models.tests_generator_models import FileFunctionSignatures
 
 
 class TestCoderState(TypedDict):
     """
     """
 
-    # @in 
+    # @in
     project_name: Annotated[
-        str, 
+        str,
         State.in_field(
             "The name of the project."
         )
     ]
 
-    # @in 
-    project_folder_strucutre: Annotated[
-        str,
-        State.in_field(
-            "The organized layout of directories and subdirectories that form the project's "
-            "file system, adhering to best practices for project structure."
-        )
+    # @in
+    project_status: Annotated[
+        PStatus,
+        State.in_field("The status of the project being generated.")
     ]
 
-    # @in 
+    # @in
     requirements_document: Annotated[
-        str, 
+        RequirementsDocument,
         State.in_field(
             "A comprehensive, well-structured document in markdown format that outlines "
-            "the project's requirements derived from the user's request. This serves as a "
-            "guide for the development process."
+            "the project's requirements derived from the user's request. This serves as a"
+            " guide for the development process."
         )
     ]
 
@@ -51,92 +51,44 @@ class TestCoderState(TypedDict):
         )
     ]
 
-    # @in
-    license_url: Annotated[
-        str,
-        State.in_field()
-    ]
-
-    # @in
-    license_text: Annotated[
-        str,
-        State.in_field()
-    ]
-
-    # @inout
-    current_task: Annotated[
-        Task,
-        State.inout_field(
-            "The Task object currently in focus, representing the active task that team "
-            "members are working on."
-        )
-    ]
-        
     # @inout
     current_planned_task: Annotated[
         PlannedTask,
         State.inout_field(
-            "The PlannedTask object currently in focus, representing the active task"
+            "The PlannedTask object currently in focus, representing the active task "
             "that coder need to work on."
         )
+    ]
+   
+    # @inout
+    current_planned_issue: Annotated[
+        PlannedIssue,
+        State.inout_field("The current planned issue that team is working on.")
     ]
     
     # @inout
     messages: Annotated[
         list[tuple[ChatRoles, str]],
         State.inout_field(
-            "A chronological list of tuples representing the conversation history between the "
-            "system, user, and AI. Each tuple contains a role identifier (e.g., 'AI', 'tool', "
-            "'user', 'system') and the corresponding message."
+            "A chronological list of tuples representing the conversation history between "
+            "the system, user, and AI. Each tuple contains a role identifier (e.g., 'AI', "
+            "'tool', 'user', 'system') and the corresponding message."
         )
     ]
 
     # @out
     test_code: Annotated[
-        str,
+        Dict[str, str],
         State.out_field(
-            "The complete, well-documented working unit test code that adheres to all standards "
-            "requested with the programming language, framework user requested ",
+            "The complete, well-documented working unit test code that adheres to all "
+            "standards requested with the programming language, framework user requested",
         )
     ]
-
+    
     # @out
-    files_created: Annotated[
-        list[str],
-        State.out_field(
-            "The absolute paths of file that were created for this project "
-            "so far."
-        )
-    ]
-
-    # @out
-    infile_license_comments: Annotated[
-        dict[str, str],
-        State.out_field(
-            "A list of multiline license comments for each type of file."
-        )
-    ]
-
-    # @out
-    functions_skeleton:Annotated[
-        FunctionSkeleton,
+    function_signatures: Annotated[
+        FileFunctionSignatures,
         State.out_field(
             "The well detailed function skeleton for the functions that are in the code."
-        )
-    ]
-
-    # @out
-    commands_to_execute: Annotated[ 
-        dict[str, str],
-        State.out_field(
-            "This field represents a dictionary of commands intended to be executed on a Linux terminal. Each key-value pair in the dictionary corresponds to an absolute path (the key) and a specific command (the value) to be executed at that path."
-        )
-    ]
-
-    # @in
-    work_package:Annotated[
-        str,
-        State.in_field(
-            "This contains the work package that needs to be segregated"
         )
     ]

@@ -1,19 +1,16 @@
 """Coder Agent
 """
 import os
-from typing import Literal, List
-
-from langchain_core.output_parsers import JsonOutputParser
-from langchain_core.runnables.base import RunnableSequence
-from langchain_openai import ChatOpenAI
+from typing import List, Literal
 
 from agents.agent.agent import Agent
 from agents.coder.coder_state import CoderState
-from configs.project_config import ProjectAgents
+from llms.llm import LLM
 from models.coder_models import CodeGenerationPlan
-from models.constants import ChatRoles, Status
+from models.constants import ChatRoles, PStatus, Status
 from prompts.coder_prompts import CoderPrompts
 from tools.code import CodeFileWriter
+from tools.file_system import FS
 from tools.license import License
 from tools.shell import Shell
 from utils.logs.logging_utils import logger
@@ -27,6 +24,7 @@ class CoderAgent(Agent[CoderState, CoderPrompts]):
     entry_node_name: str # The entry point of the graph
     code_generation_node_name: str 
     general_task_node_name: str
+    resolve_issue_node_name: str
     run_commands_node_name: str
     write_generated_code_node_name: str
     download_license_node_name: str 
@@ -34,7 +32,7 @@ class CoderAgent(Agent[CoderState, CoderPrompts]):
     agent_response_node_name: str
     update_state_node_name: str 
 
-    mode: Literal["code_generation", "general_task"]
+    mode: Literal["code_generation", "general_task", "resolving_issues"]
 
     # local state of this class which is not exposed
     # to the graph state
@@ -47,19 +45,16 @@ class CoderAgent(Agent[CoderState, CoderPrompts]):
 
     last_visited_node: str
     error_message: str
-
+    requirements_document: str
     current_code_generation_plan_list: List[CodeGenerationPlan]
 
-    # chains
-    code_generation_chain: RunnableSequence
-
-    def __init__(self, llm: ChatOpenAI) -> None:
+    def __init__(self, agent_id: str, agent_name: str, llm: LLM) -> None:
         """
         """
-        
+       
         super().__init__(
-            ProjectAgents.coder.agent_id,
-            ProjectAgents.coder.agent_name,
+            agent_id,
+            agent_name,
             CoderState(),
             CoderPrompts(),
             llm
@@ -68,6 +63,7 @@ class CoderAgent(Agent[CoderState, CoderPrompts]):
         self.entry_node_name = "entry"
         self.code_generation_node_name = "code_generation"
         self.general_task_node_name = "general_task"
+        self.resolve_issue_node_name = "resolve_issue"
         self.run_commands_node_name = "run_commands"
         self.write_generated_code_node_name = "write_code"
         self.download_license_node_name = "download_license"
@@ -88,12 +84,6 @@ class CoderAgent(Agent[CoderState, CoderPrompts]):
         self.error_message = ""
 
         self.current_code_generation_plan_list = []
-
-        self.code_generation_chain = (
-            self.prompts.code_generation_prompt
-            | self.llm
-            | JsonOutputParser()
-        )
 
     def add_message(self, message: tuple[ChatRoles, str]) -> None:
         """
@@ -117,6 +107,9 @@ class CoderAgent(Agent[CoderState, CoderPrompts]):
         elif self.mode == "general_task":
             if not self.is_code_generated:
                 return self.general_task_node_name
+        elif self.mode == "resolving_issues":
+            if not self.is_code_generated:
+                return self.resolve_issue_node_name
 
         if not self.is_license_file_downloaded:
             return self.download_license_node_name
@@ -141,19 +134,28 @@ class CoderAgent(Agent[CoderState, CoderPrompts]):
 
         self.last_visited_node = self.entry_node_name
 
-        if self.state['current_planned_task'].task_status == Status.NEW:
-            if self.state['current_planned_task'].is_function_generation_required:
-                self.mode = "code_generation"
-            else:
-                self.mode = "general_task"
-            
-            self.is_code_generated = False
-            self.has_command_execution_finished = False
-            self.has_code_been_written_locally = False
-            self.is_license_text_added_to_files = False
-            self.hasPendingToolCalls = False
+        if self.state['project_status'] == PStatus.EXECUTING:
+            if self.state['current_planned_task'].task_status == Status.NEW:
+                if self.state['current_planned_task'].is_function_generation_required:
+                    self.mode = "code_generation"
+                else:
+                    self.mode = "general_task"    
+        elif self.state['project_status'] == PStatus.RESOLVING:
+            if self.state['current_planned_issue'].status == Status.NEW:
+                self.mode = "resolving_issues"
 
-            self.current_code_generation_plan_list = []
+        self.is_code_generated = False
+        self.has_command_execution_finished = False
+        self.has_code_been_written_locally = False
+        self.is_license_text_added_to_files = False
+        self.hasPendingToolCalls = False
+        self.requirements_document = (
+            f"{state['requirements_document'].directory_structure}\n"
+            f"{state['requirements_document'].coding_standards}\n"
+            f"{state['requirements_document'].project_license_information}"
+        )
+
+        self.current_code_generation_plan_list = []
 
         return self.state
     
@@ -163,7 +165,7 @@ class CoderAgent(Agent[CoderState, CoderPrompts]):
         logger.info(f"----{self.agent_name}: Initiating general task Generation for Task Id: {state['current_planned_task'].task_id}----")
 
         self.state = state
-        self.last_visited_node = self.code_generation_node_name
+        self.last_visited_node = self.general_task_node_name
 
         task = self.state["current_planned_task"]
         logger.info(f"----{self.agent_name}: Started working on the task: {task.description}.----")
@@ -177,17 +179,17 @@ class CoderAgent(Agent[CoderState, CoderPrompts]):
         # generate single file at a time.
         while True:
             try:
-                llm_response: CodeGenerationPlan = self.code_generation_chain.invoke({
+                llm_output = self.llm.invoke_with_pydantic_model(self.prompts.code_generation_prompt, {
                     "project_name": self.state['project_name'],
                     "project_path": os.path.join(self.state['project_path'], self.state['project_name']),
-                    "requirements_document": self.state['requirements_document'],
+                    "requirements_document": self.requirements_document,
                     "error_message": self.error_message,
                     "task": task.description,
                     "functions_skeleton": "no function sekeletons available for this task.",
                     "unit_test_cases": "no unit test cases available for this task."
-                })
+                }, CodeGenerationPlan)
 
-                cleaned_response = CodeGenerationPlan(**llm_response)
+                cleaned_response = llm_output.response
                 self.current_code_generation_plan_list.append(cleaned_response)
 
                 self.error_message = ""
@@ -233,17 +235,17 @@ class CoderAgent(Agent[CoderState, CoderPrompts]):
             while True:
 
                 try:
-                    llm_response = self.code_generation_chain.invoke({
+                    llm_output = self.llm.invoke_with_pydantic_model(self.prompts.code_generation_prompt, {
                         "project_name": self.state['project_name'],
                         "project_path": os.path.join(self.state['project_path'], self.state['project_name']),
-                        "requirements_document": self.state['requirements_document'],
+                        "requirements_document": self.requirements_document,
                         "error_message": self.error_message,
                         "task": task.description,
                         "functions_skeleton": {file_path: function_skeleton},
-                        "unit_test_cases": self.state['test_code'] 
-                    })
+                        "unit_test_cases": self.state['test_code']
+                    }, CodeGenerationPlan)
 
-                    cleaned_response = CodeGenerationPlan(**llm_response)
+                    cleaned_response = llm_output.response
                     self.current_code_generation_plan_list.append(cleaned_response)
 
                     self.error_message = ""
@@ -264,6 +266,65 @@ class CoderAgent(Agent[CoderState, CoderPrompts]):
         ))
         self.is_code_generated = True
 
+        return self.state
+
+    def resolve_issue_node(self, state: CoderState) -> CoderState:
+        """
+        """
+        logger.info(f"----{self.agent_name}: Initiating resolve issue node Issue Id: {state['current_planned_issue'].id}----")
+
+        self.state = state
+        self.last_visited_node = self.resolve_issue_node_name
+
+        planned_issue = self.state['current_planned_issue']
+        logger.info(f"----{self.agent_name}: Started working on the issue: {planned_issue.description}.----")
+        
+        self.add_message((
+            ChatRoles.USER,
+            f"Started working on the issue: {planned_issue.description}."
+        ))
+
+        while True:
+            try:
+                llm_output = self.llm.invoke_with_pydantic_model(self.prompts.issue_resolution_prompt, {
+                    "project_name": self.state['project_name'],
+                    "project_path": os.path.join(self.state['project_path'], self.state['project_name']),
+                    "error_message": self.error_message,
+                    "issue": (
+                        f"Issue Detected:\n"
+                        f"-------------------------\n"
+                        f"{planned_issue.issue_details()}\n"
+                        f"Please review and address this issue promptly."
+                    ),
+                    "file_path": planned_issue.file_path,
+                    "file_content": FS.read_file(planned_issue.file_path),
+                    'function_signatures': planned_issue.function_signatures,
+                    "unit_test_code": planned_issue.test_code
+                }, CodeGenerationPlan)
+
+                cleaned_response = llm_output.response
+                self.current_code_generation_plan_list.append(cleaned_response)
+
+                self.error_message = ""
+                
+                self.add_message((
+                    ChatRoles.USER,
+                    f"{self.agent_name}: Issue Resolution completed!"
+                ))
+                self.is_code_generated = True
+
+                break # while loop exit
+            except Exception as e:
+                logger.error(f"{self.agent_name}: Error Occured at resolve issue: ===>{type(e)}<=== {e}.----")
+   
+                self.error_message = e
+                self.add_message((
+                    ChatRoles.USER,
+                    f"{self.agent_name}: {self.error_message}"
+                ))
+            except FileNotFoundError as ffe:
+                logger.error(f"{self.agent_name}: Error Occured at resolve issue: ===>{type(ffe)}<=== {ffe}.----")
+                
         return self.state
 
     def run_commands_node(self, state: CoderState) -> CoderState:
@@ -423,11 +484,18 @@ class CoderAgent(Agent[CoderState, CoderPrompts]):
 
         logger.info(f"{self.agent_name}: Preparing response.")
 
-        if self.is_code_generated and self.has_code_been_written_locally and self.is_license_text_added_to_files:
-            self.state['current_planned_task'].is_code_generated = True
-            self.state['current_planned_task'].task_status = Status.DONE
-            self.state["code_generation_plan_list"] = self.current_code_generation_plan_list
-        else:
-            self.state['current_planned_task'].task_status = Status.ABANDONED
+        if self.state['project_status'] == PStatus.EXECUTING:
+            if self.is_code_generated and self.has_code_been_written_locally and self.is_license_text_added_to_files:
+                self.state['current_planned_task'].is_code_generated = True
+                self.state['current_planned_task'].task_status = Status.DONE
+                self.state["code_generation_plan_list"] = self.current_code_generation_plan_list
+            else:
+                self.state['current_planned_task'].task_status = Status.ABANDONED
+        elif self.state['project_status'] == PStatus.RESOLVING:
+            if self.is_code_generated and self.has_code_been_written_locally and self.is_license_text_added_to_files:
+                self.state['current_planned_issue'].status = Status.DONE
+                self.state["code_generation_plan_list"] = self.current_code_generation_plan_list
+            else: 
+                self.state['current_planned_issue'].status = Status.ABANDONED
         
         return self.state
