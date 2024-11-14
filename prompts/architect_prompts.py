@@ -22,18 +22,18 @@ class ArchitectPrompts:
     """
     ArchitectPrompts class contains templates for guiding the Architect agent in its
     tasks.
-   
+
     It includes templates for initial project requirements generation and for providing
-    additional information during project implementation. These templates ensure that 
-    the Architect agent can effectively assist users in implementing their projects, 
+    additional information during project implementation. These templates ensure that
+    the Architect agent can effectively assist users in implementing their projects,
     adhering to best practices in microservice architecture, project folder structure,
     and clean-code development.
     """
 
     additional_info_prompt: PromptTemplate = PromptTemplate(
         template="""
-        As a Solution Architect, you have previously prepared comprehensive requirements 
-        documents for your team members to work on the project. You should not answer 
+        As a Solution Architect, you have previously prepared comprehensive requirements
+        documents for your team members to work on the project. You should not answer
         anything out of the provided context.
 
         We would appreciate your response to the following question:
@@ -42,7 +42,7 @@ class ArchitectPrompts:
         For your reference, here are the Requirements Documents you previously prepared:
         '{requirements_document}'
 
-        Please note, an error message will only be provided if there was an issue with 
+        Please note, an error message will only be provided if there was an issue with
         your previous output:
         {error_message}
 
@@ -59,26 +59,37 @@ class ArchitectPrompts:
 
     tasks_separation_prompt: PromptTemplate = PromptTemplate(
         template="""
-            You have previously generated a well-formatted requirements document in 
-            markdown format. As a part of it you also prepared deliverables for the 
-            project:
+        You previously generated a well-formatted requirements document in Markdown
+        format, which included detailed deliverables for the project. Each deliverable
+        is structured as a distinct section within the document.
 
-            '{tasks}'
+        Here is the content of the deliverables section:
 
-            Your task is to convert the deliverables from this markdown document into 
-            a list or an array. Each task should be copied exactly as it appears in 
-            the markdown document and transformed into an item of an list or array. 
-            No modifications should be made to the statements.
+        '{tasks}'
 
-            Error messages will only be present if there is an issue with your 
-            previous response.
-            '{error_message}'
+        **Task**: Convert each deliverable section from this Markdown content into an
+        individual item in a list or array. Each section should remain exactly as it
+        appears in the document, with no changes to its formatting or content.
+        
+        Each deliverable should be represented as a distinct item in the list, in the
+        same order as they appear in the provided content.
 
-            "Example:
-            [Task1, Task2, Task3, .... TaskN]
-            "
-            output format instructions:
-            '{format_instructions}'
+        ```
+        Expected Output Structure:
+        [
+        "Deliverable 1 details here...",
+        "Deliverable 2 details here...",
+        "Deliverable 3 details here...",
+        ...
+        "Final deliverable details here..."
+        ]
+        ```
+
+        Error messages will only appear if there is an issue with your previous response:
+        '{error_message}'
+
+        output format instructions:
+        '{format_instructions}'
         """,
         input_variables=['tasks', 'error_message'],
         partial_variables={
@@ -99,9 +110,9 @@ class ArchitectPrompts:
         2. The main features or functionalities to be implemented
         3. What schema definition models are needed to implement this service.
 
-        Format your response in markdown, starting with a "## Project Overview" 
+        Format your response in markdown, starting with a "## Project Overview"
         heading.
-        
+
         output format instructions:
         {format_instructions}
         """,
@@ -137,27 +148,28 @@ class ArchitectPrompts:
           interactions within the architecture.
 
         2. **Key Components, Data Models, and Interactions**:
-        - List and describe the key components in the architecture and their 
+        - List and describe the key components in the architecture and their
           responsibilities.
-        - Define the primary data models, including any critical fields and 
+        - Define the primary data models, including any critical fields and
           relationships between models.
-        - Explain how data flows between components, and specify the protocols or 
+        - Explain how data flows between components, and specify the protocols or
           methods used for inter-service communication.
 
         3. **Data Flow Between Services**:
         - Provide a clear explanation of how data flows between services, from the
           initiation of a request to the final response.
-        - Highlight any asynchronous or synchronous communication, including 
+        - Highlight any asynchronous or synchronous communication, including
           considerations for message queues, pub/sub patterns, or HTTP/REST calls.
 
         4. **External Integrations or APIs**:
-        - Identify any external systems or APIs integrated within this architecture, 
+        - Identify any external systems or APIs integrated within this architecture,
           along with the purpose and function of each integration.
         - Specify how these integrations impact the data flow and any special handling
           required to ensure security and reliability.
-   
+
         5. **Scalability and Reliability Considerations**:
-        - Outline strategies for horizontal or vertical scaling, load balancing, and redundancy.
+        - Outline strategies for horizontal or vertical scaling, load balancing, and
+          redundancy.
         - Describe reliability mechanisms, such as retries, failover systems, and data
           replication, to ensure high availability.
         - Mention trade-offs based on the CAP theorem where relevant.
@@ -172,7 +184,8 @@ class ArchitectPrompts:
 
         - Format your response in markdown, beginning with a "## Architecture" heading.
         - Each requirement should be addressed under clearly labeled subheadings.
-        - Use bullet points or numbered lists to present detailed descriptions and avoid lengthy paragraphs.
+        - Use bullet points or numbered lists to present detailed descriptions and avoid
+          lengthy paragraphs.
 
         ### Output Format Instructions:
         {format_instructions}
@@ -197,7 +210,7 @@ class ArchitectPrompts:
 
         Additional information: "{additional_information}"
 
-        Propose a detailed folder structure for this microservice project, adhering to 
+        Propose a detailed folder structure for this microservice project, adhering to
         best practices. Include:
         1. Root-level directories
         2. Service-specific directories
@@ -228,7 +241,7 @@ class ArchitectPrompts:
 
         Architecture:
         {architecture}
-        
+
         Additional information: "{additional_information}"
 
         For each microservice identified, provide:
@@ -238,7 +251,7 @@ class ArchitectPrompts:
         4. Internal components or modules
         5. Dependencies on other services or external systems
 
-        Format your response in markdown, starting with a "## Microservice Design" 
+        Format your response in markdown, starting with a "## Microservice Design"
         heading, with subheadings for each service.
 
         output format instructions:
@@ -266,20 +279,37 @@ class ArchitectPrompts:
         {microservice_design}
 
         Additional information: "{additional_information}"
-        
-        Break down the project into detailed, self-contained deliverables that team 
-        members can work on. Key is to not miss any technical specification for each 
-        deliverable, provide:
+
+        Break down the project into detailed, self-contained deliverables that team
+        members can work on. Each deliverable should cover all technical specifications,
+        including essential setup files and configurations. Specifically, provide:
+
         1. Deliverable name
         2. Detailed description of what needs to be done
         3. Technical requirements or specifications
 
-        Format your response in markdown, starting with a "## Tasks" heading, with each task as a subheading.
         
+        Ensure that the following aspects are covered in the breakdown, if applicable:
+        - Dockerfile for environment setup and deployment
+        - gitignore file to specify files and directories to ignore in version control
+        - Package manager files (e.g., requirements.txt for Python, package.json for
+          Node.js)
+        - README.md file that provides an overview of the project and detailed
+          instructions on how to run the application.
+        - Configurations specific to the microservice architecture
+
+        Format your response in markdown, starting with a "## Deliverables" heading,
+        with each task as a subheading.
+
         output format instructions:
         {format_instructions}
         """,
-        input_variables=["project_overview", "architecture", "microservice_design", "additional_information"],
+        input_variables=[
+            "project_overview", 
+            "architecture", 
+            "microservice_design", 
+            "additional_information"
+        ],
         partial_variables={
             "format_instructions": PydanticOutputParser(
                 pydantic_object=TaskOutput
@@ -294,13 +324,15 @@ class ArchitectPrompts:
         Additional information: "{additional_information}"
 
         Outline the standards to be followed in this project, including:
-        1. 12-Factor Application Standards: Explain how each factor applies to this project
+        1. 12-Factor Application Standards: Explain how each factor applies to this
+          project
         2. Clean Code Standards: Specific practices for maintaining clean, readable code
         3. Code Commenting Standards: Guidelines for effective code documentation
         4. Programming Language Specific Standards: Conventions for the chosen language(s)
-        5. User Requested Standards: Any additional standards specified by the user or supervisor
+        5. User Requested Standards: Any additional standards specified by the user or
+          supervisor
 
-        Format your response in markdown, starting with a "## Standards" heading, with 
+        Format your response in markdown, starting with a "## Standards" heading, with
         subheadings for each category.
 
         output format instructions:
@@ -338,13 +370,18 @@ class ArchitectPrompts:
         6. Dockerfile contents
         7. Contents for .dockerignore and .gitignore files
 
-        Format your response in markdown, starting with a "## Implementation Details" 
+        Format your response in markdown, starting with a "## Implementation Details"
         heading, with subheadings for each category.
 
         output format instructions:
         {format_instructions}
         """,
-        input_variables=["architecture", "microservice_design", "folder_structure", "additional_information"],
+        input_variables=[
+            "architecture", 
+            "microservice_design", 
+            "folder_structure", 
+            "additional_information"
+        ],
         partial_variables={
             "format_instructions": PydanticOutputParser(
                 pydantic_object=TaskOutput
@@ -360,7 +397,7 @@ class ArchitectPrompts:
 
         Specify the license to be used for this project.
 
-        Format your response in markdown, starting with a 
+        Format your response in markdown, starting with a
         "## License and Legal Considerations" heading.
 
         output format instructions:
@@ -380,7 +417,8 @@ class ArchitectPrompts:
 
         Please suggest a project name that adheres to the naming standards.
 
-        Error messages will only be present if there is an issue with your previous response.
+        Error messages will only be present if there is an issue with your previous
+        response.
         '{error_message}'
 
         Output format instructions:
