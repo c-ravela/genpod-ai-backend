@@ -533,8 +533,7 @@ class RequirementsDocument(BaseModel):
             formatted with sections for each attribute.
         """
 
-        return f"""
-# Project Requirements Document
+        return f"""# Project Requirements Document
 
 {self.project_overview}
 
