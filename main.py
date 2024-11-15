@@ -13,7 +13,12 @@ from database.database import Database
 from genpod.team import TeamMembers
 from utils.logs.logging_utils import logger
 from utils.time import get_timestamp
-from utils.fs import read_file
+from utils.fs import read_file, write_supervisor_state_to_file
+from phoenix.otel import register
+from openinference.instrumentation.openai import OpenAIInstrumentor
+
+tracer_provider = register(project_name="genpod", endpoint='http://0.0.0.0:6006/v1/traces')
+OpenAIInstrumentor().instrument(tracer_provider=tracer_provider)
 
 print(
     "\n\nWe greatly appreciate your interest! Please note that we are in the "
@@ -138,6 +143,7 @@ if __name__ == "__main__":
                 f"Received state update from supervisor node: {node_name}. "
                 f"Response details: {super_state}"
             )
+            write_supervisor_state_to_file(super_state)
             result = super_state
 
     # TODO: DB update should happen at for every iteration in the above for loop
