@@ -13,11 +13,11 @@ from database.database import Database
 from genpod.team import TeamMembers
 from utils.logs.logging_utils import logger
 from utils.time import get_timestamp
-from utils.fs import read_file
+from utils.fs import read_file, write_supervisor_state_to_file
 
 print(
-    "\n\nWe greatly appreciate your interest! Please note that we are in the "
-    "midst of active development and are striving to make improvements every day!\n\n"
+    "\n[INFO] Thank you for your interest!\n"
+    "We would love to hear your feedback, as it helps us improve the tool!\n"
 )
 
 if __name__ == "__main__":
@@ -57,6 +57,13 @@ if __name__ == "__main__":
     db.setup_db()
 
     PROJECT_INPUT = read_file(config.user_input_path)
+    print(
+        f"\n[INFO] User Input File Path:\n  {config.user_input_path}\n"
+        "\n┌─ User Input ───────────────────────────┐\n"
+        f"{PROJECT_INPUT}\n"
+        "└────────────────────────────────────────┘\n"
+    )
+
     logger.info("Project Input: %s", PROJECT_INPUT)
 
     LICENSE_URL = (
@@ -138,6 +145,7 @@ if __name__ == "__main__":
                 f"Received state update from supervisor node: {node_name}. "
                 f"Response details: {super_state}"
             )
+            write_supervisor_state_to_file(result)
             result = super_state
 
     # TODO: DB update should happen at for every iteration in the above for loop
@@ -159,10 +167,18 @@ if __name__ == "__main__":
     )
 
     print(
-        f"Project generated successfully! Project ID: {result['project_id']}, "
-        f"Project Name: {result['project_name']}, Location: {PROJECT_PATH}."
+        f"\n[INFO] Project generated successfully!\n"
+        f"Project ID: {result['project_id']}\n"
+        f"Project Name: {result['project_name']}\n"
+        f"Location: {PROJECT_PATH}\n"
     )
+
     logger.info(
         f"Project generated successfully! Project ID: {result['project_id']}, "
         f"Project Name: {result['project_name']}, Location: {PROJECT_PATH}."
+    )
+
+    print(
+        "\n[INFO] Thank you for your interest!\n"
+        "We would love to hear your feedback, as it helps us improve the tool!\n"
     )
