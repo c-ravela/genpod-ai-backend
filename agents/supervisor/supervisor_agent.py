@@ -610,6 +610,7 @@ class SupervisorAgent(Agent[SupervisorState, SupervisorPrompts]):
                 additional_info='',
                 question=state['original_user_input']
             )
+            state['agents_status'] = f"{self.team.rag.member_name} is gathering requirements"
             state['project_status'] = PStatus.NEW
             logger.info(f"{self.team.supervisor.member_name}: Created task for RAG agent to gather additional info for the user requested project. Project Status moved to {state['project_status']}")
 
@@ -968,16 +969,18 @@ class SupervisorAgent(Agent[SupervisorState, SupervisorPrompts]):
     def call_human(self, state: SupervisorState) -> SupervisorState:
 
         print(
-            f"{self.team.architect.member_name} has completed the preparation of the project requirements document. "
-            "Please proceed with a thorough review to ensure all criteria are met and aligned with project objectives.\n"
+            f"\n[INFO] {self.team.architect.member_name} has completed the preparation "
+            "of the project requirements document.\nPlease review it thoroughly to "
+            "ensure all criteria are met and aligned with the project objectives.\n"
         )
         
         print(
-            f"Document Path: {os.path.join(state['project_path'], 'docs/requirements.md')}\n"
+            f"[INFO] Document Path: {os.path.join(state['project_path'], 'docs/requirements.md')}\n"
         )
-        
+
         print(
-            "Does the requirements document meet the expected standards? Would you like to make any modifications? (Y/N): "
+            "[QUESTION] Does the requirements document meet the expected standards?\n"
+            "Would you like to make any modifications? (Y/N): "
         )
         user_response = input()
 
@@ -987,22 +990,26 @@ class SupervisorAgent(Agent[SupervisorState, SupervisorPrompts]):
         if is_modification_required:
             human_feedback = ""
             while True:
-                print("\nPlease provide your feedback: ")
+                print("\n[REQUEST] Please provide your feedback:")
                 additional_feedback = input()
                 human_feedback += f"\n{additional_feedback}"
 
-                print("\nIs there additional feedback you'd like to provide? (Y/N): ")
+                print("\n[QUESTION] Is there additional feedback you'd like to provide? (Y/N): ")
                 has_more_feedback = input()
                 if has_more_feedback.strip().lower() != 'y':
                     break
             
-            print("\nThank you for your feedback. It will be incorporated to regenerate the requirements document.")
+            print(
+                "\n[INFO] Thank you for your feedback. It will be incorporated to "
+                "regenerate the requirements document.\n"
+            )
         else:
             print(
-                "\nYou have selected 'No', indicating that no modifications are required. "
+                "\n[INFO] You have selected 'No', indicating that no modifications are required.\n"
                 "Proceeding with the current version of the requirements document."
             )
-            print("Continuing with project generation based on the current requirements.")
+            print("[INFO] Continuing with project generation based on the current requirements.\n")
+
         if is_modification_required:
             state['current_task'].task_status = Status.INPROGRESS
             state['current_task'].additional_info += f"\nHuman feedback to incorporate:\n{human_feedback}"
