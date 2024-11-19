@@ -70,7 +70,7 @@ class ArchitectPrompts:
         **Task**: Convert each deliverable section from this Markdown content into an
         individual item in a list or array. Each section should remain exactly as it
         appears in the document, with no changes to its formatting or content.
-        
+
         Each deliverable should be represented as a distinct item in the list, in the
         same order as they appear in the provided content.
 
@@ -85,7 +85,8 @@ class ArchitectPrompts:
         ]
         ```
 
-        Error messages will only appear if there is an issue with your previous response:
+        Error messages will only appear if there is an issue with your previous
+        response:
         '{error_message}'
 
         output format instructions:
@@ -288,10 +289,8 @@ class ArchitectPrompts:
         2. Detailed description of what needs to be done
         3. Technical requirements or specifications
 
-        
         Ensure that the following aspects are covered in the breakdown, if applicable:
         - Dockerfile for environment setup and deployment
-        - gitignore file to specify files and directories to ignore in version control
         - Package manager files (e.g., requirements.txt for Python, package.json for
           Node.js)
         - README.md file that provides an overview of the project and detailed
@@ -305,9 +304,9 @@ class ArchitectPrompts:
         {format_instructions}
         """,
         input_variables=[
-            "project_overview", 
-            "architecture", 
-            "microservice_design", 
+            "project_overview",
+            "architecture",
+            "microservice_design",
             "additional_information"
         ],
         partial_variables={
@@ -368,7 +367,6 @@ class ArchitectPrompts:
         4. OpenAPI specification (provide a sample structure in YAML)
         5. Dependency management (specify package manager and provide a sample file)
         6. Dockerfile contents
-        7. Contents for .dockerignore and .gitignore files
 
         Format your response in markdown, starting with a "## Implementation Details"
         heading, with subheadings for each category.
@@ -377,9 +375,9 @@ class ArchitectPrompts:
         {format_instructions}
         """,
         input_variables=[
-            "architecture", 
-            "microservice_design", 
-            "folder_structure", 
+            "architecture",
+            "microservice_design",
+            "folder_structure",
             "additional_information"
         ],
         partial_variables={
