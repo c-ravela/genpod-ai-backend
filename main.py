@@ -11,9 +11,9 @@ from configs.project_environment import ProjectEnvironment
 from configs.project_path import set_project_path
 from database.database import Database
 from genpod.team import TeamMembers
+from utils.fs import read_file
 from utils.logs.logging_utils import logger
 from utils.time import get_timestamp
-from utils.fs import read_file
 
 print(
     "\n\nWe greatly appreciate your interest! Please note that we are in the "
