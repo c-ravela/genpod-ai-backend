@@ -54,7 +54,8 @@ def check_model(provider: str, model: str) -> None:
     """
     if model not in SUPPORTED_LLMS.get(provider, []):
         raise ValueError(f"Unsupported model: {model} for provider {provider}. Supported models for {provider} are: {SUPPORTED_LLMS[provider]}")
-    
+
+
 class LLMConfig(BaseModel):
     """Configuration for a specific LLM."""
     provider: str
@@ -99,6 +100,7 @@ class LLMConfig(BaseModel):
         check_model(provider, value)
         return value
 
+
 class ProviderModelConfig(BaseModel):
     """Configuration for a specific provider's model."""
     
@@ -106,12 +108,14 @@ class ProviderModelConfig(BaseModel):
     description: str
     api_key: str = Field(required=False, default=None)
 
+
 class ProviderSetting(BaseModel):
     """Settings for a provider."""
     
     api_key: str = Field(required=False, default=None)
     max_retries: int = Field(ge=1, required=False, default=None)
     retry_backoff: int  = Field(ge=0, required=False, default=None)
+
 
 class ProviderConfig(BaseModel):
     """Configuration for a specific provider."""
@@ -153,8 +157,6 @@ class DefaultConfig(BaseModel):
     max_retries: int = Field(ge=1, required=True)
     retry_backoff: int = Field(ge=0, required=True)
     max_graph_recursion_limit: Optional[int] = Field(ge=1, required=True)
-    user_input_path: str = Field(required=True)
-    project_output_directory: str = Field(required=True)
 
 
 class GenpodConfig(BaseModel):
@@ -163,12 +165,12 @@ class GenpodConfig(BaseModel):
     default: DefaultConfig
     providers: Dict[str, ProviderConfig]
     agents: Dict[str, AgentConfig]
-    vector_collections_name: str
     max_graph_recursion_limit: Optional[int] = Field(
         ge=1, 
         required=False, 
         default=None
     )
+
 
 @dataclass
 class GraphInfo:
@@ -181,6 +183,7 @@ class GraphInfo:
     """
     graph_name: str
     graph_id: str
+
 
 @dataclass
 class AgentInfo:
@@ -237,6 +240,7 @@ class AgentInfo:
             f"LLM Associated: {self.llm}"
         )
 
+
 class ProjectGraphs(Enum):
     """
     Enum that holds all the graphs used by the project.
@@ -280,6 +284,7 @@ class ProjectGraphs(Enum):
             str: The unique identifier of the graph.
         """
         return self.value.graph_id
+
 
 class ProjectAgents(Enum):
     """
@@ -500,20 +505,10 @@ class ProjectAgents(Enum):
 class ProjectConfig:
     """
     Configuration for the entire project, including agent configurations and vector database settings.
-
-    Attributes:
-        agents (Enum): Enum containing all project agents.
-        vector_db_collections (Dict[str, str]): Dictionary mapping vector DB collection names to their paths.
     """
 
     graphs: ProjectGraphs
     agents: ProjectAgents
-    vector_db_collections: Dict[str, str] =  {
-            'MISMO-version-3.6-docs': os.path.join(os.getcwd(), "vector_collections")
-    }
-    user_input_path: str
-    project_output_directory: str
-    vector_collections_name: str
     max_graph_recursion_limit: int
     __config_path: str
     __genpod_config: GenpodConfig
@@ -551,9 +546,6 @@ class ProjectConfig:
         Updates the project settings based on the loaded configuration data.
         """
 
-        self.vector_collections_name = self.__genpod_config.vector_collections_name
-        self.user_input_path = self.__genpod_config.default.user_input_path
-        self.project_output_directory = self.__genpod_config.default.project_output_directory
         self.__set__max_graph_recursion_limit()
         self.__update__agents()
         
