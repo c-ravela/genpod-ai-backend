@@ -14,7 +14,7 @@ class TeamMembers:
     Manages a team of different agents.
     """
 
-    def __init__(self, agents: ProjectAgents, graphs: ProjectGraphs, persistance_db_path: str, vector_db_collection: str) -> None:
+    def __init__(self, agents: ProjectAgents, graphs: ProjectGraphs, persistance_db_path: str, collection_name: str, vector_db_path: str) -> None:
         """
         Initializes the team members with their configurations and state/graph setups.
         """
@@ -27,7 +27,7 @@ class TeamMembers:
 
         self.coder = CoderMember(agents, graphs, persistance_db_path)
         self.planner = PlannerMember(agents, graphs, persistance_db_path)
-        self.rag = RagMember(agents, graphs, persistance_db_path, vector_db_collection)
+        self.rag = RagMember(agents, graphs, persistance_db_path, collection_name, vector_db_path)
         self.tests_generator = TestsGeneratorMember(agents, graphs, persistance_db_path)
         self.reviewer = ReviewerMember(agents, graphs, persistance_db_path)
         
