@@ -203,6 +203,61 @@ class SupervisorState(TypedDict):
         State.out_field()
     ]
 
+    # external
+    previous_project_status: Annotated[
+        PStatus,
+        ''
+    ]
+
+    # external
+    rag_cache_building: Annotated[
+        str,
+        ''
+    ]
+
+    is_rag_cache_created: Annotated[
+        bool,
+        'Represents whether rag cache was created or not. single time update'
+    ]
+
+    is_initial_additional_info_ready: Annotated[
+        bool,
+        'single time update. set once'
+    ]
+
+    are_requirements_prepared: Annotated[
+        bool,
+        'single time update'
+    ]
+
+    are_planned_tasks_in_progress: Annotated[
+        bool,
+        """
+        Indicates whether any planned tasks are currently in progress.
+        This flag is managed by the supervisor:
+         - Set to True when the planner breaks down larger tasks into smaller
+           planned tasks.
+         - Set to False when the planned tasks list is empty.
+        The flag is used to control a loop that operates while planned tasks
+        are being created and processed.
+        """
+    ]
+
+    are_planned_issues_in_progress: Annotated[
+        bool,
+        """
+        Indicates whether any planned issues are currently in progress.
+        This flag is managed by the supervisor:
+        - Set to True when the planner breaks down larger issues into smaller
+          planned issues.
+        - Set to False when the planned issues list is empty.
+        The flag is used to control a loop that operates while planned issues
+        are being created and processed.
+        """
+    ]
+
+    is_human_reviewed: Annotated[bool, '']
+
 def add_message(state: SupervisorState, message: tuple[ChatRoles, str]) -> SupervisorState:
     """
     Adds a single message to the messages field in the state.
