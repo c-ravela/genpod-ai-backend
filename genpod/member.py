@@ -59,10 +59,24 @@ class AgentMember(Generic[GenericAgentState, GenericAgentGraph]):
     def invoke(self, input: Dict[str, Any] | Any) -> GenericAgentState:
         return self._invoke_graph('invoke', input)
     
+    def get_last_saved_state(self) -> Dict[str, Any]:
+        """
+        Retrieves the last saved state of the agent using the thread ID.
+
+        Returns:
+            Dict[str, Any]: The saved state of the agent as retrieved from the graph's application.
+
+        Raises:
+            ValueError: If no state is found for the given thread ID.
+        """
+        graph_config = {"configurable": {"thread_id": self.thread_id}}
+        return self.graph.app.get_state(graph_config).values
+
     def _invoke_graph(self, method_name: str, input: Dict[str, Any] | Any) -> Any:
         graph_config = {"configurable": {"thread_id": self.thread_id}}
         if self.recursion_limit != -1:
             graph_config['recursion_limit'] = self.recursion_limit
+        
         return getattr(self.graph.app, method_name)(input, graph_config)
 
     def set_recursion_limit(self, limit: int) -> None:
