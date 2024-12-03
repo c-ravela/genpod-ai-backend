@@ -1,6 +1,6 @@
 import os
 import ast
-from typing import TYPE_CHECKING, Dict, List, Tuple
+from typing import TYPE_CHECKING, Any, Dict, List, Tuple
 
 from langchain_core.messages import AIMessage
 from pydantic import ValidationError
@@ -24,7 +24,6 @@ if TYPE_CHECKING:
 class SupervisorAgent(Agent[SupervisorState, SupervisorPrompts]):
 
     team: 'TeamMembers'
-    previous_project_status: PStatus
 
     def __init__(self, agent_id: str, agent_name: str, llm: LLM) -> None:
 
@@ -36,43 +35,14 @@ class SupervisorAgent(Agent[SupervisorState, SupervisorPrompts]):
             llm
         )
         self.team = None
-        self.previous_project_status = PStatus.NONE
 
         # TODO - LOW: has to be moved to RAG agent
         self.rag_cache = FuzzyRAGCache()
-        self.rag_cache_building = ''
-
-        # TODO - LOW: has to be moved to RAG agent
-        self.is_rag_cache_created: bool = False  # Represents whether rag cache was created or not. single time update
-      
-        self.is_initial_additional_info_ready: bool = False  # single time update. set once
-        self.are_requirements_prepared: bool = False  # single time update
-
-        # Indicates whether any planned tasks are currently in progress.
-        # This flag is managed by the supervisor:
-        # - Set to True when the planner breaks down larger tasks into smaller 
-        #   planned tasks.
-        # - Set to False when the planned tasks list is empty.
-        # The flag is used to control a loop that operates while planned tasks 
-        # are being created and processed.
-        self.are_planned_tasks_in_progress: bool = False
-
-        # Indicates whether any planned issues are currently in progress.
-        # This flag is managed by the supervisor:
-        # - Set to True when the planner breaks down larger issues into smaller 
-        #   planned issues.
-        # - Set to False when the planned issues list is empty.
-        # The flag is used to control a loop that operates while planned issues 
-        # are being created and processed.
-        self.are_planned_issues_in_progress: bool = False
 
         self.calling_agent: str = ""
         self.called_agent: str = ""
 
-        self.is_human_reviewed: bool = False
-
         self.responses: Dict[str, List[Tuple[str, Task]]] = {}
-        self.tasks = []
 
     def setup_team(self, team: 'TeamMembers') -> None:
         """
@@ -224,19 +194,32 @@ class SupervisorAgent(Agent[SupervisorState, SupervisorPrompts]):
             )
 
         # initialize supervisor state
-        state['project_name'] = ""
-        state['project_status'] = PStatus.RECEIVED
-        state['agents_status'] = ''
-        state['microservice_name'] = ""
-        state['current_task'] = Task()
-        state['current_planned_task'] = PlannedTask()
-        state['current_planned_issue'] = PlannedIssue(is_function_generation_required=False)
-        state['current_issue'] = Issue()
-        state['is_rag_query_answered'] = False
-        state['rag_cache_queries'] = []
-        state['issues'] = IssuesQueue()
-        state['tasks'] = TaskQueue()
-        state['messages'] = [
+        state['project_name'] = self.ensure_value(state['project_name'], '')
+        state['project_status'] = self.ensure_value(
+            state['project_status'],
+            PStatus.RECEIVED
+        )
+        state['agents_status'] = self.ensure_value(state['agents_status'], '')
+        state['microservice_name'] = self.ensure_value(state['microservice_name'], '')
+        state['current_task'] = self.ensure_value(state['current_task'], Task())
+        state['current_planned_task'] = self.ensure_value(
+            state['current_planned_task'],
+            PlannedTask()
+        )
+        state['current_planned_issue'] = self.ensure_value(
+            state['current_planned_issue'],
+            PlannedIssue(is_function_generation_required=False)
+        )
+
+        state['current_issue'] = self.ensure_value(state['current_issue'], Issue())
+        state['is_rag_query_answered'] = self.ensure_value(
+            state['is_rag_query_answered'],
+            False
+        )
+        state['rag_cache_queries'] = self.ensure_value(state['rag_cache_queries'], [])
+        state['issues'] = self.ensure_value(state['issues'], IssuesQueue())
+        state['tasks'] = self.ensure_value(state['tasks'], TaskQueue())
+        state['messages'] = self.ensure_value(state['messages'], [
             (
                 ChatRoles.USER,
                 state['original_user_input']
@@ -245,15 +228,56 @@ class SupervisorAgent(Agent[SupervisorState, SupervisorPrompts]):
                 ChatRoles.SYSTEM, 
                 f'A new project with the following details has been received from the user: {state["original_user_input"]}'
             )
-        ]
-        state['human_feedback'] = []
-        state['functions_skeleton'] = {}
-        state['test_code'] = ""
-        state['planned_tasks'] = PlannedTaskQueue()
-        state['planned_issues'] = PlannedIssuesQueue()
-        state['rag_retrieval'] = ''
-        state['requirements_document'] = RequirementsDocument()
-        state['code_generation_plan_list'] = []
+        ])
+        state['human_feedback'] = self.ensure_value(state['human_feedback'], [])
+        state['functions_skeleton'] = self.ensure_value(state['functions_skeleton'], {})
+        state['test_code'] = self.ensure_value(state['test_code'], '')
+        state['planned_tasks'] = self.ensure_value(
+            state['planned_tasks'],
+            PlannedTaskQueue()
+        )
+        state['planned_issues'] = self.ensure_value(
+            state['planned_issues'],
+            PlannedIssuesQueue()
+        )
+        state['rag_retrieval'] = self.ensure_value(state['rag_retrieval'], '')
+        state['requirements_document'] = self.ensure_value(
+            state['requirements_document'],
+            RequirementsDocument()
+        )
+        state['code_generation_plan_list'] = self.ensure_value(
+            state['code_generation_plan_list'],
+            []
+        )
+
+        # external
+        state['previous_project_status'] = self.ensure_value(
+            state['previous_project_status'],
+            PStatus.NONE
+        )
+        state['rag_cache_building'] = self.ensure_value(state['rag_cache_building'], '')
+        state['is_rag_cache_created'] = self.ensure_value(
+            state['is_rag_cache_created'],
+            False
+        )
+        state['is_initial_additional_info_ready'] = self.ensure_value(
+            state['is_initial_additional_info_ready'],
+            False
+        )
+        state['are_planned_tasks_in_progress'] = self.ensure_value(
+            state['are_planned_tasks_in_progress'],
+            False
+        )
+
+        state['are_planned_issues_in_progress'] = self.ensure_value(
+            state['are_planned_issues_in_progress'],
+            False
+        )
+
+        state['is_human_reviewed'] = self.ensure_value(
+            state['is_human_reviewed'],
+            False
+        )
 
         self.responses = {member.member_id: [] for member in self.team.get_team_members_as_list()}
        
@@ -271,7 +295,7 @@ class SupervisorAgent(Agent[SupervisorState, SupervisorPrompts]):
 
         # TODO - LOW: RAG cache creation has to be moved to RAG agent
         # check if rag cache was ready if not prepare one
-        if not self.is_rag_cache_created:
+        if not state['is_rag_cache_created']:
             logger.info(f"{self.team.rag.member_name}: creating the RAG cache.")
 
             # TODO - MEDIUM: Define a proper data structure for holding the RAG queries 
@@ -290,11 +314,11 @@ class SupervisorAgent(Agent[SupervisorState, SupervisorPrompts]):
             # strings and performing many string comparisons.
             # Solution: Choose and implement algorithms like LRU (Least Recently Used) 
             # or LFU (Least Frequently Used).
-            state['rag_cache_queries'], self.rag_cache_building = self.build_rag_cache(
+            state['rag_cache_queries'], state['rag_cache_building'] = self.build_rag_cache(
                 state['original_user_input']
             )
 
-            self.is_rag_cache_created = True
+            state['is_rag_cache_created'] = True
             logger.info(
                 f"{self.team.rag.member_name}: The RAG cache has been created."
                 f"The following queries were used during the process: {state['rag_cache_queries']}"
@@ -341,10 +365,10 @@ class SupervisorAgent(Agent[SupervisorState, SupervisorPrompts]):
                     )
                 ]
 
-                state['current_task'].additional_info = f"{result}\n{self.rag_cache_building}"
+                state['current_task'].additional_info = f"{result}\n{state['rag_cache_building']}"
                 state['current_task'].task_status = Status.DONE
-                self.is_initial_additional_info_ready = True
-                state['rag_retrieval'] = result + "\n" + self.rag_cache_building
+                state['is_initial_additional_info_ready'] = True
+                state['rag_retrieval'] = result + "\n" + state['rag_cache_building']
                 state['agents_status'] = f'{self.team.rag.member_name} completed'
                 self.responses[self.team.rag.member_id].append(
                     ("Returned from RAG database", state['current_task'])
@@ -407,7 +431,6 @@ class SupervisorAgent(Agent[SupervisorState, SupervisorPrompts]):
             # if the task_status is done that mean architect has generated all the 
             # required information for team
             if architect_result['current_task'].task_status == Status.DONE:
-                self.are_requirements_prepared = True
                 state['current_task'] = architect_result['current_task']
                 state['agents_status'] = f'{self.team.architect.member_name} completed'
                 self.responses[self.team.architect.member_id].append(("Returned from Architect", architect_result['tasks']))
@@ -622,7 +645,7 @@ class SupervisorAgent(Agent[SupervisorState, SupervisorPrompts]):
             # If the task is marked as done, it means the RAG agent has gathered the additional information 
             # needed for the team to begin the project.
             if state['current_task'].task_status == Status.DONE:
-                if self.is_initial_additional_info_ready:
+                if state['is_initial_additional_info_ready']:
                     state['project_status'] = PStatus.INITIAL
 
                     # create a new task for the architect
@@ -665,7 +688,7 @@ class SupervisorAgent(Agent[SupervisorState, SupervisorPrompts]):
 
             # Architect has prepared all the required information.
             if state['current_task'].task_status == Status.DONE:
-                if not self.is_human_reviewed:
+                if not state['is_human_reviewed']:
                     state['project_status'] = PStatus.HALTED
 
                     logger.info(f"{self.team.supervisor.member_name}: Architect agent has prepared the requirements document for the team.")
@@ -688,7 +711,7 @@ class SupervisorAgent(Agent[SupervisorState, SupervisorPrompts]):
             elif state['current_task'].task_status == Status.AWAITING:
                 # Architect need additional information to complete the assigned task. 
                 # architect provides query in the task packet use it to query RAG.
-                self.previous_project_status = state['project_status']
+                state['previous_project_status'] = state['project_status']
                 state['project_status'] = PStatus.MONITORING
 
                 state['messages'] += [
@@ -713,7 +736,7 @@ class SupervisorAgent(Agent[SupervisorState, SupervisorPrompts]):
             # with the next steps.
 
             if state['current_task'].task_status == Status.RESPONDED:
-                state['project_status'] = self.previous_project_status
+                state['project_status'] = state['previous_project_status']
                 self.calling_agent = self.called_agent
 
                 state['messages'] += [
@@ -772,7 +795,7 @@ class SupervisorAgent(Agent[SupervisorState, SupervisorPrompts]):
                 # Planner needs additional information
                 # Architect was responsible for answering the query if not then rag 
                 # comes into play.
-                self.previous_project_status = state['project_status']
+                state['previous_project_status'] = state['project_status']
                 state['project_status'] = PStatus.MONITORING
                 self.calling_agent = self.called_agent
             elif state['current_task'].task_status == Status.INPROGRESS:
@@ -786,11 +809,11 @@ class SupervisorAgent(Agent[SupervisorState, SupervisorPrompts]):
                     next_planned_task = state['planned_tasks'].get_next_item()
 
                     if next_planned_task is None:
-                        self.are_planned_tasks_in_progress = False
+                        state['are_planned_tasks_in_progress'] = False
                         state['current_task'].task_status = Status.DONE
                     else:
                         state['current_planned_task'] = next_planned_task
-                        self.are_planned_tasks_in_progress = True
+                        state['are_planned_tasks_in_progress'] = True
                         self.calling_agent = self.team.supervisor.member_id
 
             return state
@@ -836,10 +859,10 @@ class SupervisorAgent(Agent[SupervisorState, SupervisorPrompts]):
                 if state['current_planned_issue'].status in (Status.NONE, Status.DONE, Status.ABANDONED):
                     if state['planned_issues'].has_pending_items():
                         state['current_planned_issue'] = state['planned_issues'].get_next_item()
-                        self.are_planned_issues_in_progress = True
+                        state['are_planned_issues_in_progress'] = True
                         self.calling_agent = self.team.supervisor.member_id
                     else:
-                        self.are_planned_issues_in_progress = False
+                        state['are_planned_issues_in_progress'] = False
                         state['current_issue'].issue_status = Status.DONE
             return state
         elif state['project_status'] == PStatus.HALTED:
@@ -847,10 +870,10 @@ class SupervisorAgent(Agent[SupervisorState, SupervisorPrompts]):
             # - The application requires human intervention to resolve issues and
             #  complete the task.
 
-            if self.is_human_reviewed:
+            if state['is_human_reviewed']:
                 state['project_status'] = PStatus.INITIAL
                 if state['current_task'].task_status == Status.INPROGRESS:
-                    self.is_human_reviewed = False
+                    state['is_human_reviewed'] = False
             
             return state
         elif state['project_status'] == PStatus.DONE:
@@ -1007,7 +1030,7 @@ class SupervisorAgent(Agent[SupervisorState, SupervisorPrompts]):
             state['current_task'].task_status = Status.INPROGRESS
             state['current_task'].additional_info += f"\nHuman feedback to incorporate:\n{human_feedback}"
 
-        self.is_human_reviewed = True
+        state['is_human_reviewed'] = True
     
         return state
 
@@ -1041,7 +1064,7 @@ class SupervisorAgent(Agent[SupervisorState, SupervisorPrompts]):
             # receives the project details and prepares the the requirements out of it.
             # In this process if architect need aditional information thats when RAG 
             # comes into play at this phase of Project.
-            if self.is_initial_additional_info_ready:
+            if state['is_initial_additional_info_ready']:
                 logger.info(f"Delegator: Invoking call_architect due to Project Status: {PStatus.INITIAL}")
                 return 'call_architect'
         elif state['project_status'] == PStatus.MONITORING:
@@ -1062,7 +1085,7 @@ class SupervisorAgent(Agent[SupervisorState, SupervisorPrompts]):
             # If this flag is True, it means that planned tasks are the current priority.
             # If the list is empty, it signifies that there are no planned tasks, and 
             # any remaining tasks should be further broken down by the planner.
-            if self.are_planned_tasks_in_progress:
+            if state['are_planned_tasks_in_progress']:
                 if state['current_planned_task'].is_function_generation_required:
                     if not state['current_planned_task'].is_test_code_generated:
                         logger.info(f"Delegator: Invoking call_test_code_generator due to Project Status: {PStatus.EXECUTING} and PlannedTask involving is_function_generation_required and is_test_code_generated.")
@@ -1085,7 +1108,7 @@ class SupervisorAgent(Agent[SupervisorState, SupervisorPrompts]):
         elif state['project_status'] == PStatus.REVIEWING:
             return 'call_reviewer'
         elif state['project_status'] == PStatus.RESOLVING:
-            if self.are_planned_issues_in_progress:
+            if state['are_planned_issues_in_progress']:
                 if state['current_planned_issue'].is_function_generation_required:
                     if not state['current_planned_issue'].is_test_code_generated:
                         logger.info(f"Delegator: Invoking call_test_code_generator due to Project Status: {PStatus.RESOLVING} and PlannedTask involving is_function_generation_required and is_test_code_generated.")
@@ -1111,7 +1134,7 @@ class SupervisorAgent(Agent[SupervisorState, SupervisorPrompts]):
             # be due to ambiguity or intentional scenarios that need human judgment to 
             # ensure progress.
 
-            if self.is_human_reviewed:
+            if state['is_human_reviewed']:
                 return 'call_supervisor'
             
             logger.info(f"Delegator: Invoking call_human due to Project Status: {PStatus.HALTED}.")
@@ -1119,3 +1142,15 @@ class SupervisorAgent(Agent[SupervisorState, SupervisorPrompts]):
 
         logger.info("Delegator: Invoking update_state.")
         return "update_state"
+
+    @staticmethod
+    def ensure_value(value: Any, fallback: Any) -> Any:
+        """
+        Ensures the value is not None by returning it if present,
+        or the fallback value otherwise.
+
+        :param value: The input value to check.
+        :param fallback: The fallback value to return if the input value is None.
+        :return: Either the value or the fallback.
+        """
+        return value if value is not None else fallback
