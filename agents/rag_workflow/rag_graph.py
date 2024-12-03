@@ -14,7 +14,13 @@ class RAGWorkFlow(Graph[RAGAgent]):
         super().__init__(
             graph_id,
             graph_name, 
-            RAGAgent(agent_id, agent_name, llm, collection_name = collection_name, persist_directory=persist_directory),
+            RAGAgent(
+                agent_id,
+                agent_name,
+                llm,
+                collection_name=collection_name,
+                persist_directory=persist_directory
+            ),
             persistance_db_path
         )
 
