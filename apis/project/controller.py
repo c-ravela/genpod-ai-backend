@@ -1,6 +1,8 @@
 from typing import List
-from apis.project.service import ProjectService
+
 from apis.project.entity import Project
+from apis.project.service import ProjectService
+
 
 class ProjectController:
     """

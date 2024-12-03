@@ -1,16 +1,15 @@
 from typing import List
+
 from agents.supervisor.supervisor_state import SupervisorState
-from apis.project.entity import Project
-from apis.project.controller import ProjectController
-
-from apis.microservice.entity import Microservice
 from apis.microservice.controller import MicroserviceController
-
-from apis.session.entity import Session
+from apis.microservice.entity import Microservice
+from apis.project.controller import ProjectController
+from apis.project.entity import Project
 from apis.session.controller import SessionController
-
-from genpod.team import TeamMembers
+from apis.session.entity import Session
 from configs.project_config import ProjectAgents, ProjectGraphs
+from genpod.team import TeamMembers
+
 
 def generate(
         project: Project,
