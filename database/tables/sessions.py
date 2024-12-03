@@ -14,6 +14,7 @@ class Sessions(Table):
         connection (sqlite3.Connection): Connection to the SQLite database.
     """
     id: int
+    agent_id: str
     project_id: int
     microservice_id: int
     created_at: datetime
@@ -24,7 +25,7 @@ class Sessions(Table):
     def __init__(self, connection: sqlite3.Connection):
         """
         Initializes the Sessions table object.
-        
+
         Args:
             connection (sqlite3.Connection): Connection to the SQLite database.
         """
@@ -32,15 +33,14 @@ class Sessions(Table):
         super().__init__(connection)
 
     def create(self) -> None:
-        """
-        Creates the mircoservices table in the database.
-        """
+        """Creates the mircoservices table in the database."""
 
         logger.info(f"Creating {self.name} Table...")
 
         create_table_query = f'''
         CREATE TABLE IF NOT EXISTS {self.name} (
             id INTEGER PRIMARY KEY,
+            agent_id TEXT NOT NULL,
             project_id INTEGER NOT NULL,
             microservice_id INTEGER NOT NULL,
             created_at DATETIME NOT NULL,
@@ -65,21 +65,22 @@ class Sessions(Table):
         finally:
             if cursor:
                 cursor.close()
-    
-    def insert(self, project_id: str, microservice_id: str, user_id: str) -> Dict[str, Any]:
+
+    def insert(self, agent_id: str, project_id: int, microservice_id: int, user_id: int) -> Dict[str, Any]:
         """
         Inserts a new session record into the table and returns it as a dictionary.
         """
 
         return super().insert(
+            agent_id=agent_id,
             project_id=project_id,
             microservice_id=microservice_id,
             created_by=user_id,
             updated_by=user_id
         )
-        
+
     def __valid_columns__(self) -> set:
         """
         Returns the set of valid columns for the sessions table.
         """
-        return {"id", "project_id", "microservice_id", "created_at", "updated_at", "created_by", "updated_by"}
+        return {"id", "agent_id", "project_id", "microservice_id", "created_at", "updated_at", "created_by", "updated_by"}
