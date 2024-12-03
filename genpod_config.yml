@@ -11,13 +11,11 @@ default:
       temperature: 0.3
       model_kwargs:
         top_p: 0.4
-      max_retries: 4
+      max_retries: 3
       streaming: True
   max_retries: 3 # Maximum retries for internal handling, not specific to any provider
   retry_backoff: 3 # Time (in seconds) to wait before retrying a request
   max_graph_recursion_limit: 1000
-  user_input_path: /path/to/user_input/textfile.txt
-  project_output_directory: /directory/path/to/project/output
 
 # Configuration for supported LLM providers and their respective models
 providers:
@@ -93,5 +91,4 @@ agents:
   reviewer:
     description: 'Performs code reviews, suggests improvements, and ensures that all outputs meet quality and performance standards.'
 
-vector_collections_name: "MISMO-version-3.6-docs"
 max_graph_recursion_limit: 1500
