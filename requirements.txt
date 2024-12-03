@@ -13,10 +13,7 @@ langchain-anthropic
 langchain-text-splitters==0.2.2
 langdetect==1.0.9
 langgraph==0.1.1
-matplotlib-inline==0.1.7
 networkx==3.3
-numpy==1.26.4
-pandas==2.2.2
 pydantic==2.7.4
 requests==2.31.0
 tiktoken==0.7.0
