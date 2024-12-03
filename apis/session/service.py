@@ -1,6 +1,8 @@
-from typing import List, Dict, Any
+from typing import Any, Dict, List
+
 from apis.session.entity import Session
 from database.database import Database
+
 
 class SessionService:
 

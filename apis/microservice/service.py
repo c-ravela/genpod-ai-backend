@@ -1,4 +1,4 @@
-from typing import List, Dict, Any
+from typing import Any, Dict, List
 
 from apis.microservice.entity import Microservice
 from database.database import Database

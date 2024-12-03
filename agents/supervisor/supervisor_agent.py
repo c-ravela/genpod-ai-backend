@@ -1,5 +1,5 @@
-import os
 import ast
+import os
 from typing import TYPE_CHECKING, Any, Dict, List, Tuple
 
 from langchain_core.messages import AIMessage
@@ -9,8 +9,9 @@ from agents.agent.agent import Agent
 from agents.supervisor.supervisor_state import SupervisorState
 from llms.llm import LLM
 from models.constants import ChatRoles, PStatus, Status
-from models.models import (Issue, IssuesQueue, PlannedTask, PlannedTaskQueue, PlannedIssue, 
-                           RequirementsDocument, Task, TaskQueue, PlannedIssuesQueue)
+from models.models import (Issue, IssuesQueue, PlannedIssue,
+                           PlannedIssuesQueue, PlannedTask, PlannedTaskQueue,
+                           RequirementsDocument, Task, TaskQueue)
 from models.supervisor_models import QueryList
 from prompts.supervisor_prompts import SupervisorPrompts
 from utils.fuzzy_rag_cache import FuzzyRAGCache

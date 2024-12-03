@@ -1,6 +1,8 @@
-from typing import List, Dict, Any
+from typing import Any, Dict, List
+
 from apis.project.entity import Project
 from database.database import Database
+
 
 class ProjectService:
     """

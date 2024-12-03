@@ -1,19 +1,20 @@
 """Driving code file for this project."""
 
+import json
 import os
 import sys
-import json
+
 from dotenv import load_dotenv
 
+from apis.main import generate, resume
+from apis.project.entity import Project
 from configs.project_config import ProjectConfig
 from configs.project_path import set_project_path
 from database.database import Database
 from utils.logs.logging_utils import logger
 from utils.time import get_timestamp
-
 from utils.yaml_utils import read_yaml
-from apis.project.entity import Project
-from apis.main import generate, resume
+
 
 def main():
     if len(sys.argv) < 2:
