@@ -1,19 +1,96 @@
 from typing import List
-from agents.supervisor.supervisor_state import SupervisorState
-from apis.project.entity import Project
-from apis.project.controller import ProjectController
 
-from apis.microservice.entity import Microservice
 from apis.microservice.controller import MicroserviceController
-
-from apis.session.entity import Session
-from apis.session.controller import SessionController
-
-from genpod.team import TeamMembers
+from apis.microservice_session.controller import MicroserviceSessionController
+from apis.project.controller import ProjectController
 from configs.project_config import ProjectAgents, ProjectGraphs
+from database.entities.microservice_sessions import MicroserviceSession
+from database.entities.microservices import Microservice
+from genpod.team import TeamMembers
+from utils.logs.logging_utils import logger
 
-def generate(
-        project: Project,
+
+class ActionManager:
+    def __init__(
+        self,
+        microservice: Microservice,
+        agents: ProjectAgents,
+        graphs: ProjectGraphs,
+        database_path: str,
+        collection_name: str,
+        vector_db_path: str,
+        graph_recursion_limit: int,
+    ):
+        logger.debug("Initializing ActionManager.")
+        self.microservice = microservice
+        self.agents = agents
+        self.graphs = graphs
+        self.database_path = database_path
+        self.collection_name = collection_name
+        self.vector_db_path = vector_db_path
+        self.graph_recursion_limit = graph_recursion_limit
+        self.microservice_controller = MicroserviceController()
+        self.session_controller = MicroserviceSessionController()
+        logger.info("ActionManager initialized successfully.")
+
+    def setup_team_members(self):
+        """Initialize and set up TeamMembers with the supervisor."""
+        logger.info("Setting up team members.")
+        try:
+            self.genpod_team = TeamMembers(
+                self.agents,
+                self.graphs,
+                self.database_path,
+                self.collection_name,
+                self.vector_db_path
+            )
+            self.genpod_team.supervisor.set_recursion_limit(self.graph_recursion_limit)
+            self.genpod_team.supervisor.graph.agent.setup_team(self.genpod_team)
+            logger.info("Team members set up successfully.")
+        except Exception as e:
+            logger.error(f"Failed to set up team members: {e}")
+            raise
+
+    def process_supervisor_response(self, supervisor_response):
+        """Process the responses from the supervisor and update the microservice."""
+        logger.info("Processing supervisor response.")
+        try:
+            should_update = False
+            for res in supervisor_response:
+                for node_name, super_state in res.items():
+                    if self.microservice.microservice_name != super_state['microservice_name']:
+                        self.microservice.microservice_name = super_state['microservice_name']
+                        should_update = True
+
+                    if self.microservice.status != str(super_state['project_status']):
+                        self.microservice.status = str(super_state['project_status'])
+                        should_update = True
+
+                    if should_update:
+                        self.microservice_controller.update(self.microservice)
+                        logger.info(f"Microservice updated: {self.microservice}")
+                        should_update = False
+        except Exception as e:
+            logger.error(f"Failed to process supervisor response: {e}")
+            raise
+    
+    def stream_to_supervisor(self, data):
+        """Stream data to the supervisor and return the response."""
+        logger.info("Streaming data to supervisor.")
+        try:
+            response = self.genpod_team.supervisor.stream(data)
+            logger.info("Data streamed to supervisor successfully.")
+            return response
+        except Exception as e:
+            logger.error(f"Failed to stream data to supervisor: {e}")
+            raise
+
+
+class Action:
+
+    @staticmethod
+    def generate(
+        microservice: Microservice,
         agents: ProjectAgents,
         graphs: ProjectGraphs,
         database_path: str,
@@ -21,212 +98,241 @@ def generate(
         vector_db_path: str,
         graph_recursion_limit: int
     ):
-    """Generate the microservice"""
+        """Generate the microservice."""
 
-    while True:
+        logger.info("Generating microservice.")
+        user_prompt = Action._prompt_user_for_project_idea()
         try:
-            print("\nEnter the prompt to define your project idea (at least 10 characters): ")
-            user_prompt = input("> ").strip()
-            
-            if len(user_prompt) > 9:
-                print(f"\nPrompt accepted: {user_prompt}")
-                break
-            else:
-                print("Invalid input. Please provide a detailed description of your project idea (at least 10 characters).")
-        except Exception as e:
-            print(f"An error occurred while processing your input: {e}")
-
-    microservice_controller = MicroserviceController()
-    session_controller = SessionController()
-
-    microservice = Microservice(
-        microservice_name="",
-        project_id=project.id,
-        status="",
-        created_by=project.created_by
-    )
-
-    microservice = microservice_controller.create(microservice)
-    for agent in agents:
-        curr_session = Session(
-            agent_id=agent.agent_id,
-            project_id=project.id,
-            microservice_id=microservice.id,
-            created_by=project.created_by
-        )
-        curr_session = session_controller.create(curr_session)
-        agent.set_thread_id(curr_session.id)
-
-    genpod_team = TeamMembers(agents, graphs, database_path, collection_name, vector_db_path)
-    genpod_team.supervisor.set_recursion_limit(graph_recursion_limit)
-    genpod_team.supervisor.graph.agent.setup_team(genpod_team)
-
-    supervisor_response = genpod_team.supervisor.stream(
-        {   
-            "project_id":project.id,
-            "microservice_id": microservice.id,
-            "original_user_input": user_prompt,
-            "project_path": project.project_location,
-            "license_url": project.license_text,
-            "license_text": project.license_file_url,
-        }
-    )
-
-    result: SupervisorState = None
-    should_update = False
-    for res in supervisor_response:
-        for node_name, super_state in res.items():
-            result = super_state
-
-            if microservice.microservice_name != super_state['microservice_name']:
-                microservice.microservice_name = super_state['microservice_name']
-                should_update = True
-            
-            if microservice.status != super_state['project_status']:
-                microservice.status = str(super_state['project_status'])
-                should_update = True
-
-            if should_update:
-                microservice_controller.update(microservice, microservice.created_by)
-                should_update = False
-
-    print(
-        f"Project generated successfully! Project ID: {result['project_id']}, "
-        f"Project Name: {result['project_name']}, Location: {project.project_location}."
-    )
-
-def resume(
-    user_id: int,
-    agents: ProjectAgents,
-    graphs: ProjectGraphs,
-    database_path: str,
-    collection_name: str,
-    vector_db_path: str,
-    graph_recursion_limit: int
-):  
-    microservice_controller = MicroserviceController()
-    picked_project_id = get_project_details(user_id)
-    picked_microservice = get_microservice_details(user_id, picked_project_id)
-    session_details = get_session_details(user_id, picked_project_id, picked_microservice.id)
-
-    session_map = {session.agent_id: session for session in session_details}
-    
-    for agent in agents:
-        curr_session = session_map.get(agent.agent_id)
-        if curr_session:
-            agent.set_thread_id(curr_session.id)
-    
-    genpod_team = TeamMembers(agents, graphs, database_path, collection_name, vector_db_path)
-    genpod_team.supervisor.set_recursion_limit(graph_recursion_limit)
-    genpod_team.supervisor.graph.agent.setup_team(genpod_team)
-
-    supervisor_response = genpod_team.supervisor.stream(genpod_team.supervisor.get_last_saved_state())
-
-    result: SupervisorState = None
-    should_update = False
-    for res in supervisor_response:
-        for node_name, super_state in res.items():
-            result = super_state
-
-            if picked_microservice.microservice_name != super_state['microservice_name']:
-                picked_microservice.microservice_name = super_state['microservice_name']
-                should_update = True
-            
-            if picked_microservice.status != super_state['project_status']:
-                picked_microservice.status = str(super_state['project_status'])
-                should_update = True
-
-            if should_update:
-                microservice_controller.update(picked_microservice, picked_microservice.created_by)
-                should_update = False
-
-    print(
-        f"Project generated successfully! Project ID: {result['project_id']}, "
-        f"Project Name: {result['project_name']}, Location: {result['project_path']}."
-    )
-
-def get_project_details(user_id: int) -> int:
-    project_controller = ProjectController()
-
-    user_projects = project_controller.get_projects(user_id)
-    if not user_projects:
-        print(f"\nNo projects found for the user with ID {user_id}.")
-        return
-    
-    print(f"\nListing projects created by the user with ID {user_id}:\n")
-    for project in user_projects:
-        print(
-            f"Project Details:\n"
-            f"  - ID: {project.id}\n"
-            f"  - Name: {project.project_name}\n"
-        )
-
-    # Prompt the user to select a project
-    while True:
-        try:
-            print("Please enter the ID of the project you want to select")
-            picked_project_id = int(input("> "))
-            if __validate_project_id(picked_project_id, user_projects):
-                print(f"\nProject with ID {picked_project_id} selected successfully!")
-                return picked_project_id
-            else:
-                print("Invalid project ID. Please try again.")
-        except ValueError:
-            print("Invalid input. Please enter a numeric project ID.")
-
-def __validate_project_id(id: int, projects: List[Project]):
-    return any(project.id == id for project in projects)
-
-def get_microservice_details(user_id: int, project_id: int) -> Microservice:
-    microservice_controller = MicroserviceController()
-
-    microservices = microservice_controller.get_microservices(project_id, user_id)
-    if not microservices:
-        print(f"\nNo microservices found for the project with ID {project_id}.")
-        return
-    
-    print(f"\nListing incomplete microservices for the project with ID {project_id} and user ID {user_id}:\n")
-    
-    # Display microservices that are not marked as "DONE"
-    active_microservices = {
-        ms.id: ms for ms in microservices if ms.status != "DONE"
-    }
-    if not active_microservices:
-        print("All microservices for this project are marked as 'DONE' and cannot be resumed.")
-        return None
-        
-    for id, microservice in active_microservices.items():
-            print(
-                f"Microservice Details:\n"
-                f"  - ID: {id}\n"
-                f"  - Name: {microservice.microservice_name}\n"
-                f"  - Project ID: {microservice.project_id}\n"
-                f"  - Status: {microservice.status}\n"
+            manager = ActionManager(
+                microservice,
+                agents,
+                graphs,
+                database_path,
+                collection_name,
+                vector_db_path,
+                graph_recursion_limit
             )
 
-    # Prompt user to select a microservice
-    while True:
-        try:
-            print("\nPlease enter the ID of the microservice you want to resume:")
-            pick = int(input("> "))
-            if pick in active_microservices:
-                selected_microservice = active_microservices[pick]
-                print(
-                    f"\nMicroservice '{selected_microservice.microservice_name}' "
-                    f"(ID: {pick}) has been selected for resumption successfully!"
+            manager.microservice.prompt = user_prompt
+            manager.microservice_controller.create(manager.microservice)
+            logger.info(f"Microservice created: {manager.microservice}")
+
+            for agent in manager.agents:
+                curr_session = MicroserviceSession(
+                    agent_id=agent.agent_id,
+                    project_id=manager.microservice.project_id,
+                    microservice_id=manager.microservice.id,
+                    created_by=manager.microservice.created_by,
+                    updated_by=manager.microservice.created_by
                 )
+                manager.session_controller.create(curr_session)
+                agent.set_thread_id(curr_session.id)
+                logger.info(f"Session created: {curr_session}")
 
-                return selected_microservice
-            else:
-                print("Invalid microservice ID. Please enter a valid ID from the list above.")
-        except ValueError:
-            print("Invalid input. Please enter a numeric microservice ID.")
+            manager.setup_team_members()
 
-def get_session_details(user_id: int, project_id: int, microservice_id: int) -> List[Session]:
-    session_controller = SessionController()
-    sessions = session_controller.get_sessions(project_id, microservice_id, user_id)
-    if not sessions:
-        print(f"\nNo sessions found for the microservice with ID {microservice_id}.")
-        return
-    
-    return sessions
+            supervisor_data = {
+                "project_id": manager.microservice.project_id,
+                "microservice_id": manager.microservice.id,
+                "original_user_input": user_prompt,
+                "project_path": manager.microservice.project_location,
+                "license_url": manager.microservice.license_text,
+                "license_text": manager.microservice.license_file_url,
+            }
+
+            supervisor_response = manager.stream_to_supervisor(supervisor_data)
+            manager.process_supervisor_response(supervisor_response)
+
+            logger.info("Microservice generation completed successfully.")
+            print(
+                f"Your service was generated successfully! Project ID: {manager.microservice.project_id}, "
+                f"Service ID: {manager.microservice.id}, "
+                f"Service Name: {manager.microservice.microservice_name}, Location: {manager.microservice.project_location}."
+            )
+        except Exception as e:
+            logger.error(f"Failed to generate microservice: {e}")
+            raise
+
+    @staticmethod
+    def resume(
+        user_id: int,
+        agents: ProjectAgents,
+        graphs: ProjectGraphs,
+        database_path: str,
+        collection_name: str,
+        vector_db_path: str,
+        graph_recursion_limit: int
+    ):
+        """Resume an existing microservice project."""
+
+        logger.info("Resuming microservice.")
+        try:
+            picked_project_id = Action._get_project_details(user_id)
+            if not picked_project_id:
+                print("No projects are available for this user.")
+                return 
+
+            picked_microservice = Action._get_microservice_details(user_id, picked_project_id)
+            if not picked_microservice:
+                print("No active services available for this project.")
+                return
+
+            session_details = Action._get_session_details(user_id, picked_project_id, picked_microservice.id)
+            if not session_details:
+                print("No sessions found for this service.")
+                return
+
+            session_map = {session.agent_id: session for session in session_details}
+            for agent in agents:
+                curr_session = session_map.get(agent.agent_id)
+                if curr_session:
+                    agent.set_thread_id(curr_session.id)
+
+            manager = ActionManager(
+                picked_microservice,
+                agents,
+                graphs,
+                database_path,
+                collection_name,
+                vector_db_path,
+                graph_recursion_limit,
+            )
+
+            manager.setup_team_members()
+            last_saved_state = manager.genpod_team.supervisor.get_last_saved_state()
+            supervisor_response = manager.stream_to_supervisor(last_saved_state)
+            manager.process_supervisor_response(supervisor_response)
+
+            logger.info("Microservice resumed successfully.")
+            print(
+                f"Your service was resumed successfully! Project ID: {manager.microservice.project_id}, "
+                f"Service ID: {manager.microservice.id}, "
+                f"Service Name: {manager.microservice.microservice_name}, Location: {manager.microservice.project_location}."
+            )
+        except Exception as e:
+            logger.error(f"Failed to resume microservice: {e}")
+            raise
+
+    @staticmethod
+    def _prompt_user_for_project_idea() -> str:
+        """Prompt the user for a project idea and validate the input."""
+        while True:
+            try:
+                logger.info("Prompting user for project idea.")
+                print("\nEnter the prompt to define your project idea (at least 10 characters): ")
+                user_prompt = input("> ").strip()
+                if len(user_prompt) > 9:
+                    print(f"\nPrompt accepted: {user_prompt}")
+                    logger.info(f"User provided valid project idea: {user_prompt}")
+                    return user_prompt
+                else:
+                    print("Invalid input. Please provide a detailed description of your project idea (at least 10 characters).")
+                    logger.warning("User provided invalid project idea. Prompting again.")
+            except Exception as e:
+                logger.error(f"An error occurred while processing user input for project idea: {e}")
+                print(f"An error occurred while processing your input: {e}")
+
+    @staticmethod
+    def _get_project_details(user_id: int) -> int:
+        """Retrieve and validate project details for the given user."""
+        logger.info(f"Retrieving project details for user ID: {user_id}")
+        project_controller = ProjectController()
+        try:
+            user_projects = project_controller.get_projects(user_id)
+            if not user_projects:
+                logger.warning(f"No projects found for user ID: {user_id}")
+                return
+
+            Action._list_items(
+                user_projects,
+                lambda project: f"  - ID: {project.id}, Name: {project.project_name}",
+                "Available Projects"
+            )
+            return Action._prompt_user(
+                "Please enter the ID of the project you want to select",
+                lambda project_id: any(p.id == project_id for p in user_projects),
+                "Invalid project ID. Please try again."
+            )
+        except Exception as e:
+            logger.error(f"An error occurred while retrieving project details for user ID {user_id}: {e}")
+            raise
+
+    @staticmethod
+    def _get_microservice_details(user_id: int, project_id: int) -> Microservice:
+        """Retrieve and validate microservice details for the given project."""
+        logger.info(f"Retrieving microservice details for user ID: {user_id}, project ID: {project_id}")
+        microservice_controller = MicroserviceController()
+        try:
+            microservices = microservice_controller.get_microservices_by_project_id(user_id, project_id)
+            if not microservices:
+                logger.warning(f"No microservices found for project ID: {project_id}")
+                return
+
+            active_microservices = [ms for ms in microservices if ms.status != "DONE"]
+            if not active_microservices:
+                logger.warning(f"No active microservices found for project ID: {project_id}")
+                return
+
+            Action._list_items(
+                active_microservices,
+                lambda ms: f"  - ID: {ms.id}, Name: {ms.microservice_name}, Status: {ms.status}",
+                "Active Microservices"
+            )
+            selected_id = Action._prompt_user(
+                "Please enter the ID of the microservice you want to resume",
+                lambda ms_id: any(ms.id == ms_id for ms in active_microservices),
+                "Invalid microservice ID. Please try again."
+            )
+            logger.info(f"User selected microservice ID: {selected_id}")
+            return next(ms for ms in active_microservices if ms.id == selected_id)
+        except Exception as e:
+            logger.error(f"An error occurred while retrieving microservice details: {e}")
+            raise
+
+    @staticmethod
+    def _get_session_details(user_id: int, project_id: int, microservice_id: int) -> List[MicroserviceSession]:
+        """Retrieve session details for the given user, project, and microservice."""
+        logger.info(f"Retrieving session details for user ID: {user_id}, project ID: {project_id}, microservice ID: {microservice_id}")
+        session_controller = MicroserviceSessionController()
+        try:
+            sessions = session_controller.get_sessions(project_id, microservice_id, user_id)
+            if not sessions:
+                logger.warning(f"No sessions found for project ID: {project_id}, microservice ID: {microservice_id}")
+                return
+            logger.info(f"Retrieved {len(sessions)} sessions for project ID: {project_id}, microservice ID: {microservice_id}")
+            return sessions
+        except Exception as e:
+            logger.error(f"An error occurred while retrieving session details: {e}")
+            raise
+
+    @staticmethod
+    def _list_items(items: List, display_func, title: str):
+        """Display a list of items."""
+        logger.info(f"Listing items under '{title}'")
+        try:
+            print(f"\n{title}:")
+            for item in items:
+                print(display_func(item))
+            logger.info(f"Listed {len(items)} items under '{title}'")
+        except Exception as e:
+            logger.error(f"An error occurred while listing items: {e}")
+            raise
+
+    @staticmethod
+    def _prompt_user(prompt: str, validate_func, error_message: str) -> int:
+        """Prompt the user for input and validate it."""
+        while True:
+            try:
+                user_input = int(input(f"{prompt}: ").strip())
+                if validate_func(user_input):
+                    logger.info(f"User input accepted: {user_input}")
+                    return user_input
+                else:
+                    logger.warning(f"Invalid input: {user_input}. Prompting user again.")
+                    print(error_message)
+            except ValueError:
+                logger.warning("Invalid input type provided. Expected an integer.")
+                print("Invalid input. Please enter a valid integer.")
+            except Exception as e:
+                logger.error(f"An error occurred while prompting user: {e}")
+                raise
