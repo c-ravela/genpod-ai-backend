@@ -1,19 +1,21 @@
 """Driving code file for this project."""
 
+import json
 import os
 import sys
-import json
+
 from dotenv import load_dotenv
 
+from apis.main import Action
 from configs.project_config import ProjectConfig
 from configs.project_path import set_project_path
-from database.database import Database
+from database.entities.microservices import Microservice
+from database.entities.projects import Project
+from database.sqlite import SQLite
 from utils.logs.logging_utils import logger
 from utils.time import get_timestamp
-
 from utils.yaml_utils import read_yaml
-from apis.project.entity import Project
-from apis.main import generate, resume
+
 
 def main():
     if len(sys.argv) < 2:
@@ -28,9 +30,7 @@ def main():
     setup_config = read_yaml(setup_config_path)
 
     db_path = setup_config['sqlite3_database_path']
-    db = Database(db_path)
-    db.setup_db()
-
+    
     try:
         genpod_config_path = setup_config['genpod_configuration_file_path']
         config = ProjectConfig(genpod_config_path)
@@ -39,21 +39,31 @@ def main():
     except Exception:
         logger.error("Error loading project config.")
         raise
+    
+    db = SQLite(db_path)
+    db.create_tables()
 
     if action == "generate":
         raw_proj = json.loads(data)
-        project_details = Project(
+        project = Project(
+            id = raw_proj['project_id'],
             project_name=raw_proj['project_name'],
-            input_prompt="",
+            created_by=raw_proj['user_id']
+        )
+
+        new_microservice = Microservice(
+            microservice_description="Test microservice",
+            project_id=project.id,
+            status="NEW",
             license_text=raw_proj['license_text'],
             license_file_url=raw_proj['license_url'],
-            created_by=raw_proj['user_id'],
-            project_path=set_project_path(setup_config['code_output_directory'], get_timestamp())
+            project_location=set_project_path(setup_config['code_output_directory'], get_timestamp()),
+            created_by=project.created_by,
+            updated_by=project.created_by
         )
-        project_details.id = raw_proj["project_id"]
 
-        generate(
-            project_details,
+        Action.generate(
+            new_microservice,
             config.agents,
             config.graphs,
             db_path,
@@ -64,7 +74,7 @@ def main():
     elif action == "resume":
         user_id = int(data)
 
-        resume(
+        Action.resume(
             user_id,
             config.agents,
             config.graphs,
@@ -77,5 +87,8 @@ def main():
         print(f"❌ Unknown action: {action}. Use 'generate' or 'resume'.")
         sys.exit(1)
 
+    db.close_session()
+    db.dispose_engine()
+    
 if __name__ == "__main__":
     main()
