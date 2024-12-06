@@ -42,6 +42,7 @@ class LLMMetrics:
         logger.debug("Generated LLMMetrics representation: %s", representation)
         return representation
 
+
 class LLMOutput(Generic[TResponse]):
     """Represents the output of a language model invocation, including response and metrics."""
     
