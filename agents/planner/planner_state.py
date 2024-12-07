@@ -3,7 +3,7 @@ from typing import Dict, List
 
 from typing_extensions import Annotated, TypedDict
 
-from agents.agent.state import State
+from agents.base.base_state import BaseState
 from models.models import Issue, PlannedIssuesQueue, PlannedTaskQueue, Task
 
 
@@ -19,40 +19,40 @@ class PlannerState(TypedDict):
     # @in
     project_status: Annotated[
         str, 
-        State.in_field()
+        BaseState.in_field()
     ]
 
     # @in
     project_path: Annotated[
         str,
-        State.in_field()
+        BaseState.in_field()
     ]
 
     # @in
     context: Annotated[
         str,
-        State.in_field("Requirements document  and rag retrivial info.")
+        BaseState.in_field("Requirements document  and rag retrivial info.")
     ]
 
     # @inout
     current_task: Annotated[
         Task,
-        State.inout_field()
+        BaseState.inout_field()
     ]
 
     current_issue: Annotated[
         Issue,
-        State.inout_field()
+        BaseState.inout_field()
     ]
 
     # @out
     planned_tasks: Annotated[
         PlannedTaskQueue,
-        State.out_field("A list of work packages planned by the planner")
+        BaseState.out_field("A list of work packages planned by the planner")
     ]
 
     # @out
     planned_issues: Annotated[
         PlannedIssuesQueue,
-        State.out_field("A list of planned issues")
+        BaseState.out_field("A list of planned issues")
     ]

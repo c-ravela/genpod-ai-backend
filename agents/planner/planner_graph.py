@@ -1,13 +1,13 @@
 from langgraph.graph import END, StateGraph
 
-from agents.agent.graph import Graph
+from agents.base.base_graph import BaseGraph
 from agents.planner.planner_agent import PlannerAgent
 from agents.planner.planner_state import PlannerState
 from llms.llm import LLM
 from models.models import Task
 
 
-class PlannerWorkFlow(Graph[PlannerAgent]):
+class PlannerWorkFlow(BaseGraph[PlannerAgent]):
     def __init__(self, graph_id: str, graph_name: str, agent_id: str, agent_name: str, llm: LLM, persistance_db_path: str):
         super().__init__(
             graph_id,

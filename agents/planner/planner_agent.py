@@ -7,7 +7,7 @@ from typing import List, Literal
 
 from pydantic import ValidationError
 
-from agents.agent.agent import Agent
+from agents.base.base_agent import BaseAgent
 from agents.planner.planner_state import PlannerState
 from llms.llm import LLM
 from models.constants import PStatus, Status
@@ -19,7 +19,7 @@ from tools.file_system import FS
 from utils.logs.logging_utils import logger
 
 
-class PlannerAgent(Agent[PlannerState, PlannerPrompts]):
+class PlannerAgent(BaseAgent[PlannerState, PlannerPrompts]):
     """
     """
     
