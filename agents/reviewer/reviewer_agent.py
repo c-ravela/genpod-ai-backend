@@ -3,7 +3,7 @@
 import os
 import subprocess
 
-from agents.agent.agent import Agent
+from agents.base.base_agent import BaseAgent
 from agents.reviewer.reviewer_state import ReviewerState
 from llms.llm import LLM
 from models.constants import Status
@@ -14,7 +14,7 @@ from tools.semgrep import Semgrep
 from utils.logs.logging_utils import logger
 
 
-class ReviewerAgent(Agent[ReviewerState, ReviewerPrompts]):
+class ReviewerAgent(BaseAgent[ReviewerState, ReviewerPrompts]):
     """
     The ReviewerAgent class is responsible for conducting comprehensive code reviews,
     including code quality analysis, security analysis, linting, and documentation 

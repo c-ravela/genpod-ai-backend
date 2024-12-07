@@ -2,13 +2,13 @@
 """
 from langgraph.graph import END, StateGraph
 
-from agents.agent.graph import Graph
+from agents.base.base_graph import BaseGraph
 from agents.reviewer.reviewer_agent import ReviewerAgent
 from agents.reviewer.reviewer_state import ReviewerState
 from llms.llm import LLM
 
 
-class ReviewerGraph(Graph[ReviewerAgent]):
+class ReviewerGraph(BaseGraph[ReviewerAgent]):
     """
     """
 
