@@ -8,7 +8,7 @@ from PIL import Image
 
 GenericAgent = TypeVar('GenericAgent', bound=Any)
 
-class Graph(Generic[GenericAgent]):
+class BaseGraph(Generic[GenericAgent]):
     """
     Base class for defining and managing state graphs.
 

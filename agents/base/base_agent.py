@@ -8,7 +8,7 @@ from llms.llm import LLM
 GenericAgentState = TypeVar('GenericAgentState', bound=Any)
 GenericPrompts = TypeVar('GenericPrompts', bound=Any)
 
-class Agent(Generic[GenericAgentState, GenericPrompts]):
+class BaseAgent(Generic[GenericAgentState, GenericPrompts]):
     """
     Represents an agent equipped with a language learning model (LLM) that can perform various tasks.
 
@@ -56,8 +56,8 @@ class Agent(Generic[GenericAgentState, GenericPrompts]):
             Any: The updated state of the agent.
         """
 
-        self.state = {**state}
-        return {**self.state}
+        self.state = state
+        return self.state
     
     def __repr__(self) -> str:
         """
