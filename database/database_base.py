@@ -1,13 +1,16 @@
-from sqlalchemy.orm import declarative_base
+from sqlalchemy.orm import DeclarativeBase
 
 from utils.logs.logging_utils import logger
 
-logger.debug("Initializing declarative base for SQLAlchemy models.")
+logger.debug("Starting the setup of the declarative base for SQLAlchemy models.")
+
 try:
-    Base = declarative_base()
-    logger.info("Declarative base initialized successfully.")
+    class Base(DeclarativeBase):
+        logger.debug("Defining the Base class for SQLAlchemy models.")
+    
+    logger.info("Declarative base for SQLAlchemy models defined successfully.")
 except Exception as e:
-    logger.error(f"Error initializing declarative base: {e}")
+    logger.exception("Failed to define the declarative base for SQLAlchemy models.")
     raise
 finally:
-    logger.debug("Declarative base setup process completed.")
+    logger.debug("Setup process for the declarative base is complete.")
