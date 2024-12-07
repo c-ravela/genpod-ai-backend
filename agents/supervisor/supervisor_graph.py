@@ -1,14 +1,21 @@
-from langchain_openai import ChatOpenAI
 from langgraph.graph import END, StateGraph
 
-from agents.agent.graph import Graph
+from agents.base.base_graph import BaseGraph
 from agents.supervisor.supervisor_agent import SupervisorAgent
 from agents.supervisor.supervisor_state import SupervisorState
 from llms.llm import LLM
 
 
-class SupervisorWorkflow(Graph[SupervisorAgent]):
-    def __init__(self, graph_id: str, graph_name: str, agent_id: str, agent_name: str, llm: LLM, persistance_db_path: str):
+class SupervisorWorkflow(BaseGraph[SupervisorAgent]):
+    def __init__(
+        self,
+        graph_id: str,
+        graph_name: str,
+        agent_id: str,
+        agent_name: str,
+        llm: LLM,
+        persistance_db_path: str
+    ):
     
         super().__init__(
             graph_id,
@@ -33,24 +40,26 @@ class SupervisorWorkflow(Graph[SupervisorAgent]):
         supervisor_workflow.add_node("update_state", self.agent.update_state)
         supervisor_workflow.add_node("Supervisor", self.agent.call_supervisor)
         supervisor_workflow.add_node("Human", self.agent.call_human)
-        supervisor_workflow.add_node("TestGenerator",self.agent.call_test_code_generator)
+        supervisor_workflow.add_node("TestGenerator", self.agent.call_test_code_generator)
 
         # Build graph
         supervisor_workflow.set_entry_point("kickoff")
-        supervisor_workflow.add_edge("kickoff","Supervisor")
-        supervisor_workflow.add_conditional_edges("Supervisor",
-                                                  self.agent.delegator,
-                                                  {
-                                                      "call_architect" : "Architect",
-                                                      "call_coder" : "Coder",
-                                                      "call_rag" : "RAG",
-                                                      "call_planner" : "Planner",
-                                                      "call_reviewer": "Reviewer",
-                                                      "call_supervisor": 'Supervisor',
-                                                      "update_state" : "update_state",
-                                                      "Human" : 'Human',
-                                                      "call_test_code_generator" : "TestGenerator"
-                                                   })
+        supervisor_workflow.add_edge("kickoff", "Supervisor")
+        supervisor_workflow.add_conditional_edges(
+            "Supervisor",
+            self.agent.delegator,
+            {
+                "call_architect" : "Architect",
+                "call_coder" : "Coder",
+                "call_rag" : "RAG",
+                "call_planner" : "Planner",
+                "call_reviewer": "Reviewer",
+                "call_supervisor": 'Supervisor',
+                "update_state" : "update_state",
+                "Human" : 'Human',
+                "call_test_code_generator" : "TestGenerator"
+            }
+        )
         supervisor_workflow.add_edge("RAG", "Supervisor")
         supervisor_workflow.add_edge("Reviewer", "Supervisor")
         supervisor_workflow.add_edge("Architect", "Supervisor")

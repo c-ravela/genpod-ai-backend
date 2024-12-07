@@ -1,31 +1,36 @@
-import os
 import ast
+import os
 from typing import TYPE_CHECKING, Any, Dict, List, Tuple
 
 from langchain_core.messages import AIMessage
 from pydantic import ValidationError
 
-from agents.agent.agent import Agent
+from agents.base.base_agent import BaseAgent
 from agents.supervisor.supervisor_state import SupervisorState
 from llms.llm import LLM
 from models.constants import ChatRoles, PStatus, Status
-from models.models import (Issue, IssuesQueue, PlannedTask, PlannedTaskQueue, PlannedIssue, 
-                           RequirementsDocument, Task, TaskQueue, PlannedIssuesQueue)
+from models.models import (Issue, IssuesQueue, PlannedIssue,
+                           PlannedIssuesQueue, PlannedTask, PlannedTaskQueue,
+                           RequirementsDocument, Task, TaskQueue)
 from models.supervisor_models import QueryList
 from prompts.supervisor_prompts import SupervisorPrompts
 from utils.fuzzy_rag_cache import FuzzyRAGCache
 from utils.logs.logging_utils import logger
 
-# to avoid circular dependency
 if TYPE_CHECKING:
-    from genpod.team import TeamMembers  # Adjust import path as needed
+    from genpod.team import TeamMembers
 
 
-class SupervisorAgent(Agent[SupervisorState, SupervisorPrompts]):
+class SupervisorAgent(BaseAgent[SupervisorState, SupervisorPrompts]):
 
     team: 'TeamMembers'
 
-    def __init__(self, agent_id: str, agent_name: str, llm: LLM) -> None:
+    def __init__(
+        self,
+        agent_id: str,
+        agent_name: str,
+        llm: LLM
+    ) -> None:
 
         super().__init__(
             agent_id,
@@ -187,10 +192,11 @@ class SupervisorAgent(Agent[SupervisorState, SupervisorPrompts]):
 
         if self.team is None:
             raise ValueError(
-                f"Error: The team for '{self.agent_name}' has not been initialized. "
+                f"Error: The team for '{self.agent_name}' has not been initialized."
                 f"Current value of 'self.team': {self.team}. "
-                "Please ensure that the 'set_team' method has been called on the supervisor agent "
-                "to initialize the team before attempting this operation."
+                "Please ensure that the 'set_team' method has been called on the"
+                "supervisor agent to initialize the team before attempting this"
+                "operation."
             )
 
         # initialize supervisor state
@@ -226,7 +232,8 @@ class SupervisorAgent(Agent[SupervisorState, SupervisorPrompts]):
             ),
             (
                 ChatRoles.SYSTEM, 
-                f'A new project with the following details has been received from the user: {state["original_user_input"]}'
+                'A new project with the following details has been received from the'
+                f'user: {state["original_user_input"]}'
             )
         ])
         state['human_feedback'] = self.ensure_value(state['human_feedback'], [])
@@ -279,9 +286,14 @@ class SupervisorAgent(Agent[SupervisorState, SupervisorPrompts]):
             False
         )
 
-        self.responses = {member.member_id: [] for member in self.team.get_team_members_as_list()}
+        self.responses = {
+            member.member_id: [] for member in self.team.get_team_members_as_list()
+        }
        
-        logger.info(f"Supervisor state has been initialized successfully. current supervisor state: {state}")
+        logger.info(
+            "Supervisor state has been initialized successfully."
+            f"current supervisor state: {state}"
+        )
        
         return state
 
@@ -321,7 +333,8 @@ class SupervisorAgent(Agent[SupervisorState, SupervisorPrompts]):
             state['is_rag_cache_created'] = True
             logger.info(
                 f"{self.team.rag.member_name}: The RAG cache has been created."
-                f"The following queries were used during the process: {state['rag_cache_queries']}"
+                "The following queries were used during the process:"
+                f"{state['rag_cache_queries']}"
             )
 
         question = state['current_task'].question
@@ -346,7 +359,8 @@ class SupervisorAgent(Agent[SupervisorState, SupervisorPrompts]):
                 self.rag_cache.add(question, result)
 
             logger.info(
-                f"{self.team.rag.member_name} is ready with a response for the query: {question}"
+                f"{self.team.rag.member_name} is ready with a response for the query:"
+                f"{question}"
             )
         except Exception as e:
             raise e
@@ -603,8 +617,8 @@ class SupervisorAgent(Agent[SupervisorState, SupervisorPrompts]):
         project.
         """
 
-        logger.info(f"{self.team.supervisor.member_name} has been called.")
-        self.called_agent = self.team.supervisor.member_id
+        logger.info(f"{self.agent_name} has been called.")
+        self.called_agent = self.agent_id
 
         if state['project_status'] == PStatus.RECEIVED:
             # When the project is in the 'RECEIVED' phase:
@@ -634,7 +648,7 @@ class SupervisorAgent(Agent[SupervisorState, SupervisorPrompts]):
                 question=state['original_user_input']
             )
             state['project_status'] = PStatus.NEW
-            logger.info(f"{self.team.supervisor.member_name}: Created task for RAG agent to gather additional info for the user requested project. Project Status moved to {state['project_status']}")
+            logger.info(f"{self.agent_name}: Created task for RAG agent to gather additional info for the user requested project. Project Status moved to {state['project_status']}")
 
             return state
         elif state['project_status'] == PStatus.NEW:
@@ -667,10 +681,10 @@ class SupervisorAgent(Agent[SupervisorState, SupervisorPrompts]):
                         )
                     ]
 
-                    logger.info(f"{self.team.supervisor.member_name}: RAG agent has finished preparing additional information for team members.")
-                    logger.info(f"{self.team.supervisor.member_name}: Created new task for architect to work on requirements document. Moved Project to {state['project_status']} phase.")
+                    logger.info(f"{self.agent_name}: RAG agent has finished preparing additional information for team members.")
+                    logger.info(f"{self.agent_name}: Created new task for architect to work on requirements document. Moved Project to {state['project_status']} phase.")
 
-            self.calling_agent = self.team.supervisor.member_id
+            self.calling_agent = self.agent_id
 
             return state
         elif state['project_status'] == PStatus.INITIAL:
@@ -691,8 +705,8 @@ class SupervisorAgent(Agent[SupervisorState, SupervisorPrompts]):
                 if not state['is_human_reviewed']:
                     state['project_status'] = PStatus.HALTED
 
-                    logger.info(f"{self.team.supervisor.member_name}: Architect agent has prepared the requirements document for the team.")
-                    logger.info(f"{self.team.supervisor.member_name}: Waiting for the human to review the requirements document.")
+                    logger.info(f"{self.agent_name}: Architect agent has prepared the requirements document for the team.")
+                    logger.info(f"{self.agent_name}: Waiting for the human to review the requirements document.")
                 else:
                     state['project_status'] = PStatus.EXECUTING
                     state['messages'] += [
@@ -706,8 +720,8 @@ class SupervisorAgent(Agent[SupervisorState, SupervisorPrompts]):
                         )
                     ]
 
-                    logger.info(f"{self.team.supervisor.member_name}: Architect agent has prepared the requirements document for the team.")
-                    logger.info(f"{self.team.supervisor.member_name}: Planner can take initiative and prepare the tasks for the team. Moved Project to {state['project_status']} phase.")
+                    logger.info(f"{self.agent_name}: Architect agent has prepared the requirements document for the team.")
+                    logger.info(f"{self.agent_name}: Planner can take initiative and prepare the tasks for the team. Moved Project to {state['project_status']} phase.")
             elif state['current_task'].task_status == Status.AWAITING:
                 # Architect need additional information to complete the assigned task. 
                 # architect provides query in the task packet use it to query RAG.
@@ -725,8 +739,8 @@ class SupervisorAgent(Agent[SupervisorState, SupervisorPrompts]):
                     )
                 ]
 
-                logger.info(f"{self.team.supervisor.member_name}: Architect agent has requested the additional information.")
-                logger.info(f"{self.team.supervisor.member_name}: RAG Agent will respond to the query. Moved Project to {state['project_status']} phase.")
+                logger.info(f"{self.agent_name}: Architect agent has requested the additional information.")
+                logger.info(f"{self.agent_name}: RAG Agent will respond to the query. Moved Project to {state['project_status']} phase.")
             
             return state
         elif state['project_status'] == PStatus.MONITORING:
@@ -814,7 +828,7 @@ class SupervisorAgent(Agent[SupervisorState, SupervisorPrompts]):
                     else:
                         state['current_planned_task'] = next_planned_task
                         state['are_planned_tasks_in_progress'] = True
-                        self.calling_agent = self.team.supervisor.member_id
+                        self.calling_agent = self.agent_id
 
             return state
         elif state['project_status'] == PStatus.REVIEWING:
@@ -847,7 +861,7 @@ class SupervisorAgent(Agent[SupervisorState, SupervisorPrompts]):
             if state['current_issue'].issue_status in (Status.DONE, Status.NONE, Status.ABANDONED):
                 if state['issues'].has_pending_items():
                     state['current_issue'] = state['issues'].get_next_item()
-                    self.calling_agent = self.team.supervisor.member_id
+                    self.calling_agent = self.agent_id
                 else:
                     state['project_status'] = PStatus.REVIEWING
             elif state['current_issue'].issue_status == Status.INPROGRESS:
@@ -860,7 +874,7 @@ class SupervisorAgent(Agent[SupervisorState, SupervisorPrompts]):
                     if state['planned_issues'].has_pending_items():
                         state['current_planned_issue'] = state['planned_issues'].get_next_item()
                         state['are_planned_issues_in_progress'] = True
-                        self.calling_agent = self.team.supervisor.member_id
+                        self.calling_agent = self.agent_id
                     else:
                         state['are_planned_issues_in_progress'] = False
                         state['current_issue'].issue_status = Status.DONE
