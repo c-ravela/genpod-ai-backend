@@ -1,4 +1,6 @@
-from typing import Any, Dict, Generic, List, TypeVar, get_origin, get_args, TypedDict, Annotated
+from typing import (Annotated, Any, Dict, Generic, List, TypedDict, TypeVar,
+                    get_args, get_origin)
+
 from utils.logs.logging_utils import logger
 
 GenericAgentState = TypeVar('GenericAgentState', bound=Any)

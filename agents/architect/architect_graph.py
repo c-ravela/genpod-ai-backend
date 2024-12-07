@@ -6,9 +6,9 @@ of control between different states of the Architect agent.
 """
 from langgraph.graph import END, StateGraph
 
-from agents.base.base_graph import BaseGraph
 from agents.architect.architect_agent import ArchitectAgent
 from agents.architect.architect_state import ArchitectState
+from agents.base.base_graph import BaseGraph
 from llms.llm import LLM
 
 

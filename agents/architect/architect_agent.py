@@ -6,8 +6,8 @@ generating appropriate responses.
 import os
 from typing import Literal
 
-from agents.base.base_agent import BaseAgent
 from agents.architect.architect_state import ArchitectState
+from agents.base.base_agent import BaseAgent
 from llms.llm import LLM
 from models.architect_models import (ProjectDetails, QueryResult, TaskOutput,
                                      TasksList)
