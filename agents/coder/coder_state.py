@@ -4,7 +4,7 @@ Agent graph state
 """
 from typing_extensions import Annotated, TypedDict
 
-from agents.agent.state import State
+from agents.base.base_state import BaseState
 from models.coder_models import CodeGenerationPlan
 from models.constants import ChatRoles
 from models.models import (Issue, PlannedIssue, PlannedTask,
@@ -18,13 +18,13 @@ class CoderState(TypedDict):
     # @in
     project_status: Annotated[
         str,
-        State.in_field()
+        BaseState.in_field()
     ]
 
     # @in
     project_name: Annotated[
         str,
-        State.in_field(
+        BaseState.in_field(
             "The name of the project."
         )
     ]
@@ -32,7 +32,7 @@ class CoderState(TypedDict):
     # @in
     requirements_document: Annotated[
         RequirementsDocument,
-        State.in_field(
+        BaseState.in_field(
             "A comprehensive, well-structured document in markdown format that outlines "
             "the project's requirements derived from the user's request. This serves "
             "as a guide for the development process."
@@ -42,7 +42,7 @@ class CoderState(TypedDict):
     # @in
     project_path: Annotated[
         str,
-        State.in_field(
+        BaseState.in_field(
             "The absolute path in the file system where the project is being generated. "
             "This path is used to store all the project-related files and directories."
         )
@@ -51,19 +51,19 @@ class CoderState(TypedDict):
     # @in
     license_url: Annotated[
         str,
-        State.in_field()
+        BaseState.in_field()
     ]
 
     # @in
     license_text: Annotated[
         str,
-        State.in_field()
+        BaseState.in_field()
     ]
 
     # @in
     functions_skeleton : Annotated[
         dict,
-        State.in_field(
+        BaseState.in_field(
             "The well detailed function skeleton for the functions that are in the code."
         )
     ]
@@ -71,7 +71,7 @@ class CoderState(TypedDict):
     # @in
     test_code: Annotated[
         dict,
-        State.in_field(
+        BaseState.in_field(
             "The complete, well-documented working unit test code that adheres to all "
             "standards requested with the programming language, framework user requested "
         )
@@ -80,7 +80,7 @@ class CoderState(TypedDict):
     # @inout
     current_task: Annotated[
         Task,
-        State.inout_field(
+        BaseState.inout_field(
             "The Task object currently in focus, representing the active task that team "
             "members are working on."
         )
@@ -89,7 +89,7 @@ class CoderState(TypedDict):
     # @inout
     current_planned_task: Annotated[
         PlannedTask,
-        State.inout_field(
+        BaseState.inout_field(
             "The PlannedTask object currently in focus, representing the active task"
             "that coder need to work on."
         )
@@ -98,18 +98,18 @@ class CoderState(TypedDict):
     # @inout
     current_planned_issue: Annotated[
         PlannedIssue,
-        State.inout_field("The current planned issue that team is working on.")
+        BaseState.inout_field("The current planned issue that team is working on.")
     ]
 
     current_issue: Annotated[
         Issue,
-        State.inout_field()
+        BaseState.inout_field()
     ]
 
     # @inout
     messages: Annotated[
         list[tuple[ChatRoles, str]],
-        State.inout_field(
+        BaseState.inout_field(
             "A chronological list of tuples representing the conversation history "
             "between the system, user, and AI. Each tuple contains a role identifier "
             "(e.g., 'AI', 'tool', 'user', 'system') and the corresponding message."
@@ -119,5 +119,5 @@ class CoderState(TypedDict):
     # @out
     code_generation_plan_list: Annotated[
         CodeGenerationPlan,
-        State.out_field()
+        BaseState.out_field()
     ]

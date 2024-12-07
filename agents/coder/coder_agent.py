@@ -3,7 +3,7 @@
 import os
 from typing import List, Literal
 
-from agents.agent.agent import Agent
+from agents.base.base_agent import BaseAgent
 from agents.coder.coder_state import CoderState
 from llms.llm import LLM
 from models.coder_models import CodeGenerationPlan
@@ -16,7 +16,7 @@ from tools.shell import Shell
 from utils.logs.logging_utils import logger
 
 
-class CoderAgent(Agent[CoderState, CoderPrompts]):
+class CoderAgent(BaseAgent[CoderState, CoderPrompts]):
     """
     """
 
@@ -470,7 +470,7 @@ class CoderAgent(Agent[CoderState, CoderPrompts]):
 
         self.add_message((
             ChatRoles.USER,
-            f"Downloaded the license from the {self.state["license_url"]}. The output of the command execution is {license_download_result[1]}"
+            f"Downloaded the license from the {self.state['license_url']}. The output of the command execution is {license_download_result[1]}"
         ))
 
         self.is_license_file_downloaded = True

@@ -4,13 +4,13 @@ Coder Graph
 from langgraph.graph import END, StateGraph
 from langgraph.graph.graph import CompiledGraph
 
-from agents.agent.graph import Graph
+from agents.base.base_graph import BaseGraph
 from agents.coder.coder_agent import CoderAgent
 from agents.coder.coder_state import CoderState
 from llms.llm import LLM
 
 
-class CoderGraph(Graph[CoderAgent]):
+class CoderGraph(BaseGraph[CoderAgent]):
     """
     """
 
