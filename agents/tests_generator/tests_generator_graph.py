@@ -2,13 +2,13 @@
 
 from langgraph.graph import END, StateGraph
 
-from agents.agent.graph import Graph
+from agents.base.base_graph import BaseGraph
 from agents.tests_generator.tests_generator_agent import TestCoderAgent
 from agents.tests_generator.tests_generator_state import TestCoderState
 from llms.llm import LLM
 
 
-class TestCoderGraph(Graph[TestCoderAgent]):
+class TestCoderGraph(BaseGraph[TestCoderAgent]):
     """
     """
 

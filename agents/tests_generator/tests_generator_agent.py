@@ -3,7 +3,7 @@
 import os
 from typing import Any, Dict, Literal
 
-from agents.agent.agent import Agent
+from agents.base.base_agent import BaseAgent
 from agents.tests_generator.tests_generator_state import TestCoderState
 from llms.llm import LLM
 from models.constants import ChatRoles, PStatus, Status
@@ -16,7 +16,7 @@ from tools.shell import Shell
 from utils.logs.logging_utils import logger
 
 
-class TestCoderAgent(Agent[TestCoderState, TestGeneratorPrompts]):
+class TestCoderAgent(BaseAgent[TestCoderState, TestGeneratorPrompts]):
     """
     """
     # names of the graph node
