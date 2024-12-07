@@ -1,7 +1,7 @@
 from langchain_community.vectorstores import Chroma
 from langchain_openai import OpenAIEmbeddings
 
-from agents.agent.agent import Agent
+from agents.base.base_agent import BaseAgent
 from agents.rag_workflow.rag_state import RAGState
 from configs.supervisor_config import RAG_TRY_LIMIT
 from llms.llm import LLM
@@ -9,7 +9,7 @@ from prompts.rag_prompts import RAGPrompts
 from utils.logs.logging_utils import logger
 
 
-class RAGAgent(Agent[RAGState, RAGPrompts]):
+class RAGAgent(BaseAgent[RAGState, RAGPrompts]):
     def __init__(self, agent_id: str, agent_name: str, llm: LLM, collection_name: str, persist_directory: str=None):
         assert persist_directory is not None, "Currently only Local Chroma VectorDB is supported"
         

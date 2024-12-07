@@ -2,13 +2,13 @@ import os
 
 from langgraph.graph import END, StateGraph
 
-from agents.agent.graph import Graph
+from agents.base.base_graph import BaseGraph
 from agents.rag_workflow.rag_agent import RAGAgent
 from agents.rag_workflow.rag_state import RAGState
 from llms.llm import LLM
 
 
-class RAGWorkFlow(Graph[RAGAgent]):
+class RAGWorkFlow(BaseGraph[RAGAgent]):
 
     def __init__(self, graph_id: str, graph_name: str, agent_id: str, agent_name: str, llm: LLM, persistance_db_path: str, collection_name: str, persist_directory: str=None):
         super().__init__(
