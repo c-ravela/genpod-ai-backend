@@ -6,13 +6,13 @@ of control between different states of the Architect agent.
 """
 from langgraph.graph import END, StateGraph
 
-from agents.agent.graph import Graph
+from agents.base.base_graph import BaseGraph
 from agents.architect.architect_agent import ArchitectAgent
 from agents.architect.architect_state import ArchitectState
 from llms.llm import LLM
 
 
-class ArchitectGraph(Graph[ArchitectAgent]):
+class ArchitectGraph(BaseGraph[ArchitectAgent]):
     """
     ArchitectGraph Class
 

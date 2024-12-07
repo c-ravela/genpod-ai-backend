@@ -6,7 +6,7 @@ state.
 """
 from typing_extensions import Annotated, TypedDict
 
-from agents.agent.state import State
+from agents.base.base_state import BaseState
 from models.constants import ChatRoles
 from models.models import RequirementsDocument, Task, TaskQueue
 
@@ -61,7 +61,7 @@ class ArchitectState(TypedDict):
     # @in 
     original_user_input: Annotated[
         str,
-        State.in_field(
+        BaseState.in_field(
             "The original set of requirements provided by the user, serving as the "
             "foundation for the project."
         )
@@ -70,7 +70,7 @@ class ArchitectState(TypedDict):
     # @in
     user_requested_standards: Annotated[
         str,
-        State.in_field(
+        BaseState.in_field(
             "The specific standards or protocols the user has requested to be implemented"
             " in the project, which could include coding standards, design patterns, or "
             "industry-specific standards."
@@ -80,7 +80,7 @@ class ArchitectState(TypedDict):
     # @in
     project_status: Annotated[
         str,
-        State.in_field(
+        BaseState.in_field(
             "An enumerated value reflecting the project's current lifecycle stage, providing "
             "real-time tracking of project progress."
         )
@@ -89,7 +89,7 @@ class ArchitectState(TypedDict):
     # @in
     project_path: Annotated[
         str,
-        State.in_field(
+        BaseState.in_field(
             "The absolute path in the file system where the project is being generated. "
             "This path is used to store all the project-related files and directories."
         )
@@ -98,7 +98,7 @@ class ArchitectState(TypedDict):
     # @in
     license_text: Annotated[
         str,
-        State.in_field(
+        BaseState.in_field(
             "The text of the license provided by the user. This text outlines the terms and "
             "conditions under which the project can be used, modified, and distributed."
         )
@@ -107,7 +107,7 @@ class ArchitectState(TypedDict):
     # @inout
     messages: Annotated[
         list[tuple[ChatRoles, str]], 
-        State.inout_field(
+        BaseState.inout_field(
             "A chronological list of tuples representing the conversation history between the "
             "system, user, and AI. Each tuple contains a role identifier (e.g., 'AI', 'tool', "
             "'user', 'system') and the corresponding message."
@@ -117,7 +117,7 @@ class ArchitectState(TypedDict):
     # @inout
     current_task: Annotated[
         Task,
-        State.inout_field(
+        BaseState.inout_field(
             "The Task object currently in focus, representing the active task that team "
             "members are working on."
         )
@@ -126,7 +126,7 @@ class ArchitectState(TypedDict):
     # @out
     project_name: Annotated[
         str, 
-        State.out_field(
+        BaseState.out_field(
             "The name of the project."
         )
     ]
@@ -134,7 +134,7 @@ class ArchitectState(TypedDict):
     # @out
     requirements_document: Annotated[
         RequirementsDocument, 
-        State.out_field(
+        BaseState.out_field(
             "A comprehensive, well-structured document in markdown format that outlines "
             "the project's requirements derived from the user's request. This serves as a "
             "guide for the development process."
@@ -144,7 +144,7 @@ class ArchitectState(TypedDict):
     # @out
     tasks: Annotated[
         TaskQueue,
-        State.out_field(
+        BaseState.out_field(
             "A list of Task objects, each encapsulating a distinct unit of work necessary "
             "for the project's completion. These tasks are meant to be carried out by the "
             "entire team collectively."
@@ -154,7 +154,7 @@ class ArchitectState(TypedDict):
     # @out
     query_answered: Annotated[
         bool,
-        State.out_field(
+        BaseState.out_field(
             "A boolean flag indicating whether the task has been answered"
         )
     ]

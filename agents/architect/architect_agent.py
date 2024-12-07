@@ -6,7 +6,7 @@ generating appropriate responses.
 import os
 from typing import Literal
 
-from agents.agent.agent import Agent
+from agents.base.base_agent import BaseAgent
 from agents.architect.architect_state import ArchitectState
 from llms.llm import LLM
 from models.architect_models import (ProjectDetails, QueryResult, TaskOutput,
@@ -18,7 +18,7 @@ from tools.code import CodeFileWriter
 from utils.logs.logging_utils import logger
 
 
-class ArchitectAgent(Agent[ArchitectState, ArchitectPrompts]):
+class ArchitectAgent(BaseAgent[ArchitectState, ArchitectPrompts]):
     """
     ArchitectAgent Class
 
