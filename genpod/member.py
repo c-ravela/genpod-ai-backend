@@ -3,12 +3,12 @@ from typing import Any, Dict, Generic, Iterator, TypeVar
 
 from langchain_openai import ChatOpenAI
 
-from agents.agent.graph import Graph
-from agents.agent.state import State
+from agents.base.base_graph import BaseGraph
+from agents.base.base_state import BaseState
 from configs.project_config import AgentInfo
 
 GenericAgentState = TypeVar('GenericAgentState', bound=Any)
-GenericAgentGraph = TypeVar('GenericAgentGraph', bound=Graph)
+GenericAgentGraph = TypeVar('GenericAgentGraph', bound=BaseGraph)
 
 class AgentMember(Generic[GenericAgentState, GenericAgentGraph]):
     """
@@ -43,7 +43,7 @@ class AgentMember(Generic[GenericAgentState, GenericAgentGraph]):
         self.llm = agent_info.llm
         self.thread_id = agent_info.thread_id
 
-        sc = State(state_class)
+        sc = BaseState(state_class)
         self.fields = sc.get_fields()
         self.in_fields = sc.get_in_fields()
         self.out_fields = sc.get_out_fields()
