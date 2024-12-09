@@ -1,5 +1,5 @@
-from typing import (Annotated, Any, Dict, Generic, List, TypedDict, TypeVar,
-                    get_args, get_origin)
+from typing import (Annotated, Any, Dict, Generic, List, TypeVar, get_args,
+                    get_origin)
 
 from utils.logs.logging_utils import logger
 
@@ -24,13 +24,14 @@ class BaseState(Generic[GenericAgentState]):
     
     def __init__(self, cls: GenericAgentState):
         """
-        Initialize with a TypedDict class to classify fields.
+        Initializes the state manager for the given TypedDict class.
 
-        :param cls: The TypedDict class whose fields need to be classified.
+        Args:
+            cls (GenericAgentState): The TypedDict class defining the state structure.
         """
         self.cls = cls
         self.class_name = cls.__name__
-        logger.debug(f"Initializing State for class: {self.class_name}")
+        logger.debug(f"Initializing BaseState for class: {self.class_name}")
 
         # Extract annotations
         extractor = AnnotationExtractor(cls)
@@ -53,21 +54,24 @@ class BaseState(Generic[GenericAgentState]):
         self._inout_fields = classifier.inout_fields
         self._internal_fields = classifier.internal_fields
 
-    # Classification methods remain unchanged
     @classmethod
     def in_field(cls, description: str = "") -> str:
+        """Marks a field as input."""
         return f"{cls._in_} {description}"
 
     @classmethod
     def out_field(cls, description: str = "") -> str:
+        """Marks a field as output."""
         return f"{cls._out_} {description}"
     
     @classmethod
     def inout_field(cls, description: str = "") -> str:
+        """Marks a field as input/output."""
         return f"{cls._inout_} {description}"
     
     @classmethod
     def internal_field(cls, description: str = "") -> str:
+        """Marks a field as internal."""
         return f"{cls._internal_} {description}"
 
     # Accessor methods remain unchanged
@@ -88,7 +92,7 @@ class BaseState(Generic[GenericAgentState]):
 
     def print_field_classifications(self):
         """
-        Print field classifications in a clear and organized manner, including counts for each category.
+        Prints field classifications in an organized manner with counts.
         """
         print(f"=== Field Classifications for {self.class_name} ===\n")
         
@@ -101,7 +105,6 @@ class BaseState(Generic[GenericAgentState]):
             "@internal Fields": self.get_internal_fields()
         }
         
-        # Iterate through each category and print the fields with counts
         for category_name, fields in categories.items():
             print(f"{category_name} ({len(fields)}):")
             print("-" * len(category_name))
@@ -112,7 +115,7 @@ class BaseState(Generic[GenericAgentState]):
 
 class FieldClassifier:
     """
-    Responsible for classifying fields based on their annotations.
+    Classifies fields based on annotations extracted from the TypedDict.
     """
     def __init__(self, annotations: Dict[str, str]):
         self.annotations = annotations
@@ -124,24 +127,30 @@ class FieldClassifier:
         logger.debug("Initializing FieldClassifier.")
 
     def classify(self, classifications: Dict[str, str]):
+        """
+        Classifies fields based on provided classifications.
+
+        Args:
+            classifications (Dict[str, str]): Classification labels.
+        """
         for field_name, annotation in self.annotations.items():
             if annotation.startswith(classifications['_internal_']):
                 self._internal_fields.append(field_name)
                 self._fields.append(field_name)
-                logger.debug(f"Classified field '{field_name}' as '@internal'")
+                logger.debug(f"Field '{field_name}' classified as '@internal'")
             else:
                 self._fields.append(field_name)
                 if annotation.startswith(classifications['_inout_']):
                     self._in_fields.append(field_name)
                     self._out_fields.append(field_name)
                     self._inout_fields.append(field_name)
-                    logger.debug(f"Classified field '{field_name}' as '@inout'")
+                    logger.debug(f"Field '{field_name}' classified as '@inout'")
                 elif annotation.startswith(classifications['_in_']):
                     self._in_fields.append(field_name)
-                    logger.debug(f"Classified field '{field_name}' as '@in'")
+                    logger.debug(f"Field '{field_name}' classified as '@in'")
                 elif annotation.startswith(classifications['_out_']):
                     self._out_fields.append(field_name)
-                    logger.debug(f"Classified field '{field_name}' as '@out'")
+                    logger.debug(f"Field '{field_name}' classified as '@out'")
                 else:
                     logger.error(f"Field '{field_name}' has an unrecognized annotation '{annotation}'.")
                     raise ValueError(f"Unrecognized annotation '{annotation}' for field '{field_name}'.")
@@ -169,7 +178,7 @@ class FieldClassifier:
 
 class AnnotationExtractor:
     """
-    Responsible for extracting annotations from a TypedDict.
+    Extracts annotations from TypedDict definitions.
     """
     def __init__(self, cls: GenericAgentState):
         self.cls = cls
@@ -177,6 +186,12 @@ class AnnotationExtractor:
         logger.debug(f"Initializing AnnotationExtractor for class: {self.class_name}")
 
     def extract(self) -> Dict[str, str]:
+        """
+        Extracts annotations from the TypedDict.
+
+        Returns:
+            Dict[str, str]: A dictionary mapping field names to their annotations.
+        """
         annotations = {}
         type_hints = getattr(self.cls, '__annotations__', {})
         logger.debug(f"Extracting annotations for class: {self.class_name}")
