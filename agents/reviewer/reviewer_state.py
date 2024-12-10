@@ -5,7 +5,7 @@ Defines the state structure for the ReviewerAgent, including project details,
 requirements, and identified issues.
 """
 
-from typing_extensions import Annotated, TypedDict
+from typing import Annotated, TypedDict
 
 from agents.base.base_state import BaseState
 from models.models import IssuesQueue

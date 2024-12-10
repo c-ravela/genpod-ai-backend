@@ -1,7 +1,5 @@
 """ Graph State for RAG Agent """
-from typing import List
-
-from typing_extensions import Annotated, TypedDict
+from typing import Annotated, List, TypedDict
 
 from agents.base.base_state import BaseState
 

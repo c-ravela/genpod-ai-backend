@@ -1,6 +1,4 @@
-from typing import Generic, TypeVar
-
-from typing_extensions import Any
+from typing import Any, Generic, TypeVar
 
 from llms.llm import LLM
 from utils.logs.logging_utils import logger
