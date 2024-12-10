@@ -1,4 +1,8 @@
 """
+ReviewerState
+
+Defines the state structure for the ReviewerAgent, including project details,
+requirements, and identified issues.
 """
 
 from typing_extensions import Annotated, TypedDict
@@ -9,13 +13,25 @@ from models.models import IssuesQueue
 
 class ReviewerState(TypedDict):
     """
+    Represents the state for the ReviewerAgent, encapsulating project details,
+    requirements, and identified issues.
+
+    Attributes:
+        project_name (str): Name of the project under review.
+        project_path (str): Absolute path where the project is stored.
+        license_text (str): License information associated with the project.
+        requirements_document (str): Requirements in markdown format serving as
+            a guide for the review process.
+        issues (IssuesQueue): A queue of issues identified during the review phase.
+        error_message (str): An internal field to store any error messages
+            encountered during the review process.
     """
 
     # @in 
     project_name: Annotated[
         str, 
         BaseState.in_field(
-            "The name of the project."
+            "The name of the project under review."
         )
     ]
 
@@ -24,14 +40,16 @@ class ReviewerState(TypedDict):
         str,
         BaseState.in_field(
             "The absolute path in the file system where the project is being generated. "
-            "This path is used to store all the project-related files and directories."
+            "This path is used to store all project-related files and directories."
         )
     ]
 
     # @in
     license_text: Annotated[
         str,
-        BaseState.in_field("The license text for code base.")
+        BaseState.in_field(
+            "The license text associated with the project."
+        )
     ]
 
     # @in 
@@ -47,7 +65,15 @@ class ReviewerState(TypedDict):
     # @out
     issues: Annotated[
         IssuesQueue,
-        BaseState.in_field(
-            "Issues identified in the generated project during reviewing phase."
+        BaseState.out_field(
+            "A queue of issues identified in the project during the review phase."
+        )
+    ]
+
+    # @internal
+    error_message: Annotated[
+        str,
+        BaseState.internal_field(
+            "Stores error messages encountered during the review process for debugging and logging purposes."
         )
     ]
