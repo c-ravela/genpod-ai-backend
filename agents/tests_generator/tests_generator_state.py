@@ -3,27 +3,21 @@
 Agent graph state
 """
 
-from typing import Dict
-
-from typing_extensions import Annotated, TypedDict
+from typing import Annotated, Any, Dict, Literal, TypedDict
 
 from agents.base.base_state import BaseState
 from models.constants import ChatRoles, PStatus
-from models.models import (Issue, PlannedIssue, PlannedTask,
-                           RequirementsDocument, Task)
+from models.models import PlannedIssue, PlannedTask, RequirementsDocument
 from models.tests_generator_models import FileFunctionSignatures
 
 
 class TestCoderState(TypedDict):
-    """
-    """
+    """Represents the state of the TestCoder agent."""
 
     # @in
     project_name: Annotated[
         str,
-        BaseState.in_field(
-            "The name of the project."
-        )
+        BaseState.in_field("The name of the project.")
     ]
 
     # @in
@@ -36,9 +30,8 @@ class TestCoderState(TypedDict):
     requirements_document: Annotated[
         RequirementsDocument,
         BaseState.in_field(
-            "A comprehensive, well-structured document in markdown format that outlines "
-            "the project's requirements derived from the user's request. This serves as a"
-            " guide for the development process."
+            "A detailed markdown document outlining the project's requirements, "
+            "standards, and structure."
         )
     ]
 
@@ -46,8 +39,7 @@ class TestCoderState(TypedDict):
     project_path: Annotated[
         str,
         BaseState.in_field(
-            "The absolute path in the file system where the project is being generated. "
-            "This path is used to store all the project-related files and directories."
+            "The full path to the project directory on the local filesystem."
         )
     ]
 
@@ -55,8 +47,8 @@ class TestCoderState(TypedDict):
     current_planned_task: Annotated[
         PlannedTask,
         BaseState.inout_field(
-            "The PlannedTask object currently in focus, representing the active task "
-            "that coder need to work on."
+            "The current task being executed, containing details such as description, "
+            "status, and execution requirements."
         )
     ]
    
@@ -90,5 +82,82 @@ class TestCoderState(TypedDict):
         FileFunctionSignatures,
         BaseState.out_field(
             "The well detailed function skeleton for the functions that are in the code."
+        )
+    ]
+
+    # @internal
+    mode: Annotated[
+        Literal['test_code_generation', 'resolving_issues'],
+        BaseState.internal_field(
+            "Indicates the agent's current operational mode (e.g., generating test code or resolving issues)."
+        )
+    ]
+
+    # @internal
+    hasError: Annotated[
+        bool,
+        BaseState.internal_field("Flag indicating whether an error occurred during the process.")
+    ]
+
+    # @internal
+    is_skeleton_generated: Annotated[
+        bool,
+        BaseState.internal_field("Flag indicating if the function skeleton has been generated successfully.")
+    ]
+
+    # @internal
+    is_code_generated: Annotated[
+        bool,
+        BaseState.internal_field("Flag indicating if the test code has been generated successfully.")
+    ]
+
+    # @internal
+    has_command_execution_finished: Annotated[
+        bool,
+        BaseState.internal_field("Flag indicating whether all generated commands have been executed.")
+    ]
+
+    # @internal
+    is_skeleton_written_to_local: Annotated[
+        bool,
+        BaseState.internal_field("Flag indicating whether the function skeleton has been written to local files.")
+    ]
+
+    # @internal
+    has_skeleton_been_written_locally: Annotated[
+        bool,
+        BaseState.internal_field(
+             "Flag indicating whether the skeleton files have been saved to the local filesystem."
+        )
+    ]
+
+    # @internal
+    hasPendingToolCalls: Annotated[
+        bool,
+        BaseState.internal_field(
+            "Flag indicating if there are pending external tool invocations required by the agent."
+        )
+    ]
+
+    # @internal
+    last_visited_node: Annotated[
+        str,
+        BaseState.internal_field(
+            "The last node in the workflow visited by the agent, used for tracking progress."
+        )
+    ]
+
+    # @internal
+    error_message: Annotated[
+        str,
+        BaseState.internal_field("Details of the most recent error encountered by the agent.")
+    ]
+
+    # @internal
+    current_test_generation: Annotated[
+        Dict[str, Any],
+        BaseState.internal_field(
+            "Holds intermediate data related to the current test generation process, "
+            "such as function signatures and generated code."
         )
     ]
