@@ -1,5 +1,7 @@
 from tabulate import tabulate
+
 from utils.logs.logging_utils import logger
+
 
 class ProjectStatus:
     def __init__(self, data):
