@@ -94,7 +94,7 @@ class MicroserviceController:
         """
         logger.info(f"Retrieving microservices for user ID: {user_id}, project ID: {project_id}")
         try:
-            microservices = self.microservice_service.get_microservices(user_id, project_id)
+            microservices = self.microservice_service.get_microservices_by_project_id(user_id, project_id)
             logger.info(f"Retrieved {len(microservices)} microservices for user ID {user_id}, project ID {project_id}")
             return microservices
         except Exception as e:
