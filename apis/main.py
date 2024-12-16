@@ -1,3 +1,5 @@
+import sys
+import time
 from typing import List
 
 from apis.microservice.controller import MicroserviceController
@@ -8,6 +10,7 @@ from database.entities.microservice_sessions import MicroserviceSession
 from database.entities.microservices import Microservice
 from genpod.team import TeamMembers
 from utils.logs.logging_utils import logger
+from utils.project_status import ProjectStatus
 
 
 class ActionManager:
@@ -88,9 +91,8 @@ class ActionManager:
 
 class Action:
 
-    @staticmethod
-    def generate(
-        microservice: Microservice,
+    def __init__(
+        self,
         agents: ProjectAgents,
         graphs: ProjectGraphs,
         database_path: str,
@@ -98,6 +100,15 @@ class Action:
         vector_db_path: str,
         graph_recursion_limit: int
     ):
+        
+        self.agents = agents
+        self.graphs = graphs
+        self.database_path = database_path
+        self.collection_name = collection_name
+        self.vector_db_path = vector_db_path
+        self.graph_recursion_limit = graph_recursion_limit
+    
+    def generate(self, microservice: Microservice):
         """Generate the microservice."""
 
         logger.info("Generating microservice.")
@@ -105,12 +116,12 @@ class Action:
         try:
             manager = ActionManager(
                 microservice,
-                agents,
-                graphs,
-                database_path,
-                collection_name,
-                vector_db_path,
-                graph_recursion_limit
+                self.agents,
+                self.graphs,
+                self.database_path,
+                self.collection_name,
+                self.vector_db_path,
+                self.graph_recursion_limit
             )
 
             manager.microservice.prompt = user_prompt
@@ -136,8 +147,8 @@ class Action:
                 "microservice_id": manager.microservice.id,
                 "original_user_input": user_prompt,
                 "project_path": manager.microservice.project_location,
-                "license_url": manager.microservice.license_text,
-                "license_text": manager.microservice.license_file_url,
+                "license_url": manager.microservice.license_file_url,
+                "license_text": manager.microservice.license_text,
             }
 
             supervisor_response = manager.stream_to_supervisor(supervisor_data)
@@ -153,25 +164,16 @@ class Action:
             logger.error(f"Failed to generate microservice: {e}")
             raise
 
-    @staticmethod
-    def resume(
-        user_id: int,
-        agents: ProjectAgents,
-        graphs: ProjectGraphs,
-        database_path: str,
-        collection_name: str,
-        vector_db_path: str,
-        graph_recursion_limit: int
-    ):
+    def resume(self, user_id: int):
         """Resume an existing microservice project."""
 
         logger.info("Resuming microservice.")
         try:
-            picked_project_id = Action._get_project_details(user_id)
-            if not picked_project_id:
-                print("No projects are available for this user.")
-                return 
-
+            # picked_project_id = Action._get_project_details(user_id)
+            # if not picked_project_id:
+            #     print("No projects are available for this user.")
+            #     return 
+            picked_project_id = 1
             picked_microservice = Action._get_microservice_details(user_id, picked_project_id)
             if not picked_microservice:
                 print("No active services available for this project.")
@@ -183,19 +185,19 @@ class Action:
                 return
 
             session_map = {session.agent_id: session for session in session_details}
-            for agent in agents:
+            for agent in self.agents:
                 curr_session = session_map.get(agent.agent_id)
                 if curr_session:
                     agent.set_thread_id(curr_session.id)
 
             manager = ActionManager(
                 picked_microservice,
-                agents,
-                graphs,
-                database_path,
-                collection_name,
-                vector_db_path,
-                graph_recursion_limit,
+                self.agents,
+                self.graphs,
+                self.database_path,
+                self.collection_name,
+                self.vector_db_path,
+                self.graph_recursion_limit,
             )
 
             manager.setup_team_members()
@@ -213,6 +215,57 @@ class Action:
             logger.error(f"Failed to resume microservice: {e}")
             raise
 
+    def microservice_status(
+        self,
+        user_id: str,
+        project_id: int,
+        microservice_id: int
+    ) -> None:
+        """
+        """
+        try:
+            session_controller = MicroserviceSessionController()
+            microservice_controller = MicroserviceController()
+            
+            picked_microservice = microservice_controller.get_microservice(microservice_id)
+            if not picked_microservice:
+                logger.warning(f"No active service found for given ID: {microservice_id}")
+                return
+
+            session_details = Action._get_session_details(user_id, project_id, picked_microservice.id)
+            if not session_details:
+                print("No sessions found for this service.")
+                return
+
+            session_map = {session.agent_id: session for session in session_details}
+            for agent in self.agents:
+                curr_session = session_map.get(agent.agent_id)
+                if curr_session:
+                    agent.set_thread_id(curr_session.id)
+
+            manager = ActionManager(
+                picked_microservice,
+                self.agents,
+                self.graphs,
+                self.database_path,
+                self.collection_name,
+                self.vector_db_path,
+                self.graph_recursion_limit,
+            )
+
+            manager.setup_team_members()
+            while True:
+                last_saved_state = manager.genpod_team.supervisor.get_last_saved_state()
+                project_status = ProjectStatus(last_saved_state)
+                
+                sys.stdout.write(project_status.display_project_status())
+                sys.stdout.flush()
+
+                time.sleep(5)
+        except Exception as e:
+            logger.error(f"Failed to get service status: {e}")
+            raise
+        
     @staticmethod
     def _prompt_user_for_project_idea() -> str:
         """Prompt the user for a project idea and validate the input."""
