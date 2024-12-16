@@ -65,13 +65,14 @@ display_cli_help() {
     echo "📝 GENPOD CLI Interactive Help:"
     echo
     echo "Available Commands:"
-    echo "   .generate  - Generate a new project."
-    echo "   .resume    - Resume an existing project."
-    echo "   .version   - Display the version of GENPOD CLI."
-    echo "   .clear     - Clear the terminal screen."
-    echo "   .help      - Show this help message."
-    echo "   .quit      - Exit the interactive session."
-    echo "   .exit      - Exit the interactive session."
+    echo "   .generate       - Generate a new project."
+    echo "   .resume         - Resume an existing project."
+    echo "   .progress <id>  - Display the real-time progress of a project by ID."
+    echo "   .version        - Display the version of GENPOD CLI."
+    echo "   .clear          - Clear the terminal screen."
+    echo "   .help           - Show this help message."
+    echo "   .quit           - Exit the interactive session."
+    echo "   .exit           - Exit the interactive session."
     echo
     echo "🙏 Thank you for using GENPOD! Type '.quit' or '.exit' to leave interactive mode."
 }
@@ -124,7 +125,7 @@ fi
 # Run a persistent loop
 while true; do
     echo -n "$tool> "  # Interactive prompt
-    read -r command  # Read user input
+    read -r command id # Read user input
 
     # Handle empty input
     if [[ -z "$command" ]]; then
@@ -139,6 +140,14 @@ while true; do
         .resume)
             # Resume a paused project
             python3 main.py resume 153
+            ;;
+        .progress)
+            # Check the status of the project by ID
+            if [[ -z "$id" ]]; then
+                echo "❌ Missing project ID. Usage: .progress <id>"
+            else
+                python3 main.py microservice_status "$id"
+            fi
             ;;
         .version)
             # Display the version
