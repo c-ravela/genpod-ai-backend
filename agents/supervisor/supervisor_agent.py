@@ -225,8 +225,8 @@ class SupervisorAgent(BaseAgent[SupervisorState, SupervisorPrompts]):
             'is_human_reviewed': False
         }
         for key, value in default_state_values.items():
-            self.state[key] = BaseAgent.ensure_value(self.state.get(key), value)
-            logger.debug(f"{self.agent_name}: {key} set to {self.state[key]}.")
+            state[key] = BaseAgent.ensure_value(state.get(key), value)
+            logger.debug(f"{self.agent_name}: {key} set to {state[key]}.")
 
         state['messages'] = BaseAgent.ensure_value(state['messages'], [
             (
