@@ -23,6 +23,7 @@ Imported Models:
 - Microservice
 - MicroserviceSession
 - TokenUsage
+- RAGAnalytics
 """
 
 from utils.logs.logging_utils import logger
@@ -32,7 +33,7 @@ try:
     from .microservices import Microservice
     from .projects import Project
     from .token_usage import TokenUsage
-
+    from .rag_analytics import RAGAnalytics 
 except ImportError as e:
     logger.error(f"Failed to import one or more ORM models: {e}")
     raise

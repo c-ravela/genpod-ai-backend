@@ -31,7 +31,8 @@ class Microservice(Base):
     project = relationship("Project", back_populates="microservice")
     sessions = relationship("MicroserviceSession", back_populates="microservice", cascade="all, delete-orphan")
     token_metrics = relationship("TokenUsage", back_populates="microservice", cascade="all, delete-orphan")
-    
+    rag_analytics = relationship("RAGAnalytics", back_populates="microservice", cascade="all, delete-orphan")
+
     def __init__(
         self,
         id: int = None,

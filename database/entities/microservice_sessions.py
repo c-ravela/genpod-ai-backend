@@ -26,6 +26,7 @@ class MicroserviceSession(Base):
     # Relationships
     project = relationship("Project", back_populates="microservice_sessions")
     microservice = relationship("Microservice", back_populates="sessions")
+    rag_analytics = relationship("RAGAnalytics", back_populates="session", cascade="all, delete-orphan")
 
     def __init__(
         self,
