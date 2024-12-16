@@ -62,6 +62,14 @@ def main():
         raise
 
     try:
+        action_obj = Action(
+            config.agents,
+            config.graphs,
+            db_path,
+            "MISMO-version-3.6-docs",
+            setup_config['vector_database_path'],
+            config.max_graph_recursion_limit
+        )
         if action == "generate":
             logger.info("Starting 'generate' action.")
             raw_proj = json.loads(data)
@@ -86,33 +94,22 @@ def main():
             )
             logger.info(f"Microservice object created: {new_microservice}")
 
-            Action.generate(
-                new_microservice,
-                config.agents,
-                config.graphs,
-                db_path,
-                "MISMO-version-3.6-docs",
-                setup_config['vector_database_path'],
-                config.max_graph_recursion_limit
-            )
+            action_obj.generate(new_microservice)
             logger.info("Generate action completed successfully.")
-
         elif action == "resume":
             logger.info("Starting 'resume' action.")
             user_id = int(data)
             logger.debug(f"User ID for resume action: {user_id}")
 
-            Action.resume(
-                user_id,
-                config.agents,
-                config.graphs,
-                db_path,
-                "MISMO-version-3.6-docs",
-                setup_config['vector_database_path'],
-                config.max_graph_recursion_limit
-            )
+            action_obj.resume(user_id)
             logger.info("Resume action completed successfully.")
+        elif action == "microservice_status":
+            logger.info("Starting 'microservice_status' action.")
+            microservice_id = int(data)
+            logger.debug(f"Microservice ID for microservice_status action: {microservice_id}")
 
+            action_obj.microservice_status(153, 1, microservice_id)
+            logger.info("Microservice status action completed successfully.")
         else:
             logger.error(f"Unknown action: {action}. Use 'generate' or 'resume'.")
             print(f"❌ Unknown action: {action}. Use 'generate' or 'resume'.")
