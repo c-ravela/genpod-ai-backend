@@ -21,13 +21,12 @@ def main():
     logger.info("Starting main genpod execution.")
 
     if len(sys.argv) < 2:
-        logger.error("No action provided. Use 'generate' or 'resume'.")
-        print("ERROR: No action provided. Use 'generate' or 'resume'.")
+        logger.error("No action provided. Use 'generate', 'resume', 'microservice_status', or 'add_project'.")
+        print("ERROR: No action provided. Use 'generate', 'resume', 'microservice_status', or 'add_project'.")
         sys.exit(1)
 
-    action = sys.argv[1].lower()
-    data = sys.argv[2]
-    logger.info(f"Action received: {action}")
+    requested_action = sys.argv[1].lower()
+    logger.info(f"Action received: {requested_action}")
 
     load_dotenv()  # dotenv is just dev environment will be removed for production
     setup_config_path = os.getenv("GENPOD_CONFIG")
@@ -70,55 +69,61 @@ def main():
             setup_config['vector_database_path'],
             config.max_graph_recursion_limit
         )
-        if action == "generate":
+
+        if requested_action == "generate":
+            if len(sys.argv) < 4:
+                logger.error("ERROR: 'generate' requires <project_id> <user_id>. Usage: 'generate <project_id> <user_id>'")
+                print("ERROR: 'generate' requires <project_id> <user_id>. Usage: 'generate <project_id> <user_id>'")
+                sys.exit(1)
+            project_id = int(sys.argv[2])
+            user_id = int(sys.argv[3])
+        
             logger.info("Starting 'generate' action.")
-            raw_proj = json.loads(data)
-            logger.debug(f"Parsed project data: {raw_proj}")
 
-            project = Project(
-                id=raw_proj['project_id'],
-                project_name=raw_proj['project_name'],
-                created_by=raw_proj['user_id']
-            )
-            logger.info(f"Project object created: {project}")
-
-            new_microservice = Microservice(
-                microservice_description="Test microservice",
-                project_id=project.id,
-                status="NEW",
-                license_text=raw_proj['license_text'],
-                license_file_url=raw_proj['license_url'],
-                project_location=set_project_path(setup_config['code_output_directory'], get_timestamp()),
-                created_by=project.created_by,
-                updated_by=project.created_by
-            )
-            logger.info(f"Microservice object created: {new_microservice}")
-
-            action_obj.generate(new_microservice)
+            project_path = set_project_path(setup_config['code_output_directory'], get_timestamp())
+            action_obj.generate(project_id, user_id, project_path)
             logger.info("Generate action completed successfully.")
-        elif action == "resume":
+        elif requested_action == "resume":
+            if len(sys.argv) < 3:
+                logger.error("ERROR: 'resume' requires <user_id>. Usage: 'resume <user_id>'")
+                sys.exit(1)
+            user_id = int(sys.argv[2])
             logger.info("Starting 'resume' action.")
-            user_id = int(data)
             logger.debug(f"User ID for resume action: {user_id}")
 
             action_obj.resume(user_id)
             logger.info("Resume action completed successfully.")
-        elif action == "microservice_status":
+        elif requested_action == "microservice_status":
+            if len(sys.argv) < 5:
+                print("ERROR: 'microservice_status' requires <project_id> <service_id> <user_id>. Usage: 'microservice_status <project_id> <service_id> <user_id>'")
+                sys.exit(1)
+            project_id = int(sys.argv[2])
+            service_id = int(sys.argv[3])
+            user_id = int(sys.argv[4])
+
             logger.info("Starting 'microservice_status' action.")
-            microservice_id = int(data)
-            logger.debug(f"Microservice ID for microservice_status action: {microservice_id}")
+            logger.debug(f"Microservice ID for microservice_status action: {service_id}")
 
-            action_obj.microservice_status(153, 1, microservice_id)
+            action_obj.microservice_status(user_id, project_id, service_id)
             logger.info("Microservice status action completed successfully.")
+        elif requested_action == "add_project":
+            if len(sys.argv) < 3:
+                print("ERROR: 'add_project' requires <user_id>. Usage: 'add_project <user_id>'")
+                sys.exit(1)
+            user_id = int(sys.argv[2])
+
+            logger.info("Starting 'add_project' action.")
+            logger.debug(f"User ID for add_project action: {user_id}")
+
+            action_obj.add_project(user_id)
+            logger.info("Add project action completed successfully.")
         else:
-            logger.error(f"Unknown action: {action}. Use 'generate' or 'resume'.")
-            print(f"❌ Unknown action: {action}. Use 'generate' or 'resume'.")
+            logger.error(f"Unknown action: {requested_action}. Use 'generate' or 'resume'.")
+            print(f"❌ Unknown action: {requested_action}. Use 'generate' or 'resume'.")
             sys.exit(1)
-
     except Exception as e:
-        logger.error(f"Error during '{action}' action execution: {e}")
+        logger.error(f"Error during '{requested_action}' action execution: {e}")
         raise
-
     finally:
         logger.info("Closing database session and disposing engine.")
         db.close_session()
