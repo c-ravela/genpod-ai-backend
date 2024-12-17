@@ -8,12 +8,14 @@ from apis.project.controller import ProjectController
 from configs.project_config import ProjectAgents, ProjectGraphs
 from database.entities.microservice_sessions import MicroserviceSession
 from database.entities.microservices import Microservice
+from database.entities.projects import Project
 from genpod.team import TeamMembers
 from utils.logs.logging_utils import logger
 from utils.project_status import ProjectStatus
 
 
 class ActionManager:
+
     def __init__(
         self,
         microservice: Microservice,
@@ -51,7 +53,7 @@ class ActionManager:
             self.genpod_team.supervisor.graph.agent.setup_team(self.genpod_team)
             logger.info("Team members set up successfully.")
         except Exception as e:
-            logger.error(f"Failed to set up team members: {e}")
+            logger.error(f"Error during team setup: {e}")
             raise
 
     def process_supervisor_response(self, supervisor_response):
@@ -74,18 +76,18 @@ class ActionManager:
                         logger.info(f"Microservice updated: {self.microservice}")
                         should_update = False
         except Exception as e:
-            logger.error(f"Failed to process supervisor response: {e}")
+            logger.error(f"Error processing supervisor response: {e}")
             raise
     
-    def stream_to_supervisor(self, data):
-        """Stream data to the supervisor and return the response."""
-        logger.info("Streaming data to supervisor.")
+    def send_to_supervisor(self, data):
+        """Send data to the supervisor and return the response."""
+        logger.info("Sending data to supervisor.")
         try:
             response = self.genpod_team.supervisor.stream(data)
-            logger.info("Data streamed to supervisor successfully.")
+            logger.info("Data sent to supervisor successfully.")
             return response
         except Exception as e:
-            logger.error(f"Failed to stream data to supervisor: {e}")
+            logger.error(f"Error sending data to supervisor: {e}")
             raise
 
 
@@ -108,12 +110,49 @@ class Action:
         self.vector_db_path = vector_db_path
         self.graph_recursion_limit = graph_recursion_limit
     
-    def generate(self, microservice: Microservice):
-        """Generate the microservice."""
+    def add_project(self, user_id: int):
+        """Add a new project to the system with user-provided inputs."""
+        logger.info("Starting to add a new project.")
+        project_controller = ProjectController()
 
-        logger.info("Generating microservice.")
-        user_prompt = Action._prompt_user_for_project_idea()
         try:
+            project_name = self._prompt_for_input("Enter the project name (at least 3 characters)", min_length=3)
+            project_description = self._prompt_for_input("Enter the project description (at least 10 characters)", min_length=10)
+
+            new_project = Project(
+                project_name=project_name,
+                project_description=project_description,
+                created_by=user_id,
+                updated_by=user_id
+            )
+            project_controller.create(new_project)
+
+            logger.info(f"Project '{new_project.project_name}' created successfully.")
+            print(f"Project '{new_project.project_name}' (ID: {new_project.id}) has been successfully created.")
+        except Exception as e:
+            logger.error(f"Failed to add project: {e}")
+            raise
+
+    def generate(self, project_id: int, user_id: int, project_path: str):
+        """Generate the microservice."""
+        logger.info("Starting microservice generation.")
+        user_prompt = Action._prompt_user_for_project_idea()
+
+        try:
+            project = self._get_project(project_id, user_id)
+            if project is None:
+                raise ValueError("Project not found.")
+            
+            microservice = Microservice(
+                project_id=project.id,
+                status="NEW",
+                project_location=project_path,
+                license_text="SPDX-License-Identifier: Apache-2.0\nCopyright 2024 Authors of CRBE & the Organization created CRBE",
+                license_file_url="https://raw.githubusercontent.com/intelops/tarian-detector/8a4ff75fe31c4ffcef2db077e67a36a067f1437b/LICENSE",
+                created_by=user_id,
+                updated_by=user_id
+            )
+
             manager = ActionManager(
                 microservice,
                 self.agents,
@@ -151,7 +190,7 @@ class Action:
                 "license_text": manager.microservice.license_text,
             }
 
-            supervisor_response = manager.stream_to_supervisor(supervisor_data)
+            supervisor_response = manager.send_to_supervisor(supervisor_data)
             manager.process_supervisor_response(supervisor_response)
 
             logger.info("Microservice generation completed successfully.")
@@ -166,14 +205,14 @@ class Action:
 
     def resume(self, user_id: int):
         """Resume an existing microservice project."""
-
         logger.info("Resuming microservice.")
+
         try:
-            # picked_project_id = Action._get_project_details(user_id)
-            # if not picked_project_id:
-            #     print("No projects are available for this user.")
-            #     return 
-            picked_project_id = 1
+            picked_project_id = Action._get_project_details(user_id)
+            if not picked_project_id:
+                print("No projects are available for this user.")
+                return
+
             picked_microservice = Action._get_microservice_details(user_id, picked_project_id)
             if not picked_microservice:
                 print("No active services available for this project.")
@@ -202,7 +241,7 @@ class Action:
 
             manager.setup_team_members()
             last_saved_state = manager.genpod_team.supervisor.get_last_saved_state()
-            supervisor_response = manager.stream_to_supervisor(last_saved_state)
+            supervisor_response = manager.send_to_supervisor(last_saved_state)
             manager.process_supervisor_response(supervisor_response)
 
             logger.info("Microservice resumed successfully.")
@@ -224,7 +263,6 @@ class Action:
         """
         """
         try:
-            session_controller = MicroserviceSessionController()
             microservice_controller = MicroserviceController()
             
             picked_microservice = microservice_controller.get_microservice(microservice_id)
@@ -269,21 +307,7 @@ class Action:
     @staticmethod
     def _prompt_user_for_project_idea() -> str:
         """Prompt the user for a project idea and validate the input."""
-        while True:
-            try:
-                logger.info("Prompting user for project idea.")
-                print("\nEnter the prompt to define your project idea (at least 10 characters): ")
-                user_prompt = input("> ").strip()
-                if len(user_prompt) > 9:
-                    print(f"\nPrompt accepted: {user_prompt}")
-                    logger.info(f"User provided valid project idea: {user_prompt}")
-                    return user_prompt
-                else:
-                    print("Invalid input. Please provide a detailed description of your project idea (at least 10 characters).")
-                    logger.warning("User provided invalid project idea. Prompting again.")
-            except Exception as e:
-                logger.error(f"An error occurred while processing user input for project idea: {e}")
-                print(f"An error occurred while processing your input: {e}")
+        return Action._prompt_for_input("Enter your project idea (at least 10 characters)", 10)
 
     @staticmethod
     def _get_project_details(user_id: int) -> int:
@@ -389,3 +413,46 @@ class Action:
             except Exception as e:
                 logger.error(f"An error occurred while prompting user: {e}")
                 raise
+
+    @staticmethod
+    def _prompt_for_input(prompt_message: str, min_length: int) -> str:
+        """
+        Prompt user for input and validate based on minimum length.
+        """
+        while True:
+            try:
+                user_input = input(f"{prompt_message}: ").strip()
+                if len(user_input) >= min_length:
+                    return user_input
+                else:
+                    print(f"Input too short. Please enter at least {min_length} characters.")
+            except Exception as e:
+                logger.error(f"Error during user input: {e}")
+                raise
+    
+    @staticmethod
+    def _get_project(project_id:int, user_id: int) -> Project:
+        """
+        Retrieve and validate project details for the given user.
+
+        Args:
+            project_id (int): The ID of the project to retrieve.
+            user_id (int): The ID of the user to whom the project belongs.
+
+        Returns:
+            Optional[Project]: Project if valid, else None.
+        """
+        logger.info(f"Retrieving project details for user ID: {user_id}")
+        project_controller = ProjectController()
+        try:
+            user_project = project_controller.get_project(project_id, user_id=user_id)
+            if not user_project:
+                logger.warning(f"No project found with ID: {project_id} for user ID: {user_id}")
+                return None
+
+            logger.info(f"Project details: ID={user_project.id}, Name={user_project.project_name}")
+
+            return user_project
+        except Exception as e:
+            logger.error(f"An error occurred while retrieving project details for user ID {user_id}: {e}")
+            raise
