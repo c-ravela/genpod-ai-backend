@@ -1,17 +1,31 @@
 #!/bin/bash
 
-GENPOD_VERSION="0.0.1"
-CONFIG_FILE_PATH="$HOME/.config/genpod/config.yml"
+# =========================
+# UTILITY FUNCTIONS
+# =========================
+to_title_case() {
+    local input="$1"
+    echo "$input" | awk '{ for (i=1; i<=NF; i++) $i = toupper(substr($i,1,1)) tolower(substr($i,2)); print }'
+}
 
-temp_json_data='{
-    "project_id": 1,
-    "project_name": "Test Project",
-    "license_text": "SPDX-License-Identifier: Apache-2.0\nCopyright 2024 Authors of CRBE & the Organization created CRBE",
-    "license_url": "https://raw.githubusercontent.com/intelops/tarian-detector/8a4ff75fe31c4ffcef2db077e67a36a067f1437b/LICENSE",
-    "user_id": 153
-}'
+# =========================
+# GENPOD CLI CONFIGURATION
+# =========================
+tool="genpod"
+TOOL_TITLE=$(to_title_case "$tool")
 
-# Function to locate the configuration file
+GENPOD_VERSION="0.0.2"
+CONFIG_FILE_PATH="$HOME/.config/$tool/config.yml"
+SESSION_FILE="$HOME/."$tool"_session"
+USER_ID=""
+
+DIR_NAME=$tool"_src"
+SCRIPT_DIR=$(dirname "$(realpath "$0")")
+PROJECT_DIR="$SCRIPT_DIR/$DIR_NAME"
+
+# =========================
+# UTILITY FUNCTIONS
+# =========================
 locate_config_file() {
     if [ -f "$CONFIG_FILE_PATH" ]; then
         return 0
@@ -22,68 +36,216 @@ locate_config_file() {
     fi
 }
 
-# Export the configuration file path for Python scripts
 export_config_path() {
     export GENPOD_CONFIG="$CONFIG_FILE_PATH"
 }
 
-# Function to display the version
 display_version() {
-    echo "GENPOD CLI version v$GENPOD_VERSION"
+    echo "$TOOL_TITLE CLI version v$GENPOD_VERSION"
 }
 
-# Function to display branding
 display_branding() {
-    echo " ██████╗ ███████╗███╗   ██╗██████╗  ██████╗ ██████╗ "
-    echo "██╔════╝ ██╔════╝████╗  ██║██╔══██╗██╔═══██╗██╔══██╗"
-    echo "██║  ███╗█████╗  ██╔██╗ ██║██████╔╝██║   ██║██║  ██║"
-    echo "██║   ██║██╔══╝  ██║╚██╗██║██╔═══╝ ██║   ██║██║  ██║"
-    echo "╚██████╔╝███████╗██║ ╚████║██║     ╚██████╔╝██████╔╝"
-    echo " ╚═════╝ ╚══════╝╚═╝  ╚═══╝╚═╝      ╚═════╝ ╚═════╝ "
-    echo "                                             v$GENPOD_VERSION"
-    echo
+    cat << EOF
+ ██████╗ ███████╗███╗   ██╗██████╗  ██████╗ ██████╗ 
+██╔════╝ ██╔════╝████╗  ██║██╔══██╗██╔═══██╗██╔══██╗
+██║  ███╗█████╗  ██╔██╗ ██║██████╔╝██║   ██║██║  ██║
+██║   ██║██╔══╝  ██║╚██╗██║██╔═══╝ ██║   ██║██║  ██║
+╚██████╔╝███████╗██║ ╚████║██║     ╚██████╔╝██████╔╝
+ ╚═════╝ ╚══════╝╚═╝  ╚═══╝╚═╝      ╚═════╝ ╚═════╝ 
+                                             v$GENPOD_VERSION
+
+EOF
 }
 
-# Function to display flag-based help (pre-interactive mode)
+
 display_flag_help() {
-    echo "📝 GENPOD CLI Help:"
-    echo
-    echo "Usage:"
-    echo "   genpod [flags]"
-    echo
-    echo "Available Flags:"
-    echo "   --version  - Display the GENPOD CLI version."
-    echo "   --help     - Show this help message."
-    echo
-    echo "To enter interactive mode, simply run 'genpod' without any flags."
-    echo
-    echo "🙏 Thank you for using GENPOD! For more help, enter the CLI and type '.help'."
+    cat << EOF
+📝  $TOOL_TITLE CLI Help:
+
+Usage:
+   $tool [flags]
+
+Available Flags:
+   --version  - Display the $TOOL_TITLE CLI version.
+   --help     - Show this help message.
+
+To enter interactive mode, simply run '$tool' without any flags.
+
+🙏 Thank you for using $TOOL_TITLE! For more help, enter the CLI and type '.help'.
+EOF
 }
 
-# Function to display interactive CLI help
 display_cli_help() {
-    echo "📝 GENPOD CLI Interactive Help:"
-    echo
-    echo "Available Commands:"
-    echo "   .generate       - Generate a new project."
-    echo "   .resume         - Resume an existing project."
-    echo "   .progress <id>  - Display the real-time progress of a project by ID."
-    echo "   .version        - Display the version of GENPOD CLI."
-    echo "   .clear          - Clear the terminal screen."
-    echo "   .help           - Show this help message."
-    echo "   .quit           - Exit the interactive session."
-    echo "   .exit           - Exit the interactive session."
-    echo
-    echo "🙏 Thank you for using GENPOD! Type '.quit' or '.exit' to leave interactive mode."
+    cat << EOF
+📝 $TOOL_TITLE CLI Interactive Help:
+
+Available Commands:
+
+   .login
+       Log in to the $TOOL_TITLE system.
+
+   .logout
+       Log out of the $TOOL_TITLE system.
+
+   .generate <project_id>
+       Generate a new service.
+
+   .add_project
+       Add a new project to the system.
+
+   .resume
+       Resume an existing service.
+
+   .progress <project_id> <service_id>
+       Display the real-time progress of a service by ID.
+
+   .version
+       Display the version of $TOOL_TITLE CLI.
+
+   .clear
+       Clear the terminal screen.
+
+   .help
+       Show this help message.
+
+   .quit / .exit
+       Exit the interactive session.
+
+🙏 Thank you for using $TOOL_TITLE! Type '.quit' or '.exit' to leave interactive mode.
+EOF
 }
 
-tool="genpod"
-DIR_NAME="genpod_src"
-# Detect the directory where the script is installed
-SCRIPT_DIR=$(dirname "$(realpath "$0")")
-PROJECT_DIR="$SCRIPT_DIR/$DIR_NAME"
+# =========================
+# SESSION MANAGEMENT
+# =========================
+login_user() {
+    echo -n "Enter your User ID to log in: "
+    read -r user_id
 
-# Check for command-line arguments
+    if [[ -z "$user_id" ]]; then
+        echo "❌ User ID cannot be empty. Please try again."
+        return 1
+    fi
+
+    if [[ "$user_id" =~ ^[0-9]+$ ]]; then
+        echo "$user_id" > "$SESSION_FILE"
+        USER_ID="$user_id"
+        echo "✅ Successfully logged in as User ID: $USER_ID"
+    else
+        echo "❌ Invalid User ID. Please enter numeric values only."
+        return 1
+    fi
+}
+
+logout_user() {
+    if [[ -f "$SESSION_FILE" ]]; then
+        rm "$SESSION_FILE"
+        USER_ID=""
+        echo "👋 You have been logged out successfully."
+    else
+        echo "ℹ️  You are not logged in."
+    fi
+}
+
+check_login() {
+    if [[ -f "$SESSION_FILE" ]]; then
+        USER_ID=$(cat "$SESSION_FILE")
+        echo "🔐 Logged in as User ID: $USER_ID"
+    else
+        echo "❌ No active session found. Please log in to continue."
+        login_user
+        [[ $? -ne 0 ]] && exit 1
+    fi
+}
+
+get_logged_in_user() {
+    if [[ -f "$SESSION_FILE" ]]; then
+        cat "$SESSION_FILE"
+    else
+        echo "❌ You are not logged in. Please log in to continue."
+        return 1
+    fi
+}
+
+validate_logged_in() {
+    if [[ -z "$USER_ID" ]]; then
+        echo "❌ You are not logged in. Please log in using '.login' before continuing."
+        return 1
+    fi
+    return 0
+}
+
+# =========================
+# MAIN LOOP
+# =========================
+main_loop() {
+    echo Welcome to $TOOL_TITLE v$GENPOD_VERSION!
+    echo "Type '.help' to see a list of available commands."
+    echo
+
+    while true; do
+        echo -n "$tool> "
+        read -r command input input2
+
+        if [[ -z "$command" ]]; then
+            continue
+        fi
+
+        case "$command" in
+            .generate)
+                validate_logged_in || continue
+                [[ -z "$input" ]] && echo "❌ Missing project ID. Usage: .generate <project_id>" || python3 main.py generate "$input" "$USER_ID"
+                ;;
+            .resume)
+                validate_logged_in || continue
+                python3 main.py resume "$USER_ID"
+                ;;
+            .add_project)
+                validate_logged_in || continue
+                python3 main.py add_project "$USER_ID"
+                ;;
+            .progress)
+                validate_logged_in || continue
+                if [[ -z "$input" ]]; then
+                    echo "❌ Missing project ID. Usage: .progress <project_id> <service_id>"
+                elif [[ -z "$input2" ]]; then
+                    echo "❌ Missing service ID. Usage: .progress <project_id> <service_id>"
+                else
+                    python3 main.py microservice_status "$input" "$input2" "$USER_ID"
+                fi
+                ;;
+            .version)
+                display_version
+                ;;
+            .clear)
+                clear
+                display_branding
+                ;;
+            .exit|.quit)
+                echo "👋 Exiting $tool. Goodbye!"
+                deactivate
+                break
+                ;;
+            .help)
+                display_cli_help
+                ;;
+            .login)
+                login_user
+                ;;
+            .logout)
+                logout_user
+                ;;
+            *)
+                echo "❌ Unknown command: $command"
+                echo "ℹ️  Type '.help' to see a list of available commands."
+                ;;
+        esac
+    done
+}
+
+# =========================
+# SCRIPT ENTRY POINT
+# =========================
 if [[ "$1" == "--version" ]]; then
     display_version
     exit 0
@@ -98,23 +260,14 @@ elif [[ "$1" != "" ]]; then
 fi
 
 locate_config_file
-
-# Export the configuration file path
 export_config_path
-
-# Display branding
 display_branding
-echo "Welcome to GENPOD v$GENPOD_VERSION!"
-echo "Type '.help' to see a list of available commands."
-echo
 
-# Navigate to the dynamically detected project directory
 cd "$PROJECT_DIR" || {
     echo "❌ Failed to navigate to the project directory: $PROJECT_DIR"
     exit 1
 }
 
-# Activate the virtual environment
 if [ -f .venv/bin/activate ]; then
     source .venv/bin/activate
 else
@@ -122,57 +275,4 @@ else
     exit 1
 fi
 
-# Run a persistent loop
-while true; do
-    echo -n "$tool> "  # Interactive prompt
-    read -r command id # Read user input
-
-    # Handle empty input
-    if [[ -z "$command" ]]; then
-        continue  # Skip the loop iteration for empty input
-    fi
-
-    case "$command" in
-        .generate)
-            # Generate a new project
-            python3 main.py generate "$temp_json_data"
-            ;;
-        .resume)
-            # Resume a paused project
-            python3 main.py resume 153
-            ;;
-        .progress)
-            # Check the status of the project by ID
-            if [[ -z "$id" ]]; then
-                echo "❌ Missing project ID. Usage: .progress <id>"
-            else
-                python3 main.py microservice_status "$id"
-            fi
-            ;;
-        .version)
-            # Display the version
-            display_version
-            ;;
-        .clear)
-            # Clear the terminal
-            clear
-            display_branding
-            echo "Type '.help' to see a list of available commands."
-            echo
-            ;;
-        .exit|.quit)
-            echo "👋 Exiting GENPOD. Goodbye!"
-            echo "🙏 Thank you for using GENPOD. Have a great day!"
-            deactivate
-            break
-            ;;
-        .help)
-            # Display interactive CLI help
-            display_cli_help
-            ;;
-        *)
-            echo "❌ Unknown command: $command"
-            echo "ℹ️  Type '.help' to see a list of available commands."
-            ;;
-    esac
-done
+main_loop
