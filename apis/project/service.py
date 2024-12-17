@@ -38,26 +38,28 @@ class ProjectService:
             logger.error(f"Error creating project: {e}")
             raise
 
-    def get_project_by_id(self, project_id: int) -> Optional[Project]:
+    def get_project_by_id(self, project_id: int, user_id: int) -> Optional[Project]:
         """
         Retrieves a project by its ID.
 
         Args:
             project_id (int): The ID of the project to retrieve.
+            user_id (int): The ID of the user who owns the project.
 
         Returns:
             Optional[Project]: The Project instance if found, else None.
         """
-        logger.info(f"Retrieving project with ID: {project_id}")
+        logger.info(f"Retrieving project with ID: {project_id} for user ID: {user_id}")
+   
         try:
-            project = self.db_session.query(Project).filter(Project.id == project_id).first()
+            project = self.db_session.query(Project).filter(Project.id == project_id, Project.created_by == user_id).first()
             if project:
                 logger.info(f"Project retrieved successfully: {project}")
             else:
-                logger.warning(f"No project found with ID: {project_id}")
+                logger.warning(f"No project found with ID: {project_id} for user ID: {user_id}")
             return project
         except SQLAlchemyError as e:
-            logger.error(f"Error retrieving project with ID {project_id}: {e}")
+            logger.error(f"Error retrieving project with ID {project_id} for user ID {user_id}: {e}")
             raise
 
     def update_project(self, updated_project: Project) -> Optional[Project]:

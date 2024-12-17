@@ -93,24 +93,26 @@ class ProjectController:
             logger.error(f"Failed to retrieve projects for user ID {user_id}: {e}")
             raise
 
-    def get_project(self, project_id: int) -> Optional[Project]:
+    def get_project(self, project_id: int, user_id: int) -> Optional[Project]:
         """
         Retrieves a single project by ID.
 
         Args:
             project_id (int): The ID of the project.
+            user_id (int): The ID of the user who owns the project.
 
         Returns:
             Optional[Project]: The Project instance if found, else None.
         """
-        logger.info(f"Retrieving project with ID: {project_id}")
+        logger.info(f"Retrieving project with ID: {project_id} for user ID: {user_id}")
         try:
-            project = self.project_service.get_project_by_id(project_id)
-            if project:
-                logger.info(f"Project retrieved successfully: {project}")
+            project = self.project_service.get_project_by_id(project_id, user_id)
+     
+            if project is not None:
+                logger.info(f"Project retrieved successfully: ID={project.id}, Name='{project.project_name}'")
             else:
-                logger.warning(f"No project found with ID: {project_id}")
+                logger.warning(f"No project found with ID: {project_id} for user ID: {user_id}")
             return project
         except Exception as e:
-            logger.error(f"Failed to retrieve project with ID {project_id}: {e}")
+            logger.error(f"Failed to retrieve project with ID: {project_id} for user ID: {user_id} - Error: {e}")
             raise
