@@ -1,6 +1,7 @@
 from abc import ABC
 
-from sqlalchemy import create_engine
+from sqlalchemy import MetaData, create_engine
+from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.orm import Session, sessionmaker
 
 from database.database_base import Base
@@ -19,8 +20,9 @@ class Database(ABC):
         Ensures only one instance of the class exists.
         """
         if Database._instance is None:
+            logger.debug("No existing Database instance found. Creating a new one.")
             Database._instance = super().__new__(cls)
-            logger.debug("Creating a new Database instance.")
+            logger.debug("Database instance object created.")
             try:
                 Database._instance._initialize(db_uri)
                 logger.info("Singleton Database instance created!")
@@ -37,14 +39,16 @@ class Database(ABC):
         """
         try:
             logger.info("Initializing database connection.")
+            logger.debug(f"Database URI: {db_uri}")
             self._engine = create_engine(
                 db_uri,
-                connect_args={"check_same_thread": False},
-                # echo=True
+                connect_args={"check_same_thread": False}
             )
+            logger.debug("SQLAlchemy engine created successfully.")
             self._session_factory = sessionmaker(
                 bind=self._engine, autoflush=False, autocommit=False
             )
+            logger.debug("Session factory created successfully.")
             self._session = self._session_factory()
             logger.info("Database connection and session factory set up successfully.")
         except Exception as e:
@@ -56,10 +60,32 @@ class Database(ABC):
         Creates tables based on SQLAlchemy models if they don't already exist.
         """
         try:
-            logger.info("Creating tables based on SQLAlchemy models.")
-            import database.entities
-            Base.metadata.create_all(bind=self._engine)
-            logger.info("Tables created successfully.")
+            logger.info("Starting process to create missing tables.")
+            logger.debug("Reflecting existing database schema...")
+            metadata = MetaData()
+            metadata.reflect(bind=self._engine)
+            logger.debug("Database schema reflection completed.")
+
+            logger.info("Checking for missing tables...")
+            existing_tables = set(metadata.tables.keys())
+            model_tables = set(Base.metadata.tables.keys())
+            
+            logger.debug(f"Existing tables in the database: {existing_tables}")
+            logger.debug(f"Defined tables in the model: {model_tables}")
+            
+            missing_tables = model_tables - existing_tables
+            if missing_tables:
+                logger.info(f"Missing tables detected: {missing_tables}")
+                for table_name in missing_tables:
+                    logger.info(f"Creating table: {table_name}")
+                    Base.metadata.tables[table_name].create(bind=self._engine)
+                    logger.debug(f"Table {table_name} created successfully.")
+                logger.info("All missing tables created successfully.")
+            else:
+                logger.info("No missing tables. Database schema is up-to-date.")
+        except SQLAlchemyError as e:
+            logger.error(f"SQLAlchemy error occurred while creating tables: {e}")
+            raise
         except Exception as e:
             logger.error(f"Error occurred while creating tables: {e}")
             raise
