@@ -9,7 +9,7 @@ def auto_init(init_func):
     def wrapper(self, *args, **kwargs):
         try:
             # Log the start of the initialization
-            logger.info(f"Initializing {self.__class__.__name__} with args={args}, kwargs={kwargs}")
+            logger.debug(f"Initializing {self.__class__.__name__} with args={args}, kwargs={kwargs}")
             
             # Call the original __init__ method
             init_func(self, *args, **kwargs)
