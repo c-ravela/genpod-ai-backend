@@ -32,8 +32,8 @@ try:
     from .microservice_sessions import MicroserviceSession
     from .microservices import Microservice
     from .projects import Project
-    from .token_usage import TokenUsage
-    from .rag_analytics import RAGAnalytics 
+    from .rag_analytics import RAGAnalytics
+    from .token_usage import TokenUsage 
 except ImportError as e:
     logger.error(f"Failed to import one or more ORM models: {e}")
     raise
