@@ -136,7 +136,6 @@ class Action:
     def generate(self, project_id: int, user_id: int, project_path: str):
         """Generate the microservice."""
         logger.info("Starting microservice generation.")
-        user_prompt = Action._prompt_user_for_project_idea()
 
         try:
             project = self._get_project(project_id, user_id)
@@ -162,7 +161,8 @@ class Action:
                 self.vector_db_path,
                 self.graph_recursion_limit
             )
-
+            
+            user_prompt = Action._prompt_user_for_project_idea()
             manager.microservice.prompt = user_prompt
             manager.microservice_controller.create(manager.microservice)
             logger.info(f"Microservice created: {manager.microservice}")
