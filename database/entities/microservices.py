@@ -4,7 +4,7 @@ from sqlalchemy import Column, DateTime, ForeignKey, Integer, String, func
 from sqlalchemy.orm import relationship
 
 from database.database_base import Base
-from utils.logs.logging_utils import logger
+from utils.decorators import auto_init
 
 
 class Microservice(Base):
@@ -33,6 +33,7 @@ class Microservice(Base):
     token_metrics = relationship("TokenUsage", back_populates="microservice", cascade="all, delete-orphan")
     rag_analytics = relationship("RAGAnalytics", back_populates="microservice", cascade="all, delete-orphan")
 
+    @auto_init
     def __init__(
         self,
         id: int = None,
@@ -49,28 +50,4 @@ class Microservice(Base):
         created_at: datetime = None,
         updated_at: datetime = None
     ):
-        logger.debug("Initializing Microservice entity.")
-        self.id = id
-        self.microservice_name = microservice_name
-        self.microservice_description = microservice_description
-        self.prompt = prompt
-        self.project_id = project_id
-        self.status = status
-        self.license_text = license_text
-        self.license_file_url = license_file_url
-        self.project_location = project_location
-        self.created_by = created_by
-        self.updated_by = updated_by
-        self.created_at = created_at
-        self.updated_at = updated_at
-        logger.info(f"Microservice entity initialized: {self}")
-
-    def __repr__(self):
-        logger.debug(f"Creating string representation for Microservice(id={self.id}).")
-        return (
-            f"<Microservice(id={self.id}, microservice_name={self.microservice_name}, "
-            f"microservice_description={self.microservice_description}, prompt={self.prompt}, "
-            f"status={self.status}, project_id={self.project_id}, license_text={self.license_text}, "
-            f"license_file_url={self.license_file_url}, project_location={self.project_location}, "
-            f"created_by={self.created_by}, updated_by={self.updated_by})>"
-        )
+        pass

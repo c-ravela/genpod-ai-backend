@@ -4,7 +4,7 @@ from sqlalchemy import Column, DateTime, ForeignKey, Integer, String, func
 from sqlalchemy.orm import relationship
 
 from database.database_base import Base
-from utils.logs.logging_utils import logger
+from utils.decorators import auto_init
 
 
 class TokenUsage(Base):
@@ -30,6 +30,7 @@ class TokenUsage(Base):
     project = relationship("Project", back_populates="token_metrics")
     microservice = relationship("Microservice", back_populates="token_metrics")
 
+    @auto_init
     def __init__(
         self,
         project_id: int = None,
@@ -45,27 +46,4 @@ class TokenUsage(Base):
         created_at: datetime = None,
         updated_at: datetime = None
     ):
-        logger.debug("Initializing TokenUsage entity.")
-        self.project_id = project_id
-        self.microservice_id = microservice_id
-        self.agent_id = agent_id
-        self.provider = provider
-        self.model = model
-        self.input_tokens = input_tokens
-        self.output_tokens = output_tokens
-        self.total_tokens = total_tokens
-        self.created_at = created_at
-        self.updated_at = updated_at
-        self.created_by = created_by
-        self.updated_by = updated_by
-        logger.info(f"TokenUsage entity initialized: {self}")
-
-    def __repr__(self):
-        logger.debug(f"Creating string representation for TokenUsage(id={self.id}).")
-        return (
-            f"<TokenUsage(id={self.id}, project_id={self.project_id}, agent_id={self.agent_id}, "
-            f"microservice_id={self.microservice_id}, provider={self.provider}, model={self.model}, "
-            f"input_tokens={self.input_tokens}, output_tokens={self.output_tokens}, total_tokens={self.total_tokens}, "
-            f"created_at={self.created_at}, updated_at={self.updated_at}, created_by={self.created_by}, "
-            f"updated_by={self.updated_by})>"
-        )
+        pass

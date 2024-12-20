@@ -4,7 +4,7 @@ from sqlalchemy import Column, DateTime, ForeignKey, Integer, String, func
 from sqlalchemy.orm import relationship
 
 from database.database_base import Base
-from utils.logs.logging_utils import logger
+from utils.decorators import auto_init
 
 
 class MicroserviceSession(Base):
@@ -28,6 +28,7 @@ class MicroserviceSession(Base):
     microservice = relationship("Microservice", back_populates="sessions")
     rag_analytics = relationship("RAGAnalytics", back_populates="session", cascade="all, delete-orphan")
 
+    @auto_init
     def __init__(
         self,
         id: int = None,
@@ -39,22 +40,4 @@ class MicroserviceSession(Base):
         created_at: datetime = None,
         updated_at: datetime = None
     ):
-        logger.debug("Initializing MicroserviceSession entity.")
-        self.id = id
-        self.agent_id = agent_id
-        self.project_id = project_id
-        self.microservice_id = microservice_id
-        self.created_by = created_by
-        self.updated_by = updated_by
-        self.created_at = created_at
-        self.updated_at = updated_at
-        logger.info(f"MicroserviceSession entity initialized: {self}")
-
-    def __repr__(self):
-        logger.debug(f"Creating string representation for MicroserviceSession(id={self.id}).")
-        return (
-            f"<MicroserviceSession(id={self.id}, agent_id={self.agent_id}, "
-            f"project_id={self.project_id}, microservice_id={self.microservice_id}, "
-            f"created_by={self.created_by}, updated_by={self.updated_by}, "
-            f"created_at={self.created_at}, updated_at={self.updated_at})>"
-        )
+        pass
