@@ -22,7 +22,7 @@ class RAGAnalytics(Base):
     document_id = Column(String, nullable=True)
     document_name = Column(String, nullable=True)
     document_version = Column(String, nullable=True)
-    raw_respone = Column(String, nullable=False)
+    raw_response = Column(String, nullable=False)
     page_number = Column(Integer, nullable=True)
     line_number = Column(Integer, nullable=True)
     size_of_data = Column(Integer, nullable=True)
@@ -49,7 +49,7 @@ class RAGAnalytics(Base):
         document_id: String = None,
         document_name: str = None,
         document_version: str = None,
-        raw_respone: str = None,
+        raw_response: str = None,
         page_number: int = None,
         line_number: int = None,
         size_of_data: int = None,
