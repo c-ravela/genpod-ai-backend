@@ -1,3 +1,10 @@
+ifneq (,$(wildcard .env))
+    include .env
+    export $(shell sed 's/=.*//' .env)
+else
+    $(error [ERROR] .env file not found. Please create a .env file to proceed.)
+endif
+
 # Specify the output directory for all generated files
 OUTPUT_PATH = $(CURDIR)/"output"
 
