@@ -10,6 +10,7 @@ from database.entities.microservice_sessions import MicroserviceSession
 from database.entities.microservices import Microservice
 from database.entities.projects import Project
 from genpod.team import TeamMembers
+from models.constants import PStatus
 from utils.logs.logging_utils import logger
 from utils.project_status import ProjectStatus
 
@@ -144,7 +145,7 @@ class Action:
             
             microservice = Microservice(
                 project_id=project.id,
-                status="NEW",
+                status=str(PStatus.NEW),
                 project_location=project_path,
                 license_text="SPDX-License-Identifier: Apache-2.0\nCopyright 2024 Authors of CRBE & the Organization created CRBE",
                 license_file_url="https://raw.githubusercontent.com/intelops/tarian-detector/8a4ff75fe31c4ffcef2db077e67a36a067f1437b/LICENSE",
@@ -166,6 +167,15 @@ class Action:
             manager.microservice.prompt = user_prompt
             manager.microservice_controller.create(manager.microservice)
             logger.info(f"Microservice created: {manager.microservice}")
+
+            delay_seconds = 5
+            print(
+                f"Service registered with the database.\n"
+                f"Assigned Service ID: {manager.microservice.id}\n"
+                f"You can locate this service under Project ID: {manager.microservice.project_id}.\n"
+                f"Service generation will begin in approximately {delay_seconds} seconds. Please wait..."
+            )
+            time.sleep(delay_seconds)
 
             for agent in manager.agents:
                 curr_session = MicroserviceSession(
