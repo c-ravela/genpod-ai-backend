@@ -99,7 +99,7 @@ def main():
 
             context.update(project_id=project_id, user_id=user_id)
             project_path = set_project_path(setup_config['code_output_directory'], get_timestamp())
-            context.project_path = project_path
+            context.update(project_path=project_path)
             logger.info("Context successfully updated for the 'generate' action.")
             logger.info(f"Generated project path: {project_path}")
 
@@ -116,7 +116,7 @@ def main():
             user_id = int(sys.argv[2])
             logger.debug(f"'Resume' action parameter: User ID = {user_id}")
 
-            context.user_id = user_id
+            context.update(user_id=user_id)
             logger.info("Context updated for the 'resume' action.")
 
             action_obj.resume(user_id)
@@ -155,7 +155,7 @@ def main():
             user_id = int(sys.argv[2])
             logger.debug(f"'Add project' action parameter: User ID = {user_id}")
 
-            context.user_id = user_id
+            context.update(user_id=user_id)
             logger.info("Context updated for the 'add_project' action.")
 
             action_obj.add_project(user_id)
