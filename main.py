@@ -1,16 +1,12 @@
 """Driving code file for this project."""
 
-import json
 import os
 import sys
-
-from dotenv import load_dotenv
 
 from apis.main import Action
 from configs.project_config import ProjectConfig
 from configs.project_path import set_project_path
-from database.entities.microservices import Microservice
-from database.entities.projects import Project
+from context.context import GenpodContext
 from database.sqlite import SQLite
 from utils.logs.logging_utils import logger
 from utils.time import get_timestamp
@@ -18,46 +14,64 @@ from utils.yaml_utils import read_yaml
 
 
 def main():
-    logger.info("Starting main genpod execution.")
+    logger.info("Initializing Genpod main execution.")
 
     if len(sys.argv) < 2:
-        logger.error("No action provided. Use 'generate', 'resume', 'microservice_status', or 'add_project'.")
-        print("ERROR: No action provided. Use 'generate', 'resume', 'microservice_status', or 'add_project'.")
+        logger.error(
+            "No action specified. Please provide an action such as 'generate', "
+            "'resume', 'microservice_status', or 'add_project'."
+        )
         sys.exit(1)
 
     requested_action = sys.argv[1].lower()
     logger.info(f"Action received: {requested_action}")
 
-    load_dotenv()  # dotenv is just dev environment will be removed for production
     setup_config_path = os.getenv("GENPOD_CONFIG")
-    logger.info(f"Loading setup configuration from: {setup_config_path}")
+    if not setup_config_path:
+        logger.critical("The environment variable 'GENPOD_CONFIG' is not set.")
+        sys.exit(1)
+    logger.info(f"Configuration file path retrieved: {setup_config_path}")
 
     try:
         setup_config = read_yaml(setup_config_path)
-        logger.info("Setup configuration loaded successfully.")
+        logger.info("Successfully loaded setup configuration.")
     except Exception as e:
-        logger.error(f"Failed to load setup configuration: {e}")
+        logger.critical(f"Failed to load setup configuration. Error: {e}")
         raise
 
-    db_path = setup_config['sqlite3_database_path']
-    logger.info(f"Using SQLite database path: {db_path}")
+    db_path = setup_config.get('sqlite3_database_path')
+    if not db_path:
+        logger.error("Database path not found in the configuration.")
+        sys.exit(1)
+    logger.debug(f"SQLite database path: {db_path}")
 
     try:
-        genpod_config_path = setup_config['genpod_configuration_file_path']
+        genpod_config_path = setup_config.get('genpod_configuration_file_path')
+        if not genpod_config_path:
+            logger.warning(
+                "The 'genpod_configuration_file_path' is missing in the setup configuration."
+            )
         config = ProjectConfig(genpod_config_path)
         config.load_config()
-        logger.info("Project configuration loaded successfully.")
+        logger.info("Project configuration successfully loaded.")
     except Exception as e:
-        logger.error(f"Error loading project configuration: {e}")
+        logger.error(f"Error while loading project configuration: {e}")
         raise
-    
+
+    try:
+        context = GenpodContext()
+        logger.info("GenpodContext initialized successfully with default values.")
+    except Exception as e:
+        logger.error(f"Failed to initialize GenpodContext. Error: {e}", exc_info=True)
+        raise
+
     try:
         db = SQLite(db_path)
-        logger.info("Database initialized successfully.")
+        logger.info("Database connection established successfully.")
         db.create_tables()
-        logger.info("Database tables created successfully.")
+        logger.info("Database tables created or verified successfully.")
     except Exception as e:
-        logger.error(f"Error initializing database: {e}")
+        logger.error(f"Error during database initialization: {e}")
         raise
 
     try:
@@ -69,72 +83,112 @@ def main():
             setup_config['vector_database_path'],
             config.max_graph_recursion_limit
         )
+        logger.debug(f"Action object initialized with configuration: {action_obj}")
 
         if requested_action == "generate":
             if len(sys.argv) < 4:
-                logger.error("ERROR: 'generate' requires <project_id> <user_id>. Usage: 'generate <project_id> <user_id>'")
-                print("ERROR: 'generate' requires <project_id> <user_id>. Usage: 'generate <project_id> <user_id>'")
+                logger.error(
+                    "Insufficient arguments for 'generate' action. Expected: <project_id> <user_id>. "
+                    "Usage: 'generate <project_id> <user_id>'."
+                )
                 sys.exit(1)
+
             project_id = int(sys.argv[2])
             user_id = int(sys.argv[3])
-        
-            logger.info("Starting 'generate' action.")
+            logger.debug(f"'Generate' action parameters: Project ID = {project_id}, User ID = {user_id}")
 
+            context.update(project_id=project_id, user_id=user_id)
             project_path = set_project_path(setup_config['code_output_directory'], get_timestamp())
+            context.project_path = project_path
+            logger.info("Context successfully updated for the 'generate' action.")
+            logger.info(f"Generated project path: {project_path}")
+
             action_obj.generate(project_id, user_id, project_path)
-            logger.info("Generate action completed successfully.")
+            logger.info("'Generate' action executed successfully.")
         elif requested_action == "resume":
             if len(sys.argv) < 3:
-                logger.error("ERROR: 'resume' requires <user_id>. Usage: 'resume <user_id>'")
+                logger.error(
+                    "Insufficient arguments for 'resume' action. Expected: <user_id>. "
+                    "Usage: 'resume <user_id>'."
+                )
                 sys.exit(1)
+
             user_id = int(sys.argv[2])
-            logger.info("Starting 'resume' action.")
-            logger.debug(f"User ID for resume action: {user_id}")
+            logger.debug(f"'Resume' action parameter: User ID = {user_id}")
+
+            context.user_id = user_id
+            logger.info("Context updated for the 'resume' action.")
 
             action_obj.resume(user_id)
-            logger.info("Resume action completed successfully.")
+            logger.info("The 'resume' action completed successfully.")
         elif requested_action == "microservice_status":
             if len(sys.argv) < 5:
-                print("ERROR: 'microservice_status' requires <project_id> <service_id> <user_id>. Usage: 'microservice_status <project_id> <service_id> <user_id>'")
+                logger.error(
+                    "Insufficient arguments for 'microservice_status' action. Expected: <project_id> <service_id> <user_id>. "
+                    "Usage: 'microservice_status <project_id> <service_id> <user_id>'."
+                )
                 sys.exit(1)
+
             project_id = int(sys.argv[2])
             service_id = int(sys.argv[3])
             user_id = int(sys.argv[4])
+            logger.debug(
+                f"'Microservice status' action parameters: Project ID = {project_id}, "
+                f"Service ID = {service_id}, User ID = {user_id}"
+            )
 
-            logger.info("Starting 'microservice_status' action.")
-            logger.debug(f"Microservice ID for microservice_status action: {service_id}")
+            context.update(
+                project_id=project_id, microservice_id=service_id, user_id=user_id
+            )
+            logger.info("Context updated for the 'microservice_status' action.")
 
             action_obj.microservice_status(user_id, project_id, service_id)
-            logger.info("Microservice status action completed successfully.")
+            logger.info("The 'microservice_status' action completed successfully.")
         elif requested_action == "add_project":
             if len(sys.argv) < 3:
-                print("ERROR: 'add_project' requires <user_id>. Usage: 'add_project <user_id>'")
+                logger.error(
+                    "Insufficient arguments for 'add_project' action. Expected: <user_id>. "
+                    "Usage: 'add_project <user_id>'."
+                )
                 sys.exit(1)
-            user_id = int(sys.argv[2])
 
-            logger.info("Starting 'add_project' action.")
-            logger.debug(f"User ID for add_project action: {user_id}")
+            user_id = int(sys.argv[2])
+            logger.debug(f"'Add project' action parameter: User ID = {user_id}")
+
+            context.user_id = user_id
+            logger.info("Context updated for the 'add_project' action.")
 
             action_obj.add_project(user_id)
-            logger.info("Add project action completed successfully.")
+            logger.info("The 'add_project' action completed successfully.")
         else:
-            logger.error(f"Unknown action: {requested_action}. Use 'generate' or 'resume'.")
-            print(f"❌ Unknown action: {requested_action}. Use 'generate' or 'resume'.")
+            logger.error(
+                f"Unrecognized action: {requested_action}. Valid actions are 'generate', 'resume', 'microservice_status', or 'add_project'."
+            )
             sys.exit(1)
     except Exception as e:
-        logger.error(f"Error during '{requested_action}' action execution: {e}")
+        logger.critical(f"An unexpected error occurred while executing action '{requested_action}': {e}", exc_info=True)
         raise
     finally:
-        logger.info("Closing database session and disposing engine.")
-        db.close_session()
-        db.dispose_engine()
-        logger.info("Database resources released successfully.")
-    
+        logger.info("Releasing database resources.")
+        try:
+            db.close_session()
+            logger.debug("Database session closed successfully.")
+        except Exception as e:
+            logger.warning(f"An error occurred while closing the database session: {e}")
+
+        try:
+            db.dispose_engine()
+            logger.debug("Database engine disposed successfully.")
+        except Exception as e:
+            logger.warning(f"An error occurred while disposing the database engine: {e}")
+
+        logger.info("All database resources have been released.")
+
 if __name__ == "__main__":
-    logger.info("Script execution started.")
+    logger.info("Genpod script execution started.")
     try:
         main()
-        logger.info("Script execution completed successfully.")
+        logger.info("Genpod script executed successfully.")
     except Exception as e:
-        logger.critical(f"Unhandled exception in main execution: {e}", exc_info=True)
+        logger.critical(f"Unhandled exception in script execution: {e}", exc_info=True)
         sys.exit(1)
