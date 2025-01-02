@@ -15,6 +15,7 @@ class GenpodContext:
        "user_id",
        "project_path",
        "current_agent",
+       "current_task",
        "_initialized"
     )
     _instance = None
@@ -33,7 +34,6 @@ class GenpodContext:
         Initialize or re-initialize fields if necessary.
         """
         if not hasattr(self, "_initialized"):
-            self._initialized = True  # Mark the instance as initialized
 
             # Initialize fields
             self.project_id: Optional[int] = None
@@ -43,10 +43,57 @@ class GenpodContext:
             self.project_path:  Optional[str] = None
             self.current_agent: Optional[AgentContext] = None
             self.current_task: Optional[TaskContext] = None
+
+            # Ensure this is set last to signal the completion of initialization
+            self._initialized = True
             logger.info("Initialized GenpodContext fields with default values.")
 
+    def __setattr__(self, name, value):
+        """
+        Intercept attribute assignments to block direct updates outside initialization.
+
+        Behavior:
+        - During initialization (`_initialized` is False), all attribute assignments are allowed.
+        - After initialization (`_initialized` is True), direct assignments to fields defined in `__slots__`
+        are restricted to enforce controlled updates using the `update` method.
+
+        Rationale:
+        - This ensures that fields are updated only through a controlled mechanism (`update`),
+        allowing for validation, logging, or any other required logic.
+        - Prevents accidental modifications to critical fields by enforcing stricter control
+        once the object has been fully initialized.
+
+        Parameters:
+            name (str): The name of the attribute being set.
+            value: The value to assign to the attribute.
+
+        Raises:
+            AttributeError: If a direct assignment is attempted to a restricted field after initialization.
+
+        Examples:
+            Allowed during initialization:
+                context = GenpodContext()
+
+            Allowed through update method:
+                context.update(project_id=123)
+
+            Disallowed direct assignment after initialization:
+                context.project_id = 123  # Raises AttributeError
+        """
+        if getattr(self, "_initialized", False):  # Only enforce restriction if initialized
+            if name in self.__slots__ and name != "_initialized":
+                logger.warning(
+                    f"Direct assignment attempt to '{name}' is blocked. Use the 'update' method instead."
+                )
+                raise AttributeError(
+                    f"Direct assignment to '{name}' is not allowed. Use the 'update' method instead."
+                )
+        logger.debug(f"Setting attribute '{name}' to '{value}'.")
+        super().__setattr__(name, value)
+        logger.info(f"Attribute '{name}' successfully set to '{value}'.")
+
     @classmethod
-    def get_instance(cls):
+    def get_context(cls) -> 'GenpodContext':
         """
         Retrieve the singleton instance of the class.
 
@@ -66,12 +113,15 @@ class GenpodContext:
         """
         Update multiple fields in the context.
         """
+        logger.info(f"Received update request with fields: {kwargs}.")
         for key, value in kwargs.items():
-            if not hasattr(self, key):
-                logger.error(f"Attempted to update invalid field '{key}'.")
-                raise AttributeError(f"Invalid field '{key}' for {self.__class__.__name__}.")
-            setattr(self, key, value)
-            logger.debug(f"Updated field '{key}' to value '{value}'.")
+            if key not in self.__slots__ or key == "_initialized":
+                logger.error(f"Attempted to update invalid or restricted field '{key}'.")
+                raise AttributeError(f"Field '{key}' is invalid or restricted in {self.__class__.__name__}.")
+            logger.debug(f"Updating field '{key}' to value '{value}'.")
+            # Use `object.__setattr__` to bypass `__setattr__` restrictions
+            object.__setattr__(self, key, value)
+            logger.info(f"Field '{key}' successfully updated to '{value}'.")
 
     def get_fields(self):
         """
