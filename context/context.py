@@ -11,9 +11,10 @@ class GenpodContext:
     __slots__ = (
        "project_id",
        "microservice_id",
-       "session_id",
+       "session_ids",
        "user_id",
        "project_path",
+       "previous_agent",
        "current_agent",
        "current_task",
        "_initialized"
@@ -30,17 +31,16 @@ class GenpodContext:
         return cls._instance
 
     def __init__(self):
-        """
-        Initialize or re-initialize fields if necessary.
-        """
+        """Initialize or re-initialize fields if necessary."""
         if not hasattr(self, "_initialized"):
 
             # Initialize fields
             self.project_id: Optional[int] = None
             self.microservice_id: Optional[int] = None
-            self.session_id: Optional[Dict[str, int]] = None
+            self.session_ids: Optional[Dict[str, int]] = None
             self.user_id: Optional[int] = None
             self.project_path:  Optional[str] = None
+            self.previous_agent: Optional[AgentContext] = None
             self.current_agent: Optional[AgentContext] = None
             self.current_task: Optional[TaskContext] = None
 
@@ -118,6 +118,9 @@ class GenpodContext:
             if key not in self.__slots__ or key == "_initialized":
                 logger.error(f"Attempted to update invalid or restricted field '{key}'.")
                 raise AttributeError(f"Field '{key}' is invalid or restricted in {self.__class__.__name__}.")
+            if key == "current_agent" and hasattr(self, "current_agent"):
+                logger.debug(f"Setting 'previous_agent' to '{self.current_agent}' before updating 'current_agent'.")
+                object.__setattr__(self, "previous_agent", self.current_agent)
             logger.debug(f"Updating field '{key}' to value '{value}'.")
             # Use `object.__setattr__` to bypass `__setattr__` restrictions
             object.__setattr__(self, key, value)
