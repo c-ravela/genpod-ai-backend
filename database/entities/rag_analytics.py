@@ -27,7 +27,6 @@ class RAGAnalytics(Base):
     line_number = Column(Integer, nullable=True)
     size_of_data = Column(Integer, nullable=True)
     question = Column(String, nullable=False)
-    response = Column(String, nullable=True)
     created_by = Column(Integer, nullable=False)
     updated_by = Column(Integer, nullable=False)
     created_at = Column(DateTime, nullable=False, server_default=func.now())
@@ -54,7 +53,6 @@ class RAGAnalytics(Base):
         line_number: int = None,
         size_of_data: int = None,
         question: str = None,
-        response: str = None,
         created_by: int = None,
         updated_by: int = None,
         created_at: datetime = None,
