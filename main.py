@@ -59,7 +59,7 @@ def main():
         raise
 
     try:
-        context = GenpodContext()
+        genpod_context = GenpodContext()
         logger.info("GenpodContext initialized successfully with default values.")
     except Exception as e:
         logger.error(f"Failed to initialize GenpodContext. Error: {e}", exc_info=True)
@@ -97,9 +97,9 @@ def main():
             user_id = int(sys.argv[3])
             logger.debug(f"'Generate' action parameters: Project ID = {project_id}, User ID = {user_id}")
 
-            context.update(project_id=project_id, user_id=user_id)
+            genpod_context.update(project_id=project_id, user_id=user_id)
             project_path = set_project_path(setup_config['code_output_directory'], get_timestamp())
-            context.update(project_path=project_path)
+            genpod_context.update(project_path=project_path)
             logger.info("Context successfully updated for the 'generate' action.")
             logger.info(f"Generated project path: {project_path}")
 
@@ -116,7 +116,7 @@ def main():
             user_id = int(sys.argv[2])
             logger.debug(f"'Resume' action parameter: User ID = {user_id}")
 
-            context.update(user_id=user_id)
+            genpod_context.update(user_id=user_id)
             logger.info("Context updated for the 'resume' action.")
 
             action_obj.resume(user_id)
@@ -137,7 +137,7 @@ def main():
                 f"Service ID = {service_id}, User ID = {user_id}"
             )
 
-            context.update(
+            genpod_context.update(
                 project_id=project_id, microservice_id=service_id, user_id=user_id
             )
             logger.info("Context updated for the 'microservice_status' action.")
@@ -155,7 +155,7 @@ def main():
             user_id = int(sys.argv[2])
             logger.debug(f"'Add project' action parameter: User ID = {user_id}")
 
-            context.update(user_id=user_id)
+            genpod_context.update(user_id=user_id)
             logger.info("Context updated for the 'add_project' action.")
 
             action_obj.add_project(user_id)
