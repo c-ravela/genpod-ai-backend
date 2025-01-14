@@ -86,7 +86,6 @@ class BaseGraph(Generic[GenericAgent]):
             logger.debug("Graph displayed successfully.")
         except Exception as e:
             logger.error(f"Failed to display graph: {e}", exc_info=True)
-            print(f"Failed to display graph: {e}")
 
     def define_graph(self) -> StateGraph:
         """
