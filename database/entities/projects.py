@@ -24,7 +24,7 @@ class Project(Base):
 
     microservice = relationship("Microservice", back_populates="project", cascade="all, delete-orphan")
     microservice_sessions = relationship("MicroserviceSession", back_populates="project", cascade="all, delete-orphan")
-    token_metrics = relationship("TokenUsage", back_populates="project", cascade="all, delete-orphan")
+    llm_metrics = relationship("MicroserviceLLMMetrics", back_populates="project", cascade="all, delete-orphan")
     rag_analytics = relationship("RAGAnalytics", back_populates="project", cascade="all, delete-orphan")
 
     @auto_init

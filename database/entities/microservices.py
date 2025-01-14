@@ -30,7 +30,7 @@ class Microservice(Base):
 
     project = relationship("Project", back_populates="microservice")
     sessions = relationship("MicroserviceSession", back_populates="microservice", cascade="all, delete-orphan")
-    token_metrics = relationship("TokenUsage", back_populates="microservice", cascade="all, delete-orphan")
+    llm_metrics = relationship("MicroserviceLLMMetrics", back_populates="microservice", cascade="all, delete-orphan")
     rag_analytics = relationship("RAGAnalytics", back_populates="microservice", cascade="all, delete-orphan")
 
     @auto_init
