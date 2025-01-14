@@ -1,4 +1,5 @@
 from abc import ABC, ABCMeta, abstractmethod
+from dataclasses import dataclass
 from time import sleep
 from typing import Any, Dict, Generic, Literal, Type, TypeVar, Union
 
@@ -7,65 +8,19 @@ from langchain_core.prompts import PromptTemplate
 from langchain_core.runnables.base import RunnableSequence
 from pydantic import BaseModel, ValidationError
 
+from llms.llm_metrics_callback import (LLMMetricsCallback, MetricsContext,
+                                       TokenUsage)
 from utils.logs.logging_utils import logger
 
 TLLMInstance = TypeVar('TLLMInstance')
 TResponse = TypeVar('TResponse', bound=BaseModel)
 
 
-class LLMMetrics:
-    """Class to represent metrics related to LLM invocations."""
-
-    def __init__(self, input_tokens: int, output_tokens: int, total_tokens: int) -> None:
-        """
-        Initializes the metrics with input, output, and total token counts.
-
-        Args:
-            input_tokens (int): The number of input tokens.
-            output_tokens (int): The number of output tokens.
-            total_tokens (int): The total number of tokens (input + output).
-        """
-        logger.debug(
-            "Initializing LLMMetrics with input_tokens: %d, output_tokens: %d, total_tokens: %d",
-            input_tokens, output_tokens, total_tokens
-        )
-        self.input_tokens = input_tokens
-        self.output_tokens = output_tokens
-        self.total_tokens = total_tokens
-    
-    def __repr__(self) -> str:
-        representation = (
-            f"<LLMMetrics(input_tokens={self.input_tokens}, "
-            f"output_tokens={self.output_tokens}, "
-            f"total_tokens={self.total_tokens})>"
-        )
-        logger.debug("Generated LLMMetrics representation: %s", representation)
-        return representation
-
-
+@dataclass
 class LLMOutput(Generic[TResponse]):
     """Represents the output of a language model invocation, including response and metrics."""
-    
-    def __init__(self, response: TResponse, metrics: LLMMetrics) -> None:
-        """
-        Initializes the LLMOutput with the response and its associated metrics.
-
-        Args:
-            response (TResponse): The response from the LLM.
-            metrics (LLMMetrics): The metrics associated with the response.
-        """
-        logger.debug(
-            "Creating LLMOutput with response: %s and metrics: %s", response, metrics
-        )
-        self.response: TResponse = response
-        self.metrics = metrics
-
-    def __repr__(self) -> str:
-        representation = (
-            f"<LLMOutput(response={self.response}, metrics={self.metrics})>"
-        )
-        logger.debug("Generated LLMOutput representation: %s", representation)
-        return representation
+    response: TResponse
+    token_usage: TokenUsage
 
 
 class LLMMeta(ABCMeta):
@@ -113,11 +68,12 @@ class LLM(ABC, Generic[TLLMInstance], metaclass=LLMMeta):
         )
         self.model = model
         self.model_config = model_config
+        self._callbacks = []
         self._llm_instance = self._initialize_llm_instance()
         self._max_retries = max_retries
         self._retry_backoff = retry_backoff
         self._current_retry_backoff = self._retry_backoff
-        self._last_metrics = LLMMetrics(0, 0, 0)
+        self._last_metrics = TokenUsage()
         logger.info("LLM initialized successfully.")
 
     @property
@@ -171,14 +127,14 @@ class LLM(ABC, Generic[TLLMInstance], metaclass=LLMMeta):
 
         usage_metadata = llm_response.usage_metadata
         if usage_metadata:
-            self._last_metrics = LLMMetrics(
+            self._last_metrics = TokenUsage(
                 input_tokens=usage_metadata.get('input_tokens', 0),
                 output_tokens=usage_metadata.get('output_tokens', 0),
                 total_tokens=usage_metadata.get('total_tokens', 0)
             )
             logger.debug("Extracted usage metadata: %s", self._last_metrics)
         else:
-            self._last_metrics = LLMMetrics(0, 0, 0)
+            self._last_metrics = TokenUsage()
 
         return llm_response
 
@@ -196,11 +152,17 @@ class LLM(ABC, Generic[TLLMInstance], metaclass=LLMMeta):
         wrapped_prompt = self.__wrap_prompt_with_instructions(prompt, prompt_inputs)
         feedback = ""
         
+        current_metrics = MetricsContext(self.provider, self.model)
+        self._callbacks = [LLMMetricsCallback(current_metrics)]
+
         while attempt < self._max_retries:
             try:
                 logger.debug("Attempting to invoke LLM (attempt %d).", attempt + 1)
                 runnable = self._create_chain(wrapped_prompt, response_type)
-                runnable_response = runnable.invoke({'feedback': feedback})
+                runnable_response = runnable.invoke(
+                    {'feedback': feedback},
+                    config={"callbacks": self._callbacks}
+                )
 
                 if response_model:
                     try:
@@ -213,8 +175,8 @@ class LLM(ABC, Generic[TLLMInstance], metaclass=LLMMeta):
                 # Reset retry backoff to default after successful invocation
                 self._current_retry_backoff = self._retry_backoff
                 logger.info("LLM invocation successful on attempt %d.", attempt + 1)
+                current_metrics.save_to_db()
                 return LLMOutput(final_response, self._last_metrics)
-            
             except Exception as e:
                 attempt += 1
                 logger.warning(
@@ -228,6 +190,7 @@ class LLM(ABC, Generic[TLLMInstance], metaclass=LLMMeta):
                     self._current_retry_backoff = self._retry_backoff
                     raise RuntimeError(f"LLM invocation failed: {e}")
                 sleep(self._current_retry_backoff)
+                logger.debug("Retrying after backoff: %.2f seconds.", self._current_retry_backoff)
                 self._current_retry_backoff *= 2
 
     def __wrap_prompt_with_instructions(
