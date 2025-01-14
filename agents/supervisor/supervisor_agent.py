@@ -7,6 +7,9 @@ from pydantic import ValidationError
 
 from agents.base.base_agent import BaseAgent
 from agents.supervisor.supervisor_state import SupervisorState
+from context.agent_context import AgentContext
+from context.context import GenpodContext
+from context.task_context import TaskContext
 from llms.llm import LLM
 from models.constants import ChatRoles, PStatus, Status
 from models.models import (Issue, IssuesQueue, PlannedIssue,
@@ -46,6 +49,7 @@ class SupervisorAgent(BaseAgent[SupervisorState, SupervisorPrompts]):
             SupervisorPrompts(),
             llm
         )
+        self._genpod_context = GenpodContext.get_context()
         self.team = None
 
         # TODO - LOW: has to be moved to RAG agent
@@ -246,7 +250,7 @@ class SupervisorAgent(BaseAgent[SupervisorState, SupervisorPrompts]):
             "Supervisor state has been initialized successfully."
             f"current supervisor state: {state}"
         )
-
+        self._genpod_context.update(microservice_id=state['microservice_id'])
         return state
 
     def call_rag(self, state: SupervisorState) -> SupervisorState:
@@ -713,6 +717,9 @@ class SupervisorAgent(BaseAgent[SupervisorState, SupervisorPrompts]):
                 additional_info='',
                 question=state['original_user_input']
             )
+            self._genpod_context.update(
+                current_task=TaskContext(task_id=state['current_task'].task_id)
+            )
             state['project_status'] = PStatus.NEW
             logger.info(
                 f"Supervisor: Task created for RAG agent to gather additional information. "
@@ -737,7 +744,9 @@ class SupervisorAgent(BaseAgent[SupervisorState, SupervisorPrompts]):
                         additional_info=state['rag_retrieval'],
                         question=''
                     )
-
+                    self._genpod_context.update(
+                        current_task=TaskContext(task_id=state['current_task'].task_id)
+                    )
                     state['messages'] += [
                         (
                             ChatRoles.AI,
@@ -902,6 +911,9 @@ class SupervisorAgent(BaseAgent[SupervisorState, SupervisorPrompts]):
                     state['project_status'] = PStatus.REVIEWING
                 else:
                     state['current_task'] = next_task
+                    self._genpod_context.update(
+                        current_task=TaskContext(task_id=state['current_task'].task_id)
+                    )
             elif state['current_task'].task_status == Status.AWAITING:
                 # Planner needs additional information
                 # Architect was responsible for answering the query if not then rag 
@@ -1260,6 +1272,13 @@ class SupervisorAgent(BaseAgent[SupervisorState, SupervisorPrompts]):
             # expecting. RAG holds the some standards documents and it fetches the 
             # relevant information related to the project to help team members 
             # efficient and qualified output.
+            self._genpod_context.update(
+                current_agent=AgentContext(
+                    agent_id=self.team.rag.member_id,
+                    agent_name=self.team.rag.member_name,
+                    agent_session_id=self.team.rag.thread_id
+                )
+            )
             logger.info(f"Delegator: Project is in {PStatus.NEW} status. Invoking call_rag to gather additional information.")
             return 'call_rag'
 
@@ -1270,6 +1289,13 @@ class SupervisorAgent(BaseAgent[SupervisorState, SupervisorPrompts]):
             # In this process if architect need aditional information thats when RAG 
             # comes into play at this phase of Project.
             if state['is_initial_additional_info_ready']:
+                self._genpod_context.update(
+                    current_agent=AgentContext(
+                        agent_id=self.team.architect.member_id,
+                        agent_name=self.team.architect.member_name,
+                        agent_session_id=self.team.architect.thread_id
+                    )
+                )
                 logger.info("Delegator: Project is in INITIAL status with additional information ready. Invoking call_architect.")
                 return 'call_architect'
         elif state['project_status'] == PStatus.MONITORING:
@@ -1278,6 +1304,13 @@ class SupervisorAgent(BaseAgent[SupervisorState, SupervisorPrompts]):
             # RAG is the source for the information. It can fetch relevant information 
             # from vector DB for the given query.
             if state['current_task'].task_status == Status.AWAITING:
+                self._genpod_context.update(
+                    current_agent=AgentContext(
+                        agent_id=self.team.rag.member_id,
+                        agent_name=self.team.rag.member_name,
+                        agent_session_id=self.team.rag.thread_id
+                    )
+                )
                 logger.info("Delegator: Project is in MONITORING status. Invoking call_rag to handle an awaiting query.")
                 return 'call_rag'
         elif state['project_status'] == PStatus.EXECUTING:
@@ -1293,6 +1326,13 @@ class SupervisorAgent(BaseAgent[SupervisorState, SupervisorPrompts]):
             if state['are_planned_tasks_in_progress']:
                 if state['current_planned_task'].is_function_generation_required:
                     if not state['current_planned_task'].is_test_code_generated:
+                        self._genpod_context.update(
+                            current_agent=AgentContext(
+                                agent_id=self.team.tests_generator.member_id,
+                                agent_name=self.team.tests_generator.member_name,
+                                agent_session_id=self.team.tests_generator.thread_id
+                            )
+                        )
                         logger.info(
                             "Delegator: Project is in EXECUTING status with a planned task requiring function generation and test code generation. Invoking call_test_code_generator."
                         )
@@ -1301,28 +1341,62 @@ class SupervisorAgent(BaseAgent[SupervisorState, SupervisorPrompts]):
                 # Other conditions like is_code_generated from PlannedTask object is 
                 # also useful to figure out if coder has already completed the task.
                 if not state['current_planned_task'].is_code_generated:
+                    self._genpod_context.update(
+                        current_agent=AgentContext(
+                            agent_id=self.team.coder.member_id,
+                            agent_name=self.team.coder.member_name,
+                            agent_session_id=self.team.coder.thread_id
+                        )
+                    )
                     logger.info(
                         "Delegator: Project is in EXECUTING status with a planned task requiring code generation. Invoking call_coder."
                     )
                     return 'call_coder'
             else:
                 if state['current_task'].task_status in (Status.NEW, Status.RESPONDED):
+                    self._genpod_context.update(
+                        current_agent=AgentContext(
+                            agent_id=self.team.planner.member_id,
+                            agent_name=self.team.planner.member_name,
+                            agent_session_id=self.team.planner.thread_id
+                        )
+                    )
                     logger.info(
                         "Delegator: Project is in EXECUTING status with tasks requiring planning. Invoking call_planner."
                     )
                     return 'call_planner'
 
+            self._genpod_context.update(
+                current_agent=AgentContext(
+                    agent_id=self.agent_id,
+                    agent_name=self.agent_name,
+                )
+            )
             # occurs when architect just completed the assigned task(generating 
             # documents and tasks) and now supervisor has to assign tasks for planner.
             logger.info("Delegator: Project is in EXECUTING status with tasks pending assignment. Invoking call_supervisor.")
             return 'call_supervisor'
         elif state['project_status'] == PStatus.REVIEWING:
             logger.info("Delegator: Project is in REVIEWING status. Invoking call_reviewer.")
+            self._genpod_context.update(
+                current_agent=AgentContext(
+                    agent_id=self.team.reviewer.member_id,
+                    agent_name=self.team.reviewer.member_name,
+                    agent_session_id=self.team.reviewer.thread_id
+                )
+            )
             return 'call_reviewer'
         elif state['project_status'] == PStatus.RESOLVING:
             if state['are_planned_issues_in_progress']:
                 if state['current_planned_issue'].is_function_generation_required:
                     if not state['current_planned_issue'].is_test_code_generated:
+                        self._genpod_context.update(
+                            current_agent=AgentContext(
+                                agent_id=self.team.tests_generator.member_id,
+                                agent_name=self.team.tests_generator.member_name,
+                                agent_session_id=self.team.tests_generator.thread_id
+                            )
+                        )
                         logger.info(
                             "Delegator: Project is in RESOLVING status with a planned issue requiring function generation and test code generation. Invoking call_test_code_generator."
                         )
@@ -1331,12 +1405,26 @@ class SupervisorAgent(BaseAgent[SupervisorState, SupervisorPrompts]):
                 # Other conditions like is_code_generated from PlannedTask object is 
                 # also useful to figure out if coder has already completed the task.
                 if not state['current_planned_issue'].is_code_generated:
+                    self._genpod_context.update(
+                        current_agent=AgentContext(
+                            agent_id=self.team.coder.member_id,
+                            agent_name=self.team.coder.member_name,
+                            agent_session_id=self.team.coder.thread_id
+                        )
+                    )
                     logger.info(
                         "Delegator: Project is in RESOLVING status with a planned issue requiring code generation. Invoking call_coder."
                     )
                     return 'call_coder'
             else:
                 if state['current_issue'].issue_status == Status.NEW:
+                    self._genpod_context.update(
+                        current_agent=AgentContext(
+                            agent_id=self.team.planner.member_id,
+                            agent_name=self.team.planner.member_name,
+                            agent_session_id=self.team.planner.thread_id
+                        )
+                    )
                     logger.info(
                         "Delegator: Project is in RESOLVING status with a new issue requiring planning. Invoking call_planner."
                     )
@@ -1353,11 +1441,24 @@ class SupervisorAgent(BaseAgent[SupervisorState, SupervisorPrompts]):
             # ensure progress.
 
             if state['is_human_reviewed']:
+                self._genpod_context.update(
+                    current_agent=AgentContext(
+                        agent_id=self.agent_id,
+                        agent_name=self.agent_name
+                    )
+                )
                 logger.info("Delegator: Project is in HALTED status and has been reviewed by a human. Invoking call_supervisor.")
                 return 'call_supervisor'
             
+            self._genpod_context.update(current_agent=AgentContext())
             logger.info("Delegator: Project is in HALTED status requiring human review. Invoking call_human.")
             return "Human"
 
+        self._genpod_context.update(
+            current_agent=AgentContext(
+                agent_id=self.agent_id,
+                agent_name=self.agent_name,
+            )
+        )
         logger.info("Delegator: No specific action matched. Invoking update_state.")
         return "update_state"
