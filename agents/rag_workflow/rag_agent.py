@@ -7,6 +7,9 @@ from configs.supervisor_config import RAG_TRY_LIMIT
 from llms.llm import LLM
 from prompts.rag_prompts import RAGPrompts
 from utils.logs.logging_utils import logger
+from apis.rag_analytics.controller import RAGAnalyticsController
+from database.entities.rag_analytics import RAGAnalytics
+from context.context import GenpodContext
 
 
 class RAGAgent(BaseAgent[RAGState, RAGPrompts]):
@@ -21,6 +24,7 @@ class RAGAgent(BaseAgent[RAGState, RAGPrompts]):
             llm
         )
 
+        self._genpod_context = GenpodContext.get_context()
         self.iteration_count = RAG_TRY_LIMIT
         self.mismo_vectorstore = Chroma(
             collection_name = collection_name,
@@ -41,7 +45,6 @@ class RAGAgent(BaseAgent[RAGState, RAGPrompts]):
         Returns:
             state (dict): New key added to state, documents, that contains retrieved documents
         """
-        # print("----RETRIEVE----")
         logger.info("----RETRIEVE----")
         question = state["question"]
         if self.max_hallucination is None:
@@ -61,8 +64,6 @@ class RAGAgent(BaseAgent[RAGState, RAGPrompts]):
         Returns:
             state (dict): New key added to state, generation, that contains LLM generation
         """
-        # print("----GENERATE----")
-        
         logger.info("----GENERATE----")
         question = state["question"]
         documents = state["documents"]
@@ -89,7 +90,6 @@ class RAGAgent(BaseAgent[RAGState, RAGPrompts]):
             state (dict): Updates documents key with only filtered relevant documents
         """
 
-        # print("----CHECK DOCUMENT RELEVANCE TO QUESTION----")
         logger.info("----CHECK DOCUMENT RELEVANCE TO QUESTION----")
         question = state["question"]
         documents = state["documents"]
@@ -106,11 +106,9 @@ class RAGAgent(BaseAgent[RAGState, RAGPrompts]):
             
             grade = llm_output.response["score"]
             if grade == "yes":
-                # print("----GRADE: DOCUMENT RELEVANT----")
                 logger.info("----GRADE: DOCUMENT RELEVANT----")
                 filtered_docs.append(d)
             else:
-                # print("----GRADE: DOCUMENT NOT RELEVANT----")
                 logger.info("----GRADE: DOCUMENT NOT RELEVANT----")
                 continue
         return {**state, "documents": filtered_docs, "question": question}
@@ -134,9 +132,7 @@ class RAGAgent(BaseAgent[RAGState, RAGPrompts]):
             state['generation'] = "Model is hallucinating with too many inaccuracies."
             state['query_answered'] = False
             return {**state, "next":"update_state"}
-        
 
-        # print("----TRANSFORM QUERY----")
         logger.info("----TRANSFORM QUERY----")
         question = state["question"]
         documents = state["documents"]
@@ -157,7 +153,6 @@ class RAGAgent(BaseAgent[RAGState, RAGPrompts]):
             str: Binary decision for next node to call
         """
 
-        # print("----ASSESS GRADED DOCUMENTS----")
         logger.info("----ASSESS GRADED DOCUMENTS----")
         question = state["question"]
         filtered_documents = state["documents"]
@@ -165,14 +160,10 @@ class RAGAgent(BaseAgent[RAGState, RAGPrompts]):
         if not filtered_documents:
             # All documents have been filtered check_relevance
             # We will re-generate a new query
-            # print(
-            #     "----DECISION: ALL DOCUMENTS ARE NOT RELEVANT TO QUESTION, TRANSFORM QUERY----"
-            # )
             logger.info("----DECISION: ALL DOCUMENTS ARE NOT RELEVANT TO QUESTION, TRANSFORM QUERY----")
             return "transform_query"
         else:
             # We have relevant documents, so generate answer
-            # print("----DECISION: GENERATE----")
             logger.info("----DECISION: GENERATE----")
             return "generate"
 
@@ -187,7 +178,6 @@ class RAGAgent(BaseAgent[RAGState, RAGPrompts]):
             str: Decision for next node to call
         """
 
-        # print("----CHECK HALLUCINATIONS----")
         logger.info("----CHECK HALLUCINATIONS----")
         question = state["question"]
         documents = state["documents"]
@@ -203,10 +193,8 @@ class RAGAgent(BaseAgent[RAGState, RAGPrompts]):
 
         # Check hallucination
         if grade == "yes":
-            # print("----DECISION: GENERATION IS GROUNDED IN DOCUMENTS----")
             logger.info("----DECISION: GENERATION IS GROUNDED IN DOCUMENTS----")
             # Check question-answering
-            # print("----GRADE GENERATION vs QUESTION----")
             logger.info("----GRADE GENERATION vs QUESTION----")
             llm_output = self.llm.invoke(self.prompts.answer_grader_prompt, {
                     "question": question, 
@@ -217,15 +205,12 @@ class RAGAgent(BaseAgent[RAGState, RAGPrompts]):
             
             grade = llm_output.response["score"]
             if grade == "yes":
-                # print("----DECISION: GENERATION ADDRESSES QUESTION----")
                 logger.info("----DECISION: GENERATION ADDRESSES QUESTION----")
                 return "useful"
             else:
-                # print("----DECISION: GENERATION DOES NOT ADDRESS QUESTION----")
                 logger.info("----DECISION: GENERATION DOES NOT ADDRESS QUESTION----")
                 return "not useful"
         else:
-            # print("----DECISION: GENERATION IS NOT GROUNDED IN DOCUMENTS, RE-TRY----")
             logger.info("----DECISION: GENERATION DOES NOT ADDRESS QUESTION----")
             self.max_hallucination -= 1
             if self.max_hallucination == 0:
@@ -233,6 +218,33 @@ class RAGAgent(BaseAgent[RAGState, RAGPrompts]):
             else:
                 return "not supported"
     
+    def save_analytics_record(self, state: RAGState):
+        _analytics_ctrl = RAGAnalyticsController()
+        agent_context = self._genpod_context.previous_agent if self._genpod_context.previous_agent else self._genpod_context.current_agent
+        _analytics_record = None
+        for document in state["documents"]:
+            document_id = document.metadata.get('id', "")
+            document_version = document.metadata.get('version', "")
+
+            _analytics_record = RAGAnalytics(
+                agent_id=agent_context.agent_id,
+                project_id=self._genpod_context.project_id,
+                microservice_id=self._genpod_context.microservice_id,
+                session_id=agent_context.agent_session_id,
+                task_id=self._genpod_context.current_task.task_id,
+
+                document_id=document_id,
+                document_version=document_version,
+                question=state['question'],
+                raw_response=document.page_content,
+                size_of_data=len(document.page_content),
+
+                created_by=self._genpod_context.user_id,
+                updated_by=self._genpod_context.user_id
+            )
+
+            _analytics_ctrl.create(_analytics_record)
+
     def update_state(self, state: RAGState):
         self.state = {**state}
         self.max_hallucination = state['max_hallucination']

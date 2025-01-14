@@ -35,6 +35,7 @@ class RAGWorkFlow(BaseGraph[RAGAgent]):
         rag_workflow.add_node("grade_documents", self.agent.grade_documents)  # grade documents
         rag_workflow.add_node("generate", self.agent.generate)  # generate
         rag_workflow.add_node("transform_query", self.agent.transform_query)  # transform_query
+        rag_workflow.add_node("save_analytics", self.agent.save_analytics_record)
         rag_workflow.add_node("update_state", self.agent.update_state)
 
         # Build graph
@@ -54,7 +55,7 @@ class RAGWorkFlow(BaseGraph[RAGAgent]):
             lambda x: x["next"],
             {
                 "retrieve": "retrieve",
-                "update_state": "update_state",
+                "update_state": "save_analytics",
             },
         )
         rag_workflow.add_conditional_edges(
@@ -62,10 +63,12 @@ class RAGWorkFlow(BaseGraph[RAGAgent]):
             self.agent.grade_generation_v_documents_and_question,
             {
                 "not supported": "generate",
-                "useful": "update_state",
+                "useful": "save_analytics",
                 "not useful": "transform_query",
             },
         )
+
+        rag_workflow.add_edge("save_analytics", "update_state")
         rag_workflow.add_edge("update_state", END)
 
         return rag_workflow
