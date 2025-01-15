@@ -1276,7 +1276,6 @@ class SupervisorAgent(BaseAgent[SupervisorState, SupervisorPrompts]):
                 current_agent=AgentContext(
                     agent_id=self.team.rag.member_id,
                     agent_name=self.team.rag.member_name,
-                    agent_session_id=self.team.rag.thread_id
                 )
             )
             logger.info(f"Delegator: Project is in {PStatus.NEW} status. Invoking call_rag to gather additional information.")
@@ -1293,7 +1292,6 @@ class SupervisorAgent(BaseAgent[SupervisorState, SupervisorPrompts]):
                     current_agent=AgentContext(
                         agent_id=self.team.architect.member_id,
                         agent_name=self.team.architect.member_name,
-                        agent_session_id=self.team.architect.thread_id
                     )
                 )
                 logger.info("Delegator: Project is in INITIAL status with additional information ready. Invoking call_architect.")
@@ -1308,7 +1306,6 @@ class SupervisorAgent(BaseAgent[SupervisorState, SupervisorPrompts]):
                     current_agent=AgentContext(
                         agent_id=self.team.rag.member_id,
                         agent_name=self.team.rag.member_name,
-                        agent_session_id=self.team.rag.thread_id
                     )
                 )
                 logger.info("Delegator: Project is in MONITORING status. Invoking call_rag to handle an awaiting query.")
@@ -1330,7 +1327,6 @@ class SupervisorAgent(BaseAgent[SupervisorState, SupervisorPrompts]):
                             current_agent=AgentContext(
                                 agent_id=self.team.tests_generator.member_id,
                                 agent_name=self.team.tests_generator.member_name,
-                                agent_session_id=self.team.tests_generator.thread_id
                             )
                         )
                         logger.info(
@@ -1345,7 +1341,6 @@ class SupervisorAgent(BaseAgent[SupervisorState, SupervisorPrompts]):
                         current_agent=AgentContext(
                             agent_id=self.team.coder.member_id,
                             agent_name=self.team.coder.member_name,
-                            agent_session_id=self.team.coder.thread_id
                         )
                     )
                     logger.info(
@@ -1358,7 +1353,6 @@ class SupervisorAgent(BaseAgent[SupervisorState, SupervisorPrompts]):
                         current_agent=AgentContext(
                             agent_id=self.team.planner.member_id,
                             agent_name=self.team.planner.member_name,
-                            agent_session_id=self.team.planner.thread_id
                         )
                     )
                     logger.info(
@@ -1382,7 +1376,6 @@ class SupervisorAgent(BaseAgent[SupervisorState, SupervisorPrompts]):
                 current_agent=AgentContext(
                     agent_id=self.team.reviewer.member_id,
                     agent_name=self.team.reviewer.member_name,
-                    agent_session_id=self.team.reviewer.thread_id
                 )
             )
             return 'call_reviewer'
@@ -1394,7 +1387,6 @@ class SupervisorAgent(BaseAgent[SupervisorState, SupervisorPrompts]):
                             current_agent=AgentContext(
                                 agent_id=self.team.tests_generator.member_id,
                                 agent_name=self.team.tests_generator.member_name,
-                                agent_session_id=self.team.tests_generator.thread_id
                             )
                         )
                         logger.info(
@@ -1409,7 +1401,6 @@ class SupervisorAgent(BaseAgent[SupervisorState, SupervisorPrompts]):
                         current_agent=AgentContext(
                             agent_id=self.team.coder.member_id,
                             agent_name=self.team.coder.member_name,
-                            agent_session_id=self.team.coder.thread_id
                         )
                     )
                     logger.info(
@@ -1422,7 +1413,6 @@ class SupervisorAgent(BaseAgent[SupervisorState, SupervisorPrompts]):
                         current_agent=AgentContext(
                             agent_id=self.team.planner.member_id,
                             agent_name=self.team.planner.member_name,
-                            agent_session_id=self.team.planner.thread_id
                         )
                     )
                     logger.info(
