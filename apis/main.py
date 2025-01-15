@@ -6,6 +6,7 @@ from apis.microservice.controller import MicroserviceController
 from apis.microservice_session.controller import MicroserviceSessionController
 from apis.project.controller import ProjectController
 from configs.project_config import ProjectAgents, ProjectGraphs
+from context.context import GenpodContext
 from database.entities.microservice_sessions import MicroserviceSession
 from database.entities.microservices import Microservice
 from database.entities.projects import Project
@@ -104,6 +105,7 @@ class Action:
         graph_recursion_limit: int
     ):
         
+        self._genpod_context = GenpodContext.get_context()
         self.agents = agents
         self.graphs = graphs
         self.database_path = database_path
@@ -177,6 +179,7 @@ class Action:
             )
             time.sleep(delay_seconds)
 
+            agents_session = {}
             for agent in manager.agents:
                 curr_session = MicroserviceSession(
                     agent_id=agent.agent_id,
@@ -187,8 +190,9 @@ class Action:
                 )
                 manager.session_controller.create(curr_session)
                 agent.set_thread_id(curr_session.id)
+                agents_session[agent.agent_id] = curr_session.id
                 logger.info(f"Session created: {curr_session}")
-
+            self._genpod_context.update(agents_session=agents_session)
             manager.setup_team_members()
 
             supervisor_data = {
