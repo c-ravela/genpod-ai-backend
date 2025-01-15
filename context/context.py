@@ -11,7 +11,7 @@ class GenpodContext:
     __slots__ = (
        "project_id",
        "microservice_id",
-       "session_ids",
+       "agents_session",
        "user_id",
        "project_path",
        "previous_agent",
@@ -37,7 +37,7 @@ class GenpodContext:
             # Initialize fields
             self.project_id: Optional[int] = None
             self.microservice_id: Optional[int] = None
-            self.session_ids: Optional[Dict[str, int]] = None
+            self.agents_session: Optional[Dict[str, int]] = None
             self.user_id: Optional[int] = None
             self.project_path:  Optional[str] = None
             self.previous_agent: Optional[AgentContext] = None
@@ -118,9 +118,23 @@ class GenpodContext:
             if key not in self.__slots__ or key == "_initialized":
                 logger.error(f"Attempted to update invalid or restricted field '{key}'.")
                 raise AttributeError(f"Field '{key}' is invalid or restricted in {self.__class__.__name__}.")
+
             if key == "current_agent" and hasattr(self, "current_agent"):
+                value: AgentContext = value
                 logger.debug(f"Setting 'previous_agent' to '{self.current_agent}' before updating 'current_agent'.")
                 object.__setattr__(self, "previous_agent", self.current_agent)
+
+                if value.agent_id in self.agents_session:
+                    value.agent_session_id = self.agents_session[value.agent_id]
+                    logger.debug(
+                        f"Set 'agent_session_id' for agent '{value.agent_id}' from agents_session: {value.agent_session_id}"
+                    )
+                else:
+                    logger.warning(
+                        f"No session ID found for agent_id '{value.agent_id}' in agents_session. Defaulting to None."
+                    )
+                    value.agent_session_id = None
+
             logger.debug(f"Updating field '{key}' to value '{value}'.")
             # Use `object.__setattr__` to bypass `__setattr__` restrictions
             object.__setattr__(self, key, value)
