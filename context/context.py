@@ -129,6 +129,7 @@ class GenpodContext:
                     logger.debug(
                         f"Set 'agent_session_id' for agent '{value.agent_id}' from agents_session: {value.agent_session_id}"
                     )
+                    logger.info(f"Updated session ID for agent '{value.agent_id}'.")
                 else:
                     logger.warning(
                         f"No session ID found for agent_id '{value.agent_id}' in agents_session. Defaulting to None."
