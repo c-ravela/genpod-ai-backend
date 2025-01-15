@@ -12,6 +12,7 @@ from utils.logs.logging_utils import logger
 from utils.time import get_timestamp
 from utils.yaml_utils import read_yaml
 
+
 def main():
     logger.info("Initializing Genpod main execution.")
 
