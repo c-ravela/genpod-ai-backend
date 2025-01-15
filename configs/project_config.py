@@ -13,6 +13,7 @@ from utils.yaml_utils import read_yaml
 SUPPORTED_LLMS = {
     'openai': [
         'chatgpt-4o-latest',
+        'gpt-4o-2024-11-20',
         'gpt-4o-2024-08-06',
         'gpt-4o-2024-05-13',
         'o1-preview-2024-09-12',
