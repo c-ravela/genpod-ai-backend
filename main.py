@@ -12,7 +12,6 @@ from utils.logs.logging_utils import logger
 from utils.time import get_timestamp
 from utils.yaml_utils import read_yaml
 
-
 def main():
     logger.info("Initializing Genpod main execution.")
 
@@ -100,8 +99,8 @@ def main():
             genpod_context.update(project_id=project_id, user_id=user_id)
             project_path = set_project_path(setup_config['code_output_directory'], get_timestamp())
             genpod_context.update(project_path=project_path)
-            logger.info("Context successfully updated for the 'generate' action.")
             logger.info(f"Generated project path: {project_path}")
+            logger.info("Context successfully updated for the 'generate' action.")
 
             action_obj.generate(project_id, user_id, project_path)
             logger.info("'Generate' action executed successfully.")
