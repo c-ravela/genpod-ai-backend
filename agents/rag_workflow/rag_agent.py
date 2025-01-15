@@ -3,13 +3,13 @@ from langchain_openai import OpenAIEmbeddings
 
 from agents.base.base_agent import BaseAgent
 from agents.rag_workflow.rag_state import RAGState
+from apis.rag_analytics.controller import RAGAnalyticsController
 from configs.supervisor_config import RAG_TRY_LIMIT
+from context.context import GenpodContext
+from database.entities.rag_analytics import RAGAnalytics
 from llms.llm import LLM
 from prompts.rag_prompts import RAGPrompts
 from utils.logs.logging_utils import logger
-from apis.rag_analytics.controller import RAGAnalyticsController
-from database.entities.rag_analytics import RAGAnalytics
-from context.context import GenpodContext
 
 
 class RAGAgent(BaseAgent[RAGState, RAGPrompts]):
