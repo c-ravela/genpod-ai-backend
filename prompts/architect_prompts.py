@@ -14,6 +14,7 @@ the Architect agent can effectively assist users in implementing their projects.
 from langchain.output_parsers import PydanticOutputParser
 from langchain_core.prompts import PromptTemplate
 
+from core.prompt import PromptWithConfig
 from models.architect_models import (ProjectDetails, QueryResult, TaskOutput,
                                      TasksList)
 
@@ -30,7 +31,8 @@ class ArchitectPrompts:
     and clean-code development.
     """
 
-    additional_info_prompt: PromptTemplate = PromptTemplate(
+    additional_info_prompt: PromptWithConfig = PromptWithConfig(
+      template=PromptTemplate(
         template="""
         As a Solution Architect, you have previously prepared comprehensive requirements
         documents for your team members to work on the project. You should not answer
@@ -55,9 +57,12 @@ class ArchitectPrompts:
                 pydantic_object=QueryResult
             ).get_format_instructions()
         }
+      ),
+      enable_rag_retrival=False
     )
 
-    tasks_separation_prompt: PromptTemplate = PromptTemplate(
+    tasks_separation_prompt: PromptWithConfig = PromptWithConfig(
+      template=PromptTemplate(
         template="""
         You previously generated a well-formatted requirements document in Markdown
         format, which included detailed deliverables for the project. Each deliverable
@@ -98,334 +103,371 @@ class ArchitectPrompts:
                 pydantic_object=TasksList
             ).get_format_instructions()
         }
+    ),
+      enable_rag_retrival=False
+    )
+    
+    # TODO: Model has to be updated for rag interaction
+    project_overview_prompt: PromptWithConfig = PromptWithConfig(
+        template=PromptTemplate(
+            template="""
+            Given the user request: "{user_request}"
+            Supervisor expectations: "{task_description}"
+            Additional information: "{additional_information}"
+
+            As a Solution Architect, provide a comprehensive project overview. Include:
+            1. A brief description of the project's purpose and goals
+            2. The main features or functionalities to be implemented
+            3. What schema definition models are needed to implement this service.
+
+            Format your response in markdown, starting with a "## Project Overview"
+            heading.
+
+            output format instructions:
+            {format_instructions}
+            """,
+            input_variables=[
+                'user_request', 'task_description', 'additional_information'
+            ],
+            partial_variables={
+                "format_instructions": PydanticOutputParser(
+                    pydantic_object=TaskOutput
+                ).get_format_instructions()
+            }
+        ),
+        enable_rag_retrival=True
+	)
+
+    # TODO: Model has to be updated for rag interaction
+    architecture_prompt: PromptWithConfig = PromptWithConfig(
+        template=PromptTemplate(
+            template="""
+            Based on the project overview provided, describe a high-level architecture for
+            this microservice-based project, focusing on the following key aspects:
+
+            - **Project Overview:** "{project_overview}"
+            - **Additional Information:** "{additional_information}"
+
+            ### Requirements:
+
+            1. **High-Level Diagram with Description**:
+            - Provide a text-based diagram representing the high-level architecture of the
+            microservice.
+            - The diagram should illustrate the flow from client requests through various
+            layers, including the API gateway, business logic, data access layer, and
+            database.
+            - Clearly label each component to show how requests are processed and data is
+            managed within the system.
+            - Follow the diagram with a concise description of each component's role and
+            interactions within the architecture.
+
+            2. **Key Components, Data Models, and Interactions**:
+            - List and describe the key components in the architecture and their
+            responsibilities.
+            - Define the primary data models, including any critical fields and
+            relationships between models.
+            - Explain how data flows between components, and specify the protocols or
+            methods used for inter-service communication.
+
+            3. **Data Flow Between Services**:
+            - Provide a clear explanation of how data flows between services, from the
+            initiation of a request to the final response.
+            - Highlight any asynchronous or synchronous communication, including
+            considerations for message queues, pub/sub patterns, or HTTP/REST calls.
+
+            4. **External Integrations or APIs**:
+            - Identify any external systems or APIs integrated within this architecture,
+            along with the purpose and function of each integration.
+            - Specify how these integrations impact the data flow and any special handling
+            required to ensure security and reliability.
+
+            5. **Scalability and Reliability Considerations**:
+            - Outline strategies for horizontal or vertical scaling, load balancing, and
+            redundancy.
+            - Describe reliability mechanisms, such as retries, failover systems, and data
+            replication, to ensure high availability.
+            - Mention trade-offs based on the CAP theorem where relevant.
+
+            6. **CAP Theorem Application**:
+            - Discuss how the principles of the CAP theorem (Consistency, Availability, and
+            Partition Tolerance) apply to this architecture.
+            - Indicate any prioritization or trade-offs made to achieve specific project
+            goals, with examples.
+
+            ### Response Format:
+
+            - Format your response in markdown, beginning with a "## Architecture" heading.
+            - Each requirement should be addressed under clearly labeled subheadings.
+            - Use bullet points or numbered lists to present detailed descriptions and avoid
+            lengthy paragraphs.
+
+            ### Output Format Instructions:
+            {format_instructions}
+            """,
+            input_variables=['project_overview', 'additional_information'],
+            partial_variables={
+                "format_instructions": PydanticOutputParser(
+                    pydantic_object=TaskOutput
+                ).get_format_instructions()
+            }
+        ),
+        enable_rag_retrival=True
     )
 
-    project_overview_prompt: PromptTemplate = PromptTemplate(
-        template="""
-        Given the user request: "{user_request}"
-        Supervisor expectations: "{task_description}"
-        Additional information: "{additional_information}"
+    # TODO: Model has to be updated for rag interaction
+    folder_structure_prompt: PromptWithConfig = PromptWithConfig(
+        template=PromptTemplate(
+            template="""
+            Given the project overview and architecture:
 
-        As a Solution Architect, provide a comprehensive project overview. Include:
-        1. A brief description of the project's purpose and goals
-        2. The main features or functionalities to be implemented
-        3. What schema definition models are needed to implement this service.
+            Project Overview:
+            {project_overview}
 
-        Format your response in markdown, starting with a "## Project Overview"
-        heading.
+            Architecture:
+            {architecture}
 
-        output format instructions:
-        {format_instructions}
-        """,
-        input_variables=[
-            'user_request', 'task_description', 'additional_information'
-        ],
-        partial_variables={
-            "format_instructions": PydanticOutputParser(
-                pydantic_object=TaskOutput
-            ).get_format_instructions()
-        }
+            Additional information: "{additional_information}"
+
+            Propose a detailed folder structure for this microservice project, adhering to
+            best practices. Include:
+            1. Root-level directories
+            2. Service-specific directories
+            3. Common or shared directories
+            4. Test directories
+            5. Configuration file locations
+            6. Explanation of the purpose for each major directory
+
+            Format your response in markdown, starting with a "## Folder Structure" heading.
+
+            output format instructions:
+            {format_instructions}
+            """,
+            input_variables=["project_overview", "architecture", "additional_information"],
+            partial_variables={
+                "format_instructions": PydanticOutputParser(
+                    pydantic_object=TaskOutput
+                ).get_format_instructions()
+            }
+        ),
+        enable_rag_retrival=True
     )
 
-    architecture_prompt: PromptTemplate = PromptTemplate(
-        template="""
-        Based on the project overview provided, describe a high-level architecture for
-        this microservice-based project, focusing on the following key aspects:
+    # TODO: Model has to be updated for rag interaction
+    microservice_design_prompt: PromptWithConfig = PromptWithConfig(
+        template=PromptTemplate(
+            template="""
+            Based on the following project overview and architecture:
 
-        - **Project Overview:** "{project_overview}"
-        - **Additional Information:** "{additional_information}"
+            Project Overview:
+            {project_overview}
 
-        ### Requirements:
+            Architecture:
+            {architecture}
 
-        1. **High-Level Diagram with Description**:
-        - Provide a text-based diagram representing the high-level architecture of the
-          microservice.
-        - The diagram should illustrate the flow from client requests through various
-          layers, including the API gateway, business logic, data access layer, and
-          database.
-        - Clearly label each component to show how requests are processed and data is
-          managed within the system.
-        - Follow the diagram with a concise description of each component's role and
-          interactions within the architecture.
+            Additional information: "{additional_information}"
 
-        2. **Key Components, Data Models, and Interactions**:
-        - List and describe the key components in the architecture and their
-          responsibilities.
-        - Define the primary data models, including any critical fields and
-          relationships between models.
-        - Explain how data flows between components, and specify the protocols or
-          methods used for inter-service communication.
+            For each microservice identified, provide:
+            1. Service name and primary responsibility
+            2. Key endpoints or functions
+            3. Data models or schemas
+            4. Internal components or modules
+            5. Dependencies on other services or external systems
 
-        3. **Data Flow Between Services**:
-        - Provide a clear explanation of how data flows between services, from the
-          initiation of a request to the final response.
-        - Highlight any asynchronous or synchronous communication, including
-          considerations for message queues, pub/sub patterns, or HTTP/REST calls.
+            Format your response in markdown, starting with a "## Microservice Design"
+            heading, with subheadings for each service.
 
-        4. **External Integrations or APIs**:
-        - Identify any external systems or APIs integrated within this architecture,
-          along with the purpose and function of each integration.
-        - Specify how these integrations impact the data flow and any special handling
-          required to ensure security and reliability.
-
-        5. **Scalability and Reliability Considerations**:
-        - Outline strategies for horizontal or vertical scaling, load balancing, and
-          redundancy.
-        - Describe reliability mechanisms, such as retries, failover systems, and data
-          replication, to ensure high availability.
-        - Mention trade-offs based on the CAP theorem where relevant.
-
-        6. **CAP Theorem Application**:
-        - Discuss how the principles of the CAP theorem (Consistency, Availability, and
-          Partition Tolerance) apply to this architecture.
-        - Indicate any prioritization or trade-offs made to achieve specific project
-          goals, with examples.
-
-        ### Response Format:
-
-        - Format your response in markdown, beginning with a "## Architecture" heading.
-        - Each requirement should be addressed under clearly labeled subheadings.
-        - Use bullet points or numbered lists to present detailed descriptions and avoid
-          lengthy paragraphs.
-
-        ### Output Format Instructions:
-        {format_instructions}
-        """,
-        input_variables=['project_overview', 'additional_information'],
-        partial_variables={
-            "format_instructions": PydanticOutputParser(
-                pydantic_object=TaskOutput
-            ).get_format_instructions()
-        }
+            output format instructions:
+            {format_instructions}
+            """,
+            input_variables=["project_overview", "architecture", "additional_information"],
+            partial_variables={
+                "format_instructions": PydanticOutputParser(
+                    pydantic_object=TaskOutput
+                ).get_format_instructions()
+            }
+        ),
+        enable_rag_retrival=True
     )
 
-    folder_structure_prompt: PromptTemplate = PromptTemplate(
-        template="""
-        Given the project overview and architecture:
+    # TODO: Model has to be updated for rag interaction
+    tasks_breakdown_prompt: PromptWithConfig = PromptWithConfig(
+        template=PromptTemplate(
+            template="""
+            Given the project overview, architecture, and microservice design:
 
-        Project Overview:
-        {project_overview}
+            Project Overview:
+            {project_overview}
 
-        Architecture:
-        {architecture}
+            Architecture:
+            {architecture}
 
-        Additional information: "{additional_information}"
+            Microservice Design:
+            {microservice_design}
 
-        Propose a detailed folder structure for this microservice project, adhering to
-        best practices. Include:
-        1. Root-level directories
-        2. Service-specific directories
-        3. Common or shared directories
-        4. Test directories
-        5. Configuration file locations
-        6. Explanation of the purpose for each major directory
+            Additional information: "{additional_information}"
 
-        Format your response in markdown, starting with a "## Folder Structure" heading.
+            Break down the project into detailed, self-contained deliverables that team
+            members can work on. Each deliverable should cover all technical specifications,
+            including essential setup files and configurations. Specifically, provide:
 
-        output format instructions:
-        {format_instructions}
-        """,
-        input_variables=["project_overview", "architecture", "additional_information"],
-        partial_variables={
-            "format_instructions": PydanticOutputParser(
-                pydantic_object=TaskOutput
-            ).get_format_instructions()
-        }
+            1. Deliverable name
+            2. Detailed description of what needs to be done
+            3. Technical requirements or specifications
+
+            Ensure that the following aspects are covered in the breakdown, if applicable:
+            - Dockerfile for environment setup and deployment
+            - Package manager files (e.g., requirements.txt for Python, package.json for
+            Node.js)
+            - README.md file that provides an overview of the project and detailed
+            instructions on how to run the application.
+            - Configurations specific to the microservice architecture
+
+            Format your response in markdown, starting with a "## Deliverables" heading,
+            with each task as a subheading.
+
+            output format instructions:
+            {format_instructions}
+            """,
+            input_variables=[
+                "project_overview",
+                "architecture",
+                "microservice_design",
+                "additional_information"
+            ],
+            partial_variables={
+                "format_instructions": PydanticOutputParser(
+                    pydantic_object=TaskOutput
+                ).get_format_instructions()
+            }
+        ),
+        enable_rag_retrival=True
     )
 
-    microservice_design_prompt: PromptTemplate = PromptTemplate(
-        template="""
-        Based on the following project overview and architecture:
+    # TODO: Model has to be updated for rag interaction
+    standards_prompt: PromptWithConfig = PromptWithConfig(
+        template=PromptTemplate(
+            template="""
+            Considering the user request: "{user_request}"
+            And the supervisor expectations: "{task_description}"
+            Additional information: "{additional_information}"
 
-        Project Overview:
-        {project_overview}
+            Outline the standards to be followed in this project, including:
+            1. 12-Factor Application Standards: Explain how each factor applies to this
+            project
+            2. Clean Code Standards: Specific practices for maintaining clean, readable code
+            3. Code Commenting Standards: Guidelines for effective code documentation
+            4. Programming Language Specific Standards: Conventions for the chosen language(s)
+            5. User Requested Standards: Any additional standards specified by the user or
+            supervisor
 
-        Architecture:
-        {architecture}
+            Format your response in markdown, starting with a "## Standards" heading, with
+            subheadings for each category.
 
-        Additional information: "{additional_information}"
-
-        For each microservice identified, provide:
-        1. Service name and primary responsibility
-        2. Key endpoints or functions
-        3. Data models or schemas
-        4. Internal components or modules
-        5. Dependencies on other services or external systems
-
-        Format your response in markdown, starting with a "## Microservice Design"
-        heading, with subheadings for each service.
-
-        output format instructions:
-        {format_instructions}
-        """,
-        input_variables=["project_overview", "architecture", "additional_information"],
-        partial_variables={
-            "format_instructions": PydanticOutputParser(
-                pydantic_object=TaskOutput
-            ).get_format_instructions()
-        }
+            output format instructions:
+            {format_instructions}
+            """,
+            input_variables=["user_request", "task_description", "additional_information"],
+            partial_variables={
+                "format_instructions": PydanticOutputParser(
+                    pydantic_object=TaskOutput
+                ).get_format_instructions()
+            }
+        ),
+        enable_rag_retrival=True
     )
 
-    tasks_breakdown_prompt: PromptTemplate = PromptTemplate(
-        template="""
-        Given the project overview, architecture, and microservice design:
+    # TODO: Model has to be updated for rag interaction
+    implementation_details_prompt: PromptWithConfig = PromptWithConfig(
+        template=PromptTemplate(
+            template="""
+            Based on the following project details:
 
-        Project Overview:
-        {project_overview}
+            Architecture:
+            {architecture}
 
-        Architecture:
-        {architecture}
+            Microservice Design:
+            {microservice_design}
 
-        Microservice Design:
-        {microservice_design}
+            Folder Structure:
+            {folder_structure}
 
-        Additional information: "{additional_information}"
+            Additional information: "{additional_information}"
 
-        Break down the project into detailed, self-contained deliverables that team
-        members can work on. Each deliverable should cover all technical specifications,
-        including essential setup files and configurations. Specifically, provide:
+            Provide specific implementation details for:
+            1. list of required source files
+            2. list of Configuration files
+            3. list of Unit test approach and files
+            4. OpenAPI specification (provide a sample structure in YAML)
+            5. Dependency management (specify package manager and provide a sample file)
+            6. Dockerfile contents
 
-        1. Deliverable name
-        2. Detailed description of what needs to be done
-        3. Technical requirements or specifications
+            Format your response in markdown, starting with a "## Implementation Details"
+            heading, with subheadings for each category.
 
-        Ensure that the following aspects are covered in the breakdown, if applicable:
-        - Dockerfile for environment setup and deployment
-        - Package manager files (e.g., requirements.txt for Python, package.json for
-          Node.js)
-        - README.md file that provides an overview of the project and detailed
-          instructions on how to run the application.
-        - Configurations specific to the microservice architecture
-
-        Format your response in markdown, starting with a "## Deliverables" heading,
-        with each task as a subheading.
-
-        output format instructions:
-        {format_instructions}
-        """,
-        input_variables=[
-            "project_overview",
-            "architecture",
-            "microservice_design",
-            "additional_information"
-        ],
-        partial_variables={
-            "format_instructions": PydanticOutputParser(
-                pydantic_object=TaskOutput
-            ).get_format_instructions()
-        }
+            output format instructions:
+            {format_instructions}
+            """,
+            input_variables=[
+                "architecture",
+                "microservice_design",
+                "folder_structure",
+                "additional_information"
+            ],
+            partial_variables={
+                "format_instructions": PydanticOutputParser(
+                    pydantic_object=TaskOutput
+                ).get_format_instructions()
+            }
+        ),
+        enable_rag_retrival=True
     )
 
-    standards_prompt: PromptTemplate = PromptTemplate(
-        template="""
-        Considering the user request: "{user_request}"
-        And the supervisor expectations: "{task_description}"
-        Additional information: "{additional_information}"
+    # TODO: Model has to be updated for rag interaction
+    license_details_prompt: PromptWithConfig = PromptWithConfig(
+        template=PromptTemplate(
+            template="""
+            Considering the user request: "{user_request}"
+            And the License Text: "{license_text}"
+            Additional information: "{additional_information}"
 
-        Outline the standards to be followed in this project, including:
-        1. 12-Factor Application Standards: Explain how each factor applies to this
-          project
-        2. Clean Code Standards: Specific practices for maintaining clean, readable code
-        3. Code Commenting Standards: Guidelines for effective code documentation
-        4. Programming Language Specific Standards: Conventions for the chosen language(s)
-        5. User Requested Standards: Any additional standards specified by the user or
-          supervisor
+            Specify the license to be used for this project.
 
-        Format your response in markdown, starting with a "## Standards" heading, with
-        subheadings for each category.
+            Format your response in markdown, starting with a
+            "## License and Legal Considerations" heading.
 
-        output format instructions:
-        {format_instructions}
-        """,
-        input_variables=["user_request", "task_description", "additional_information"],
-        partial_variables={
-            "format_instructions": PydanticOutputParser(
-                pydantic_object=TaskOutput
-            ).get_format_instructions()
-        }
+            output format instructions:
+            {format_instructions}
+            """,
+            input_variables=["user_request", "license_text", "additional_information"],
+            partial_variables={
+                "format_instructions": PydanticOutputParser(
+                    pydantic_object=TaskOutput
+                ).get_format_instructions()
+            }
+        ),
+        enable_rag_retrival=True
     )
 
-    implementation_details_prompt: PromptTemplate = PromptTemplate(
-        template="""
-        Based on the following project details:
+    project_details_prompt: PromptWithConfig = PromptWithConfig(
+        template=PromptTemplate(
+            template="""
+            Given the user's request: "{user_request}"
 
-        Architecture:
-        {architecture}
+            Please suggest a project name that adheres to the naming standards.
 
-        Microservice Design:
-        {microservice_design}
+            Error messages will only be present if there is an issue with your previous
+            response.
+            '{error_message}'
 
-        Folder Structure:
-        {folder_structure}
-
-        Additional information: "{additional_information}"
-
-        Provide specific implementation details for:
-        1. list of required source files
-        2. list of Configuration files
-        3. list of Unit test approach and files
-        4. OpenAPI specification (provide a sample structure in YAML)
-        5. Dependency management (specify package manager and provide a sample file)
-        6. Dockerfile contents
-
-        Format your response in markdown, starting with a "## Implementation Details"
-        heading, with subheadings for each category.
-
-        output format instructions:
-        {format_instructions}
-        """,
-        input_variables=[
-            "architecture",
-            "microservice_design",
-            "folder_structure",
-            "additional_information"
-        ],
-        partial_variables={
-            "format_instructions": PydanticOutputParser(
-                pydantic_object=TaskOutput
-            ).get_format_instructions()
-        }
-    )
-
-    license_details_prompt: PromptTemplate = PromptTemplate(
-        template="""
-        Considering the user request: "{user_request}"
-        And the License Text: "{license_text}"
-        Additional information: "{additional_information}"
-
-        Specify the license to be used for this project.
-
-        Format your response in markdown, starting with a
-        "## License and Legal Considerations" heading.
-
-        output format instructions:
-        {format_instructions}
-        """,
-        input_variables=["user_request", "license_text", "additional_information"],
-        partial_variables={
-            "format_instructions": PydanticOutputParser(
-                pydantic_object=TaskOutput
-            ).get_format_instructions()
-        }
-    )
-
-    project_details_prompt: PromptTemplate = PromptTemplate(
-        template="""
-        Given the user's request: "{user_request}"
-
-        Please suggest a project name that adheres to the naming standards.
-
-        Error messages will only be present if there is an issue with your previous
-        response.
-        '{error_message}'
-
-        Output format instructions:
-        {format_instructions}
-        """,
-        input_variables=['user_request', 'error_message'],
-        partial_variables={
-            "format_instructions": PydanticOutputParser(
-                pydantic_object=ProjectDetails
-            ).get_format_instructions()
-        }
+            Output format instructions:
+            {format_instructions}
+            """,
+            input_variables=['user_request', 'error_message'],
+            partial_variables={
+                "format_instructions": PydanticOutputParser(
+                    pydantic_object=ProjectDetails
+                ).get_format_instructions()
+            }
+        ),
+        enable_rag_retrival=False
     )
