@@ -25,6 +25,7 @@ class ProjectDetails(BaseModel):
     # )
 
 
+# TODO: Need to update this model rag interaction has been updated.
 class TaskOutput(BaseModel):
     """
     This class represents the output of a task. It includes fields to indicate
