@@ -1,6 +1,6 @@
+from langchain.prompts import PromptTemplate
 from pydantic import BaseModel, Field, field_validator
 
-from langchain.prompts import PromptTemplate
 from utils.logs.logging_utils import logger
 
 
