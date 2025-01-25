@@ -103,7 +103,7 @@ class SupervisorAgent(BaseAgent[SupervisorState, SupervisorPrompts]):
                 req_queries: AIMessage = response.response
                 req_queries = ast.literal_eval(req_queries.content)
                 validated_requirements_queries = QueryList(req_queries=req_queries)
-                logger.info("Successfully built RAG cache with validated queries.")
+                logger.info("Successfully generated questions for the RAG cache and validated the queries.")
                 break
             except (ValidationError, ValueError, SyntaxError) as e:
                 logger.warning("Error while building RAG cache: %s", str(e))
