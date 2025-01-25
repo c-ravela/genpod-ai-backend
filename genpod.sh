@@ -275,4 +275,5 @@ else
     exit 1
 fi
 
+check_login
 main_loop
