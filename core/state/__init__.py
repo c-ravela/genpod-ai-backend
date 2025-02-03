@@ -1,7 +1,7 @@
-from .base_state import BaseState
-from .state_interface import IState
+from .base_state import BaseInputState, BaseOutputState, BaseState
 
 __all__ = [
     'BaseState',
-    'IState'
+    'BaseInputState',
+    'BaseOutputState',
 ]
