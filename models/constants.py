@@ -73,19 +73,21 @@ class Status(Enum):
 class PStatus(Enum):
     """
     Enumeration representing the various states a project can be in.
-
+    
+    Each member of this enum corresponds to a specific phase in a project's lifecycle.
+    
     The states track the project's progress through different phases:
 
-    - 'NONE': No status assigned yet.
-    - 'RECEIVED': Project has been received but not yet processed.
-    - 'NEW': Project is in the pre-initiation phase.
-    - 'INITIAL': Setup is pending.
-    - 'EXECUTING': Task is in progress.
-    - 'MONITORING': Project is being monitored for issues during execution.
-    - 'REVIEWING': Project is under review.
-    - 'RESOLVING': Issues are being addressed or resolved.
-    - 'HALTED': Project is paused, either due to completion or unresolved issues requiring intervention.
-    - 'DONE': All user-requested requirements have been fulfilled.
+    - 'NONE': No status has been assigned to the project yet.
+    - 'RECEIVED': The project has been received but not yet processed.
+    - 'NEW': The project is in the pre-initiation phase.
+    - 'INITIAL': Setup is pending; initial preparations are underway.
+    - 'EXECUTING': The assigned task is currently in progress.
+    - 'MONITORING': The project is being monitored for any issues during execution.
+    - 'REVIEWING': The project is under review, often for quality control or feedback.
+    - 'RESOLVING': Issues have been identified and are being addressed or resolved.
+    - 'HALTED': The project is paused, either due to completion or because of unresolved issues requiring intervention.
+    - 'DONE': All user-requested requirements have been fulfilled, and the project is complete.
     """
 
     NONE: str = "NONE"
