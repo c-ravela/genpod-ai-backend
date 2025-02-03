@@ -153,17 +153,6 @@ class Task(BaseModel):
         required=True
     )
 
-    additional_info: str = Field(
-        description="Additional info requested.",
-        default=""
-    )
-
-    question: str = Field(
-        description="Question to supervisor if additional information is needed"
-        " to proceed with task execution.",
-        default=""
-    )
-
 
 class TaskQueue(Queue[Task]):
     """A queue specifically for Task objects."""
@@ -472,55 +461,37 @@ class RequirementsDocument(BaseModel):
     generate a Markdown representation of the document.
     """
 
-    project_overview: str = Field(
-        description="A brief overview of the project, summarizing its goals "
-                    "and objectives.",
-        default=""
+    project_summary: str = Field(
+        default="",
+        description="A brief overview of the project, summarizing its goals and objectives."
     )
-
-    project_architecture: str = Field(
-        description="Detailed information about the project's architecture, "
-                    "including design patterns and key components.",
-        default=""
+    system_architecture: str = Field(
+        default="",
+        description="Detailed information about the project's architecture, including design patterns and key components."
     )
-
-    directory_structure: str = Field(
-        description="A description of the project's directory and folder "
-                    "structure, outlining the organization of files and "
-                    "directories.",
-        default=""
+    file_structure: str = Field(
+        default="",
+        description="A description of the project's directory and folder structure, outlining the organization of files and directories."
     )
-
-    microservices_architecture: str = Field(
-        description="Details about the design and architecture of the "
-                    "project's microservices, including their interactions "
-                    "and dependencies.",
-        default=""
+    microservice_design: str = Field(
+        default="",
+        description="Details about the design of the project's microservices, including their interactions and dependencies."
     )
-
-    tasks_overview: str = Field(
-        description="An overview of the tasks involved in the project, "
-                    "including their purpose and key objectives.",
-        default=""
+    tasks_summary: str = Field(
+        default="",
+        description="An overview of the tasks involved in the project, including their purpose and key objectives."
     )
-
-    coding_standards: str = Field(
-        description="The coding standards and conventions followed in the "
-                    "project, ensuring consistency and quality in the "
-                    "codebase.",
-        default=""
+    code_standards: str = Field(
+        default="",
+        description="The coding standards and conventions followed in the project to ensure consistency and quality."
     )
-
-    implementation_process: str = Field(
-        description="A detailed description of the implementation process, "
-                    "including phases, milestones, and methodologies.",
-        default=""
+    implementation_plan: str = Field(
+        default="",
+        description="A detailed description of the implementation process, including phases, milestones, and methodologies."
     )
-
-    project_license_information: str = Field(
-        description="Information about the project's licensing terms and "
-                    "conditions, including usage rights and restrictions.",
-        default=""
+    license_terms: str = Field(
+        default="",
+        description="Information about the project's licensing terms and conditions, including usage rights and restrictions."
     )
 
     def to_markdown(self) -> str:
@@ -529,60 +500,23 @@ class RequirementsDocument(BaseModel):
         document.
 
         Returns:
-            str: A Markdown string that represents the requirements document,
-            formatted with sections for each attribute.
+            str: A Markdown string representing the requirements document with 
+                sections for each attribute.
         """
 
-        return f"""# Project Requirements Document
+        sections = [
+            ("Project Summary", self.project_summary),
+            ("System Architecture", self.system_architecture),
+            ("File Structure", self.file_structure),
+            ("Microservice Design", self.microservice_design),
+            ("Tasks Summary", self.tasks_summary),
+            ("Code Standards", self.code_standards),
+            ("Implementation Plan", self.implementation_plan),
+            ("License Terms", self.license_terms),
+        ]
+        
+        markdown_sections = "\n\n".join(
+            f"{content}" for title, content in sections
+        )
 
-{self.project_overview}
-
-{self.project_architecture}
-
-{self.directory_structure}
-
-{self.microservices_architecture}
-
-{self.tasks_overview}
-
-{self.coding_standards}
-
-{self.implementation_process}
-
-{self.project_license_information}
-        """
-
-    def __getitem__(self, key: str) -> Any:
-        """
-        Retrieves the value of an attribute using square bracket notation.
-
-        Args:
-            key (str): The name of the attribute to retrieve.
-
-        Returns:
-            Any: The value of the specified attribute.
-
-        Raises:
-            KeyError: If the attribute with the specified key does not exist 
-            in the document.
-        """
-        if hasattr(self, key):
-            return getattr(self, key)
-        raise KeyError(f"Key '{key}' not found in RequirementsDocument.")
-
-    def __setitem__(self, key: str, value: Any) -> None:
-        """
-        Sets the value of an attribute using square bracket notation.
-
-        Args:
-            key (str): The name of the attribute to set.
-            value (Any): The new value to assign to the specified attribute.
-
-        Raises:
-            KeyError: If the attribute with the specified key does not exist 
-            in the document.
-        """
-        if hasattr(self, key):
-            setattr(self, key, value)
-        else:
-            raise KeyError(f"Key '{key}' not found in RequirementsDocument.")
+        return f"# Project Requirements Document\n\n{markdown_sections}"
