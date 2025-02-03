@@ -1,113 +1,117 @@
-from abc import ABC, abstractmethod
-from typing import Any
+from typing import Any, Dict, Generic, TypeVar
 
-from core.agent import IAgent
-from core.state import IState
-from llms.llm import LLM
+from core.graph import BaseGraph
+from llms import LLM
+from utils.decorators import auto_repr
 from utils.logs.logging_utils import logger
 
+GenericAgentGraph = TypeVar('GenericAgentGraph', bound=BaseGraph)
 
-class BaseAgent(IAgent, ABC):
+
+@auto_repr
+class BaseAgent(Generic[GenericAgentGraph]):
     """
-    Abstract base class for all agents, implementing common functionalities.
+    Base agent that interacts with a graph and a language model (LLM).
     """
 
     def __init__(
         self,
-        agent_id: str,
-        agent_name: str,
-        prompts: str,
+        id: str,
+        name: str,
         llm: LLM,
+        graph: GenericAgentGraph,
         use_rag: bool = False
-    ) -> None:
+    ):
         """
         Initializes the BaseAgent.
 
         Args:
-            agent_id (str): Unique identifier for the agent.
-            agent_name (str): Human-readable name for the agent.
-            state (BaseState): The initial state of the agent.
-            prompts (BasePrompt): The prompts used by the agent.
-            llm (LLM): Language Learning Model instance.
-            use_rag (bool, optional): Flag to enable RAG interactions. Defaults to False.
+            id (str): Unique identifier for the agent.
+            name (str): Human-readable name for the agent.
+            llm (LLM): Instance of a language model.
+            graph (GenericAgentGraph): The graph associated with this agent.
+            use_rag (bool, optional): Flag to enable retrieval-augmented generation. Defaults to False.
         """
-        logger.info(f"Initializing {self.__class__.__name__} with agent_id='{agent_id}' and agent_name='{agent_name}'")
-        self._agent_id = agent_id
-        self._agent_name = agent_name
-        self.prompts = prompts
+        logger.info("Initializing BaseAgent with id: %s, name: %s, use_rag: %s", id, name, use_rag)
+        self.id = id
+        self.name = name
         self.llm = llm
+        self.graph = graph
         self.use_rag = use_rag
-        logger.info(f"Initialized {self.__class__.__name__} successfully.")
 
-    @property
-    def agent_id(self) -> str:
+    def stream(self, input_data: Any) -> Any:
         """
-        Gets the agent's unique identifier.
-
-        Returns:
-            str: The agent's ID.
-        """
-        logger.debug(f"Accessing 'agent_id' for {self.__class__.__name__}: '{self._agent_id}'")
-        return self._agent_id
-
-    @property
-    def agent_name(self) -> str:
-        """
-        Gets the agent's name.
-
-        Returns:
-            str: The agent's name.
-        """
-        logger.debug(f"Accessing 'agent_name' for {self.__class__.__name__}: '{self._agent_name}'")
-        return self._agent_name
-
-    @abstractmethod
-    def router(self, state: 'BaseState') -> str:
-        """
-        Abstract method to determine the routing logic based on the agent's state.
+        Streams input data by delegating to the graph's stream method.
 
         Args:
-            state (BaseState): The current state of the agent.
+            input_data (Any): The input data to be processed.
 
         Returns:
-            str: The routing decision or response.
+            Any: The result of streaming the input data through the graph.
         """
-        pass
+        logger.debug("Agent %s streaming input data: %s", self.id, input_data)
+        result = self.graph.stream(input_data)
+        logger.debug("Agent %s received streaming result: %s", self.id, result)
+        return result
 
-    @staticmethod
-    def ensure_value(value: Any, fallback: Any) -> Any:
+    def invoke(self, input_data: Any) -> Any:
         """
-        Ensures the value is not None by returning it if present,
-        or the fallback value otherwise.
+        Invokes the graph by delegating to the graph's invoke method.
 
         Args:
-            value (Any): The input value to check.
-            fallback (Any): The fallback value to return if the input value is None.
+            input_data (Any): The input data to be processed.
 
         Returns:
-            Any: Either the provided value or the fallback value.
+            Any: The result of invoking the graph.
         """
-        if value is not None:
-            logger.debug(f"Value provided: {value}")
-            return value
-        else:
-            logger.warning(f"Value is None, returning fallback: {fallback}")
-            return fallback
+        logger.debug("Agent %s invoking graph with input: %s", self.id, input_data)
+        result = self.graph.invoke(input_data)
+        logger.debug("Agent %s received invocation result: %s", self.id, result)
+        return result
 
-    def __repr__(self) -> str:
+    def set_thread_id(self, thread_id: int) -> None:
         """
-        Returns a string representation of the BaseAgent instance.
+        Sets the thread (execution) ID for the graph by delegating to the graph's set_thread_id method.
+
+        Args:
+            thread_id (int): A positive integer representing the thread (execution) ID.
+        """
+        logger.info("Agent %s setting thread_id to: %s", self.id, thread_id)
+        self.graph.set_thread_id(thread_id)
+        logger.info("Agent %s thread_id successfully set to: %s", self.id, thread_id)
+
+    def show_graph(self) -> None:
+        """
+        Displays the graph visually by delegating to the graph's display_graph method.
+        """
+        logger.info("Agent %s displaying graph.", self.id)
+        self.graph.display_graph()
+        logger.info("Agent %s has finished displaying the graph.", self.id)
+    
+    @property
+    def runtime_config(self) -> Dict[str, Any]:
+        """
+        Returns the runtime configuration of the graph.
+
+        This property provides access to the configuration (previously called graph_config)
+        from the underlying graph.
 
         Returns:
-            str: The string representation.
+            Dict[str, Any]: The configuration dictionary for the graph.
         """
-        logger.debug(f"Generating string representation for agent {self.agent_name} (ID: {self.agent_id})")
-        return (
-            f"{self.__class__.__name__}("
-            f"agent_id={self.agent_id!r}, "
-            f"agent_name={self.agent_name!r}, "
-            f"prompts={self.prompts!r}, "
-            f"llm={self.llm!r}, "
-            f"use_rag={self.use_rag!r}"
-            f")"
-        )
+        logger.info("Agent %s retrieving runtime configuration.", self.id)
+        config = self.graph.graph_config
+        logger.debug("Agent %s runtime configuration: %s", self.id, config)
+        return config
+
+    def retrieve_last_state(self) -> Dict[str, Any]:
+        """
+        Retrieves the last saved state of the workflow from the graph.
+
+        Returns:
+            Dict[str, Any]: The last saved state as retrieved from the underlying graph.
+        """
+        logger.info("Agent %s retrieving last saved state from graph.", self.id)
+        state = self.graph.get_last_saved_state()
+        logger.info("Agent %s retrieved last saved state: %s", self.id, state)
+        return state
