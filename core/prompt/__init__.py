@@ -1,9 +1,13 @@
 from .base_prompt import BasePrompt
-from .prompt_interface import IPrompt
-from .prompt_with_config import PromptWithConfig
+from .prompt import Prompt
+from .prompt_template_adapters import *
+from .rag_instructions_prompt import RagInstructionsPrompt
 
 __all__ = [
     'BasePrompt',
-    'IPrompt',
-    'PromptWithConfig',
+    'BasePromptTemplateAdapter',
+    'ChatPromptTemplateAdapter',
+    'Prompt',
+    'PromptTemplateAdapter',
+    'RagInstructionsPrompt'
 ]
