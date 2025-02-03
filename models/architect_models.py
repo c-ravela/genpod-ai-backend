@@ -2,21 +2,17 @@
 This module defines the data model for the output of the Architect agent in
 the form of a Requirements Document.
 """
-from typing import ClassVar
+from typing import ClassVar, List
 
 from pydantic import BaseModel, Field, field_validator
 
 
 class ProjectDetails(BaseModel):
     """
-    This class encapsulates the essential details of a project. It includes fields
-    to describe the project name and the project's folder structure. These details
-    provide a high-level overview of the project and its organization.
+    Represents the essential details of a project.
     """
-
     project_name: str = Field(
-        description="The name of the project",
-        required=True
+        description="The name of the project.",
     )
 
     # project_folder_structure: str = Field(
@@ -25,58 +21,53 @@ class ProjectDetails(BaseModel):
     # )
 
 
-# TODO: Need to update this model rag interaction has been updated.
-class TaskOutput(BaseModel):
+class TaskResponse(BaseModel):
     """
-    This class represents the output of a task. It includes fields to indicate
-    whether additional information is needed to complete the task, the question
-    to ask for additional information, and the content of the requested information.
+    This model represents the response output of a task.
+    It encapsulates the content that answers the prompt.
     """
-
-    is_add_info_needed: bool = Field(
-        description="Specifies if more information is needed to complete the task.",
-        required=True
-    )
-
-    question_for_additional_info: str = Field(
-        description="The question to ask when additional information is needed."
-    )
 
     content: str = Field(
-        description="The content of the requested information."
+        description="The response content for the prompt."
     )
 
 
-class TasksList(BaseModel):
+class TaskList(BaseModel):
     """
-    The TasksList class is a Pydantic model that represents a list of tasks for a 
-    project. Each task in the list provides sufficient context and detailed information 
-    crucial for the task completion process.
+    TaskList represents a collection of tasks for a project.
+    
+    Each task in the list provides the necessary context and details crucial for task completion.
     """
-
-    tasks: list[str] = Field(
-        description="The list of tasks derived from the detailed requirements, "
-        "each providing sufficient context with detailed information crucial for "
-        "the task completion process",
-        required=True,
+    tasks: List[str] = Field(
+        description=(
+            "A non-empty list of tasks derived from the detailed requirements. "
+            "Each task provides sufficient context and detailed information required for task execution."
+        )
     )
 
-    description: ClassVar[str] = "Schema representing a list of tasks derived from "
-    "the project requirements."
+    SCHEMA_DESCRIPTION: ClassVar[str] = (
+        "Schema representing a list of tasks derived from the project requirements."
+    )
 
     @field_validator("tasks")
-    def check__tasks(cls, value):
+    def validate_tasks(cls, value: List[str]) -> List[str]:
+        """
+        Validates that the 'tasks' field is a non-empty list.
+
+        Args:
+            value (List[str]): The input list of tasks.
+
+        Returns:
+            List[str]: The validated list of tasks.
+
+        Raises:
+            TypeError: If the provided value is not a list.
+            ValueError: If the list is empty.
+        """
         if not isinstance(value, list):
-            raise TypeError(
-                f"Expected 'tasks' to be of type list but received {type(value).__name__}."
-            )
-
+            raise TypeError(f"Expected 'tasks' to be a list but received {type(value).__name__}.")
         if not value:
-            raise ValueError(
-                "The 'tasks' list received from the previous response is empty."
-                f" Received: {value}, Expected: Non empty list of strings."
-            )
-
+            raise ValueError("The 'tasks' list is empty. Expected a non-empty list of strings.")
         return value
 
 
