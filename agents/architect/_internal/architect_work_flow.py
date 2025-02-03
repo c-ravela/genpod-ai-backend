@@ -8,7 +8,7 @@ from agents.architect._internal.architect_prompt import ArchitectPrompts
 from agents.architect._internal.architect_state import *
 from core.decorators import *
 from core.workflow import BaseWorkFlow
-from llms.llm import LLM
+from llms import LLM
 from models.architect_models import ProjectDetails, TaskList, TaskResponse
 from models.constants import PStatus, Status
 from models.models import Task, TaskQueue

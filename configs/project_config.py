@@ -5,8 +5,7 @@ from typing import Any, Dict, Optional, Tuple, Union
 
 from pydantic import BaseModel, Field, field_validator
 
-from llms.factory import llm_factory
-from llms.llm import LLM
+from llms import LLM, llm_factory
 from utils.yaml_utils import read_yaml
 
 # Supported LLMs categorized by provider
