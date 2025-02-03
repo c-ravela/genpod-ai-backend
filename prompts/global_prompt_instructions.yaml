@@ -1,0 +1,13 @@
+instructions:
+  - template: |
+      Please adhere to the following instructions:
+
+      1. If the prompt specifies a particular format, follow it exactly.
+      2. Avoid including any unnecessary introductory phrases (e.g., "Here is my response")
+         or tail phrases (e.g., "Thank you for your question.").
+
+      Note: If specific format instructions are provided and your previous response contained errors,
+      you will receive targeted feedback to help improve your future outputs.
+
+      Feedback: `{feedback}`
+    position: top

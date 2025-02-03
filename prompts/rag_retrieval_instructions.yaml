@@ -1,0 +1,9 @@
+instructions:
+  - template: |
+      If the given task can be completed with the additional information provided, proceed accordingly.
+      Otherwise, return an array of clarifying questions.
+      
+      Note:
+      - Additional information will only be provided if it has been previously requested.
+      - Whenever additional information is needed, ignore any specific format instructions and simply return an array of questions.
+    position: top
