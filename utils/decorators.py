@@ -1,5 +1,7 @@
 from functools import wraps
+
 from utils.logs.logging_utils import logger
+
 
 def auto_init(init_func):
     """
