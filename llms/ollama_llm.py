@@ -103,10 +103,3 @@ class Ollama(LLM[ChatOllama]):
         except Exception as e:
             logger.exception("Failed to create chain.")
             raise
-
-    def __repr__(self):
-        representation = (
-            f"<Ollama(provider_name={self.provider_name}, model_name={self.model})>"
-        )
-        logger.debug("Generated representation: %s", representation)
-        return representation

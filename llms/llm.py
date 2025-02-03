@@ -8,8 +8,9 @@ from langchain_core.prompts import PromptTemplate
 from langchain_core.runnables.base import RunnableSequence
 from pydantic import BaseModel, ValidationError
 
-from llms.llm_metrics_callback import (LLMMetricsCallback, MetricsContext,
-                                       TokenUsage)
+from core.prompt import BasePrompt
+from llms.llm_metrics_callback import *
+from utils.decorators import auto_repr
 from utils.logs.logging_utils import logger
 
 TLLMInstance = TypeVar('TLLMInstance')
@@ -49,6 +50,7 @@ class LLMMeta(ABCMeta):
         return provider_class
 
 
+@auto_repr
 class LLM(ABC, Generic[TLLMInstance], metaclass=LLMMeta):
     """Abstract base class for different LLM (Large Language Model) providers."""
 
@@ -98,7 +100,7 @@ class LLM(ABC, Generic[TLLMInstance], metaclass=LLMMeta):
 
     def invoke_with_pydantic_model(
         self,
-        prompt: PromptTemplate,
+        prompt: BasePrompt,
         prompt_inputs: Dict[str, Any],
         response_model: Type[TResponse]
     ) -> LLMOutput[TResponse]:
@@ -110,7 +112,7 @@ class LLM(ABC, Generic[TLLMInstance], metaclass=LLMMeta):
 
     def invoke(
         self,
-        prompt: PromptTemplate,
+        prompt: BasePrompt,
         prompt_inputs: Dict[str, Any],
         response_type: Literal['string', 'json', 'raw'] = 'raw'
     ) -> LLMOutput[Union[str, dict, AIMessage]]:
@@ -140,7 +142,7 @@ class LLM(ABC, Generic[TLLMInstance], metaclass=LLMMeta):
 
     def __invoke_with_retry(
         self, 
-        prompt: PromptTemplate,
+        prompt: BasePrompt,
         prompt_inputs: Dict[str, Any],
         response_type: Literal['string', 'json', 'raw'] = 'raw',
         response_model: Type[TResponse] = None
@@ -149,7 +151,8 @@ class LLM(ABC, Generic[TLLMInstance], metaclass=LLMMeta):
         Invokes the LLM with a retry mechanism.
         """
         attempt = 0
-        wrapped_prompt = self.__wrap_prompt_with_instructions(prompt, prompt_inputs)
+        rendered_prompt = prompt.render(**prompt_inputs)
+        final_prompt = PromptTemplate.from_template(rendered_prompt)
         feedback = ""
         
         current_metrics = MetricsContext(self.provider, self.model)
@@ -158,7 +161,7 @@ class LLM(ABC, Generic[TLLMInstance], metaclass=LLMMeta):
         while attempt < self._max_retries:
             try:
                 logger.debug("Attempting to invoke LLM (attempt %d).", attempt + 1)
-                runnable = self._create_chain(wrapped_prompt, response_type)
+                runnable = self._create_chain(final_prompt, response_type)
                 runnable_response = runnable.invoke(
                     {'feedback': feedback},
                     config={"callbacks": self._callbacks}
@@ -177,6 +180,9 @@ class LLM(ABC, Generic[TLLMInstance], metaclass=LLMMeta):
                 logger.info("LLM invocation successful on attempt %d.", attempt + 1)
                 current_metrics.save_to_db()
                 return LLMOutput(final_response, self._last_metrics)
+            except KeyError as ke:
+                logger.error("Unrecoverable KeyError in prompt formatting: %s", ke, exc_info=True)
+                raise RuntimeError(f"Unrecoverable error in prompt template: {ke}") from ke 
             except Exception as e:
                 attempt += 1
                 logger.warning(
@@ -192,41 +198,3 @@ class LLM(ABC, Generic[TLLMInstance], metaclass=LLMMeta):
                 sleep(self._current_retry_backoff)
                 logger.debug("Retrying after backoff: %.2f seconds.", self._current_retry_backoff)
                 self._current_retry_backoff *= 2
-
-    def __wrap_prompt_with_instructions(
-        self,
-        prompt: PromptTemplate,
-        prompt_inputs: Dict[str, Any]
-    ) -> PromptTemplate:
-        """
-        Wraps the user prompt with additional instructions and feedback handling.
-        """
-        user_prompt = prompt.format(**prompt_inputs)
-        user_prompt = user_prompt.replace("{", "{{").replace("}", "}}")
-
-        wrapped_prompt = PromptTemplate(
-            template="""
-Please adhere to the following instructions:
-
-1. If the prompt specifies a particular format, follow it exactly.
-2. Avoid including any unnecessary introductory phrases (e.g., "Here is my response") 
-or tail phrases (e.g., "Thank you for your question.").
-
-Note: If any format instructions are given and there was a previous error in your response,
-you will receive feedback to improve future outputs.
-
-`{feedback}`\n{formatted_user_prompt}
-            """,
-            input_variables=['feedback'],
-            partial_variables={"formatted_user_prompt": user_prompt}
-        )
-        logger.debug("Wrapped prompt created.")
-        return wrapped_prompt
-    
-    def __repr__(self):
-        representation = (
-            f"<LLM(provider={self.provider}, model={self.model}, "
-            f"model_config={self.model_config}, last_metrics={self._last_metrics})>"
-        )
-        logger.debug("Generated LLM representation: %s", representation)
-        return representation
