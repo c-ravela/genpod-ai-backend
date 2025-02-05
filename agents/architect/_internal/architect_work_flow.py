@@ -85,6 +85,9 @@ class ArchitectWorkFlow(BaseWorkFlow[ArchitectPrompts]):
             elif state.current_mode_stage == DocumentGenerationStage.GATHER_PROJECT_DETAILS:
                 logger.info("Routing to GATHER_PROJECT_DETAILS node.")
                 return str(ArchitectNodeEnum.GATHER_PROJECT_DETAILS)
+            elif state.current_mode_stage == DocumentGenerationStage.FINISHED:
+                logger.info("Routing to FINISHED node.")
+                return str(ArchitectNodeEnum.EXIT)
             else:
                 logger.warning("Unhandled document generation stage: %s", state.current_mode_stage)
         
@@ -380,18 +383,21 @@ class ArchitectWorkFlow(BaseWorkFlow[ArchitectPrompts]):
         Returns:
             ArchitectOutput: The final output state.
         """
-        logger.info("Agent '%s': Entering exit_node.", self.agent_name)
-    
+        func_name = "exit_node"
+        logger.info("Agent '%s': %s - Entering exit node.", self.agent_name, func_name)
+        
         if state.operational_mode == ArchitectAgentMode.DOCUMENT_GENERATION:
-            logger.debug("Operational mode is DOCUMENT_GENERATION. Current mode stage: %s", state.current_mode_stage)
+            logger.debug("Agent '%s': %s - Operational mode is DOCUMENT_GENERATION. Current mode stage: %s", 
+                     self.agent_name, func_name, state.current_mode_stage)
             if state.current_mode_stage == DocumentGenerationStage.FINISHED:
                 state.current_task.task_status = Status.DONE
-                logger.info("Agent '%s': Task status set to DONE.", self.agent_name)
+                logger.info("Agent '%s': %s - Task status set to DONE.", self.agent_name, func_name)
             else:
-                logger.warning("Agent '%s': Exit node reached but current_mode_stage is not FINISHED: %s", 
-                            self.agent_name, state.current_mode_stage)
+                state.current_task.task_status = Status.INCOMPLETE
+                logger.warning("Agent '%s': %s - Exit node reached but current_mode_stage is not FINISHED (current stage: %s). Task status set to INCOMPLETE.", 
+                            self.agent_name, func_name, state.current_mode_stage)
         
-        logger.info("Agent '%s': Exiting workflow (exit_node).", self.agent_name)
+        logger.info("Agent '%s': %s - Exiting workflow (exit node).", self.agent_name, func_name)
         return state
 
     def _build_task_queue(self, task_descriptions: list) -> TaskQueue:
