@@ -8,7 +8,7 @@ from models.architect_models import ProjectDetails, TaskList, TaskResponse
 from utils.logs.logging_utils import logger
 from utils.yaml_utils import read_yaml
 
-ARCHITECT_PROMPT_PATH = path.join(getcwd(), "prompts", "architect_prompts.yaml")
+ARCHITECT_PROMPTS_PATH = path.join(getcwd(), "prompts", "architect_prompts.yaml")
 
 class ArchitectPrompts:
     """
@@ -34,9 +34,9 @@ class ArchitectPrompts:
         self.use_rag = use_rag
         
         try:
-            self._template_from_yaml = read_yaml(ARCHITECT_PROMPT_PATH)
+            self._template_from_yaml = read_yaml(ARCHITECT_PROMPTS_PATH)
         except Exception as e:
-            logger.error("Failed to load architect prompt configuration from %s: %s", ARCHITECT_PROMPT_PATH, e)
+            logger.error("Failed to load architect prompt configuration from %s: %s", ARCHITECT_PROMPTS_PATH, e)
             raise
 
         project_summary_prompt_template = PromptTemplate(
