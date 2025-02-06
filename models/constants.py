@@ -39,6 +39,7 @@ class ChatRoles(Enum):
       """
       return self.value
     
+
 class Status(Enum):
     """
     Enumeration representing the states of a task or project.
@@ -50,6 +51,7 @@ class Status(Enum):
     - 'RESPONDED': Response received after being in 'AWAITING'.
     - 'INPROGRESS': Currently being worked on.
     - 'ABANDONED': Left incomplete.
+    - 'INCOMPLETE': Marked as incomplete (explicitly recognized as not finished).
     - 'DONE': Completed.
     """
     
@@ -59,6 +61,7 @@ class Status(Enum):
     RESPONDED = "RESPONDED"
     INPROGRESS = "INPROGRESS"
     ABANDONED = "ABANDONED"
+    INCOMPLETE = "INCOMPLETE"
     DONE = "DONE"
 
     def __str__(self):
@@ -69,6 +72,7 @@ class Status(Enum):
             str: The value of the Enum member.
         """
         return self.value
+
 
 class PStatus(Enum):
     """
@@ -109,3 +113,34 @@ class PStatus(Enum):
           str: The value of the Enum member.
       """
       return self.value
+
+
+class RagResponseType(str, Enum):
+    """
+    Enum representing the type of response produced by the RAG middleware.
+
+    Values:
+      - ANSWERED: The query was successfully answered by a RAG agent.
+      - NOT_ANSWERED: The query was not answered by the RAG agent even though one is available.
+      - NO_AGENT_AVAILABLE: No RAG agents are available to answer the query.
+      - FROM_CACHE: The query was answered from a cached response.
+      - REJECTED: The query was rejected because the agent has exceeded its error threshold for the task.
+      - NOT_ADDRESSED: The query is still being processed by the RAG middleware and has not yet been addressed.
+        This state is used during query processing; once all steps are completed, the response type will be updated
+        to one of the final states (e.g., ANSWERED, NOT_ANSWERED, NO_AGENT_AVAILABLE, FROM_CACHE, or REJECTED).
+    """
+    ANSWERED = "rag_answered"
+    NOT_ANSWERED = "rag_not_answered"
+    NO_AGENT_AVAILABLE = "no_rag_to_answer"
+    FROM_CACHE = "rag_cache"
+    REJECTED = "rejected"
+    NOT_ADDRESSED = "not_addressed"
+
+    def __str__(self):
+        """
+        Returns the string representation of the Enum member.
+
+        Returns:
+            str: The value of the Enum member.
+        """
+        return self.value

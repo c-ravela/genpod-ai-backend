@@ -12,7 +12,16 @@ Note:
 Please refer to the individual files for more details about each model or Enum
 class.
 """
-from .constants import Status
+from .constants import ChatRoles, PStatus, RagResponseType, Status
 from .models import Task
+from .rag_middleware_models import RagAgentDetail, RagSelectionResponse
 
-__all__ = ['Status', 'Task']
+__all__ = [
+    'ChatRoles',
+    'PStatus',
+    'RagAgentDetail',
+    'RagResponseType',
+    'RagSelectionResponse',
+    'Status',
+    'Task',
+]
