@@ -2,8 +2,10 @@ import re
 from difflib import SequenceMatcher
 from typing import Any, Dict, Optional
 
+from pydantic import BaseModel, Field
 
-class FuzzyRAGCache:
+
+class FuzzyRAGCache(BaseModel):
     """
     In-memory lookup with fuzzy matching for RAG cache entries.
     
@@ -14,15 +16,8 @@ class FuzzyRAGCache:
     
     It also maintains a size limit and performs cleanup of least frequently used entries when the limit is exceeded.
     """
-    def __init__(self, limit: int = 50) -> None:
-        """
-        Initialize the in-memory lookup.
-        
-        Args:
-            limit (int): The maximum number of query entries to store.
-        """
-        self.limit: int = limit
-        self.lookup: Dict[str, Dict[str, Any]] = {}
+    limit: int = Field(default=50, description="Maximum number of query entries to store.")
+    lookup: Dict[str, Dict[str, Any]] = Field(default_factory=dict, description="Internal lookup dictionary.")
 
     def add(self, query: str, response: Any) -> None:
         """
