@@ -4,6 +4,7 @@ from typing import List, Optional, Tuple
 
 from pydantic import *
 
+from core.agent.base_agent import BaseAgent
 from models.constants import ChatRoles, PStatus
 from models.models import Task
 from utils.logs.logging_utils import logger
@@ -24,7 +25,17 @@ class ConfiguredBaseModel(BaseModel):
       a nicely formatted JSON representation of the model. This is useful for debugging
       and logging purposes, as it provides a clear and readable output of the model's data.
     """
-    model_config = ConfigDict(extra='forbid')
+    model_config = ConfigDict(
+        extra='forbid',
+        arbitrary_types_allowed = True,
+        json_encoders={
+            BaseAgent: lambda a: {
+                'id': a.id,
+                'name': a.name,
+                'use_rag': a.use_rag
+            }
+        }
+    )
 
     def __str__(self):
         return f"{self.__class__.__name__}({self.model_dump_json(indent=4)})"
