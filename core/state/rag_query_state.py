@@ -5,7 +5,7 @@ from pydantic import Field
 from core.state.base_state import *
 
 
-class RAGInputState(BaseInputState):
+class RAGQueryInput(BaseInputState):
     """
     Represents the input state for a RAG agent.
 
@@ -17,7 +17,7 @@ class RAGInputState(BaseInputState):
     )
 
 
-class RAGOutputState(BaseOutputState):
+class RAGQueryOutput(BaseOutputState):
     """
     Represents the output state for a RAG agent.
 
@@ -40,7 +40,7 @@ class RAGOutputState(BaseOutputState):
     )
 
 
-class RAGState(BaseState):
+class RAGQueryState(BaseState):
     """
     Unified state model for RAG agents.
 

@@ -1,11 +1,11 @@
 from .base_state import BaseInputState, BaseOutputState, BaseState
-from .rag_state import RAGInputState, RAGOutputState, RAGState
+from .rag_query_state import RAGQueryInput, RAGQueryOutput, RAGQueryState
 
 __all__ = [
     'BaseState',
     'BaseInputState',
     'BaseOutputState',
-    'RAGState',
-    'RAGInputState',
-    'RAGOutputState',
+    'RAGQueryState',
+    'RAGQueryInput',
+    'RAGQueryOutput',
 ]
