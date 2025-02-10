@@ -10,6 +10,7 @@ from utils.yaml_utils import read_yaml
 
 ARCHITECT_PROMPTS_PATH = path.join(getcwd(), "prompts", "architect_prompts.yaml")
 
+
 class ArchitectPrompts:
     """
     ArchitectPrompts contains templates for guiding the Architect agent in its tasks.
