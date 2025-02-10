@@ -64,7 +64,7 @@ class BasePrompt(BaseModel, ABC):
         Raises:
             Exception: Propagates exceptions from loading common instructions.
         """
-        logger.info("Initializing BasePrompt with adapter: %s and extra kwargs: %s", adapter, kwargs)
+        logger.debug("Initializing BasePrompt with adapter: %s and extra kwargs: %s", adapter, kwargs)
         super().__init__(adapter=adapter, **kwargs)
         if not self.common_instructions:
             self.common_instructions = self.load_common_instructions()

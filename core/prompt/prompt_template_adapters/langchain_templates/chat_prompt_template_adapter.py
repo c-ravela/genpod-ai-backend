@@ -52,7 +52,7 @@ class ChatPromptTemplateAdapter(BasePromptTemplateAdapter):
         Raises:
             Exception: Propagates any exception raised during the formatting process.
         """
-        logger.info("Formatting prompt using %s with arguments: %s", self.__class__.__name__, kwargs)
+        logger.debug("Formatting prompt using %s with arguments: %s", self.__class__.__name__, kwargs)
         try:
             prompt_text = self.prompt_template.format(**kwargs)
             logger.debug("Generated prompt text: %s", prompt_text)
