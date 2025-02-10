@@ -15,9 +15,12 @@ class.
 from .constants import ChatRoles, PStatus, RagResponseType, Status
 from .models import Task
 from .rag_middleware_models import RagAgentDetail, RagSelectionResponse
+from .rag_models import BinaryScore, PromptResponse
 
 __all__ = [
+    'BinaryScore',
     'ChatRoles',
+    'PromptResponse',
     'PStatus',
     'RagAgentDetail',
     'RagResponseType',
