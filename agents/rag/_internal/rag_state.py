@@ -1,54 +1,46 @@
-""" Graph State for RAG Agent """
-from typing import Annotated, List, TypedDict
 
-from agents.base.base_state import BaseState
+from langchain_core.documents import Document
+from pydantic import Field
+
+from core.state import RAGQueryInput, RAGQueryOutput, RAGQueryState
 
 
-class RAGState(TypedDict):
+class RAGInput(RAGQueryInput):
     """
-    Represents the state of our RAG Retriever.
+    Input state for the RAG Agent.
 
-    Attributes:
-        question: question
-        generation: LLM generation
-        documents: list of documents
-        iteration_count: max number of times transform query can happen
+    Inherits all fields from RAGQueryInput. No additional fields are defined.
+    """
+    pass
+
+
+class RAGOuput(RAGQueryOutput):
+    """
+    Output state for the RAG Agent.
+
+    Inherits all fields from RAGQueryOutput. No additional fields are defined.
+    """
+    pass
+
+
+class RAGState(RAGQueryState):
+    """
+    Internal state for the RAG Agent.
+
+    This state holds the workflow information including retrieved documents,
+    counters for hallucinations and retries, and any other data needed during
+    the query processing workflow.
     """
 
-    # @in
-    question: Annotated[
-        str,
-        BaseState.in_field("query in the form of question for rag to fetch information from vector db.")
-    ]
-
-    # @in
-    max_hallucination: Annotated[
-        int,
-        BaseState.in_field("max times of iterations during hallucination")
-    ]
-
-    # @out
-    generation: Annotated[
-        str,
-        BaseState.out_field("Information fetch rag for the query")
-    ]
-
-    # @inout
-    documents: Annotated[
-        List[str],
-        BaseState.inout_field()
-    ]
-
-    # @out
-    next: Annotated[
-        str,
-        BaseState.out_field()
-    ]
-
-    # @out
-    query_answered: Annotated[
-        bool,
-        BaseState.out_field(
-            "A boolean flag indicating whether the task has been answered"
-        )
-    ]
+    documents: list[Document] = Field(
+        default_factory=list,
+        description="The list of documents retrieved from the vector store."
+    )
+    hallucination_count: int = Field(
+        default=0,
+        description="The number of hallucinations detected during the generation process."
+    )
+    retry_count: int = Field(
+        default=0,
+        description="The number of retry attempts made to generate a valid response."
+    )

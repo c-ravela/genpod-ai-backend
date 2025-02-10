@@ -1,115 +1,135 @@
-import os
+from langgraph.graph import StateGraph
 
-from langgraph.graph import END, StateGraph
+from agents.rag._internal.rag_node_enum import RAGNodeEnum
+from agents.rag._internal.rag_state import RAGInput, RAGOuput, RAGState
+from agents.rag._internal.rag_workflow import RAGWorkFlow
+from core.graph import BaseGraph
+from utils.logs.logging_utils import logger
 
-from agents.base.base_graph import BaseGraph
-from agents.rag_workflow.rag_agent import RAGAgent
-from agents.rag_workflow.rag_state import RAGState
-from llms.llm import LLM
 
+class RAGGraph(BaseGraph[RAGWorkFlow]):
+    """
+    Graph representation for the Retrieval-Augmented Generation (RAG) workflow.
 
-class RAGWorkFlow(BaseGraph[RAGAgent]):
-
-    def __init__(self, graph_id: str, graph_name: str, agent_id: str, agent_name: str, llm: LLM, persistance_db_path: str, collection_name: str, persist_directory: str=None):
-        super().__init__(
-            graph_id,
-            graph_name, 
-            RAGAgent(
-                agent_id,
-                agent_name,
-                llm,
-                collection_name=collection_name,
-                persist_directory=persist_directory
-            ),
-            persistance_db_path
-        )
-
-        self.compile_graph_with_persistence()
-
-    def define_graph(self) -> StateGraph:
-        
-        rag_workflow = StateGraph(RAGState)
-
-        # Define the nodes
-        rag_workflow.add_node("retrieve", self.agent.retrieve)  # retrieve
-        rag_workflow.add_node("grade_documents", self.agent.grade_documents)  # grade documents
-        rag_workflow.add_node("generate", self.agent.generate)  # generate
-        rag_workflow.add_node("transform_query", self.agent.transform_query)  # transform_query
-        rag_workflow.add_node("save_analytics", self.agent.save_analytics_record)
-        rag_workflow.add_node("update_state", self.agent.update_state)
-
-        # Build graph
-        rag_workflow.set_entry_point("retrieve")
-        rag_workflow.add_edge("retrieve", "grade_documents")
-        rag_workflow.add_conditional_edges(
-            "grade_documents",
-            self.agent.decide_to_generate,
-            {
-                "transform_query": "transform_query",
-                "generate": "generate",
-            },
-        )
-        # self.rag_workflow.add_edge("transform_query", "retrieve")
-        rag_workflow.add_conditional_edges(
-            "transform_query",
-            lambda x: x["next"],
-            {
-                "retrieve": "retrieve",
-                "update_state": "save_analytics",
-            },
-        )
-        rag_workflow.add_conditional_edges(
-            "generate",
-            self.agent.grade_generation_v_documents_and_question,
-            {
-                "not supported": "generate",
-                "useful": "save_analytics",
-                "not useful": "transform_query",
-            },
-        )
-
-        rag_workflow.add_edge("save_analytics", "update_state")
-        rag_workflow.add_edge("update_state", END)
-
-        return rag_workflow
+    This class defines the state transitions for the RAG workflow by creating nodes and
+    conditional edges. Each node corresponds to a specific stage in the workflow, and the
+    transitions are determined by the router function from the RAGWorkFlow instance.
     
-    def get_current_state(self):
-        """ Returns the current state dictionary of the agent """
-        return self.agent.state
+    The entry point is set to RAGNodeEnum.ENTRY and the finish point is set to RAGNodeEnum.EXIT.
+    """
 
+    def __init__(
+        self,
+        work_flow: RAGWorkFlow, 
+        recursion_limit: int,
+        persistence_db_path: str
+    ):
+        """
+        Initialize the RAGGraph with a given workflow, recursion limit, and persistence database path.
 
-if __name__=="__main__":
-    #  Example using in you main graph.
-    from pprint import pprint
+        Args:
+            work_flow (RAGWorkFlow): An instance of the RAG workflow.
+            recursion_limit (int): Maximum recursion depth allowed for the graph transitions.
+            persistence_db_path (str): Path to the database for persisting the graph state.
+        """
+        super().__init__(work_flow, recursion_limit, persistence_db_path)
+        logger.info(
+            "Initialized RAGGraph with recursion_limit=%d and persistence_db_path='%s'.",
+            recursion_limit, persistence_db_path
+        )
 
-    from dotenv import load_dotenv
-    from langchain_openai import ChatOpenAI
-    load_dotenv()
+    def define_graph(self):
+        """
+        Define and return the state graph for the RAG workflow.
 
-    llm = ChatOpenAI(model="gpt-4o-2024-05-13", temperature=0, max_retries=5, streaming=True, seed=4000)
+        The graph is built using nodes corresponding to the various stages of the workflow and
+        conditional edges that dictate state transitions based on the router's output.
 
-    # Currently only use this value for collection_name if you have embeded and saved vector into the db with a differnet name then you can use it here.
-    collection_name = 'MISMO-version-3.6-docs'
+        Returns:
+            StateGraph: The fully defined state graph for the RAG workflow.
+        """
+        logger.info("Defining the RAG workflow graph...")
+        rag_work_flow_graph = StateGraph(RAGState, input=RAGInput, output=RAGOuput)
 
-    persist_directory = os.path.join(os.getcwd(), "../../vector_collections")
+        node_mapping = {
+            RAGNodeEnum.ENTRY: self.work_flow.entry_node,
+            RAGNodeEnum.RETRIEVE_DOCUMENTS: self.work_flow.retrieve_documents_node,
+            RAGNodeEnum.GRADE_DOCUMENTS: self.work_flow.grade_documents_node,
+            RAGNodeEnum.TRANSFORM_QUERY: self.work_flow.transform_query_node,
+            RAGNodeEnum.GENERATE_RESPONSE: self.work_flow.generate_response_node,
+            RAGNodeEnum.GRADE_RESPONSE: self.work_flow.grade_response_node,
+            RAGNodeEnum.EXIT: self.work_flow.exit_node,
+        }
 
-    RAG_thread_id = "1"
-    try:
-        RAG = RAGWorkFlow(llm=llm, collection_name=collection_name, thread_id=RAG_thread_id,  persist_directory=persist_directory)
+        for node, func in node_mapping.items():
+            node_str = str(node)
+            rag_work_flow_graph.add_node(node_str, func)
+            logger.debug("Added node '%s' to the graph.", node_str)
 
-        rag_input = {"question": "Any question related to MISMO_Standards"}
+        rag_work_flow_graph.add_conditional_edges(
+            str(RAGNodeEnum.ENTRY),
+            self.work_flow.router,
+            {
+                str(RAGNodeEnum.RETRIEVE_DOCUMENTS): str(RAGNodeEnum.RETRIEVE_DOCUMENTS),
+            }
+        )
+        logger.debug("Added conditional edges for node '%s'.", str(RAGNodeEnum.ENTRY))
 
-        result = ''
-        for output in RAG.app.stream(rag_input, thread_id= RAG.thread_id):
-            for key, value in output.items():
-                # Node
-                pprint(f"Node '{key}':")
-                # Optional: print full state at each node
-                # pprint.pprint(value["keys"], indent=2, width=80, depth=None)
-                result = value["generation"]
-            pprint("\n---\n")
-        
-        pprint(result)
+        rag_work_flow_graph.add_conditional_edges(
+            str(RAGNodeEnum.RETRIEVE_DOCUMENTS),
+            self.work_flow.router, 
+            {
+                str(RAGNodeEnum.GRADE_DOCUMENTS): str(RAGNodeEnum.GRADE_DOCUMENTS),
+                str(RAGNodeEnum.EXIT): str(RAGNodeEnum.EXIT)
+            }
+        )
+        logger.debug("Added conditional edges for node '%s'.", str(RAGNodeEnum.RETRIEVE_DOCUMENTS))
 
-    except AssertionError as ae:
-        print(f"Assertion Error Occured: {ae}")
+        rag_work_flow_graph.add_conditional_edges(
+            str(RAGNodeEnum.GRADE_DOCUMENTS),
+            self.work_flow.router, 
+            {
+                str(RAGNodeEnum.TRANSFORM_QUERY): str(RAGNodeEnum.TRANSFORM_QUERY),
+                str(RAGNodeEnum.GENERATE_RESPONSE): str(RAGNodeEnum.GENERATE_RESPONSE)
+            }
+        )
+        logger.debug("Added conditional edges for node '%s'.", str(RAGNodeEnum.GRADE_DOCUMENTS))
+
+        rag_work_flow_graph.add_conditional_edges(
+            str(RAGNodeEnum.TRANSFORM_QUERY),
+            self.work_flow.router,
+            {
+                str(RAGNodeEnum.RETRIEVE_DOCUMENTS): str(RAGNodeEnum.RETRIEVE_DOCUMENTS),
+                str(RAGNodeEnum.EXIT): str(RAGNodeEnum.EXIT)
+            }
+        )
+        logger.debug("Added conditional edges for node '%s'.", str(RAGNodeEnum.TRANSFORM_QUERY))
+
+        rag_work_flow_graph.add_conditional_edges(
+            str(RAGNodeEnum.GENERATE_RESPONSE),
+            self.work_flow.router,
+            {
+                str(RAGNodeEnum.GRADE_RESPONSE): str(RAGNodeEnum.GRADE_RESPONSE),
+                str(RAGNodeEnum.EXIT): str(RAGNodeEnum.EXIT)
+            }
+        )
+        logger.debug("Added conditional edges for node '%s'.", str(RAGNodeEnum.GENERATE_RESPONSE))
+
+        rag_work_flow_graph.add_conditional_edges(
+            str(RAGNodeEnum.GRADE_RESPONSE),
+            self.work_flow.router,
+            {
+                str(RAGNodeEnum.GENERATE_RESPONSE): str(RAGNodeEnum.GENERATE_RESPONSE),
+                str(RAGNodeEnum.TRANSFORM_QUERY): str(RAGNodeEnum.TRANSFORM_QUERY),
+                str(RAGNodeEnum.EXIT): str(RAGNodeEnum.EXIT)
+            }
+        )
+        logger.debug("Added conditional edges for node '%s'.", str(RAGNodeEnum.GRADE_RESPONSE))
+
+        rag_work_flow_graph.set_entry_point(RAGNodeEnum.ENTRY)
+        rag_work_flow_graph.set_finish_point(RAGNodeEnum.EXIT)
+        logger.info("Set graph entry point to '%s' and finish point to '%s'.",
+                    RAGNodeEnum.ENTRY, RAGNodeEnum.EXIT)
+
+        logger.info("RAG workflow graph defined successfully.")
+        return rag_work_flow_graph
