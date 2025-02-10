@@ -6,7 +6,7 @@ from agents.rag_middleware._internal.rag_middleware_prompt import *
 from agents.rag_middleware._internal.rag_middleware_state import *
 from agents.rag_middleware.registry import RagAgentEntry
 from core.decorators import *
-from core.state import RAGInputState, RAGOutputState
+from core.state import RAGQueryInput, RAGQueryOutput
 from core.workflow import BaseWorkFlow
 from llms import LLM
 from models import *
@@ -266,7 +266,7 @@ class RAGMiddlewareWorkFlow(BaseWorkFlow[RAGMiddlewarePrompts]):
           - Retrieves the selected RAG agent from the state.
           - Constructs the input state for the RAG agent.
           - Invokes the RAG agent with the input and captures the raw output.
-          - Parses the raw output into a RAGOutputState and updates the state.
+          - Parses the raw output into a RAGQueryOutput and updates the state.
           - Sets the next processing stage to REFINE_RESPONSE.
         
         Args:
@@ -282,7 +282,7 @@ class RAGMiddlewareWorkFlow(BaseWorkFlow[RAGMiddlewarePrompts]):
         logger.debug("%s: Selected RAG agent: %s", func_name, rag_agent)
 
         # Construct input state for the RAG agent.
-        rag_agent_input = RAGInputState(**state.model_dump(include=set(RAGInputState.model_fields.keys())))
+        rag_agent_input = RAGQueryInput(**state.model_dump(include=set(RAGQueryInput.model_fields.keys())))
         # Additionally, set the current task for the RAG agent.
         rag_agent_input.current_task = Task(
             task_status=Status.NEW,
@@ -295,8 +295,8 @@ class RAGMiddlewareWorkFlow(BaseWorkFlow[RAGMiddlewarePrompts]):
         logger.debug("%s: Raw output from RAG agent: %s", func_name, rag_agent_output_raw)
 
         # Populate the output state with the raw output from the agent.
-        state.rag_agent_output = RAGOutputState(**rag_agent_output_raw)
-        logger.debug("%s: RAG agent output parsed into RAGOutputState: %s", func_name, state.rag_agent_output)
+        state.rag_agent_output = RAGQueryOutput(**rag_agent_output_raw)
+        logger.debug("%s: RAG agent output parsed into RAGQueryOutput: %s", func_name, state.rag_agent_output)
 
         state.current_mode_stage = RAGQueryStage.REFINE_RESPONSE
         logger.info("%s: Updated processing stage to '%s'.", func_name, state.current_mode_stage)
@@ -327,7 +327,7 @@ class RAGMiddlewareWorkFlow(BaseWorkFlow[RAGMiddlewarePrompts]):
         func_name = "response_refinement_node"
         logger.info("%s: Starting response refinement.", func_name)
 
-        rag_output: RAGOutputState = state.rag_agent_output
+        rag_output: RAGQueryOutput = state.rag_agent_output
         logger.debug("%s: Raw RAG output: %s", func_name, rag_output)
 
         refined_response = rag_output.response.strip()

@@ -21,3 +21,6 @@ class RAGQueryStage(str, Enum):
     FORWARD_TO_RAG = "forward_to_rag"
     REFINE_RESPONSE = "refine_response"
     FINISHED = "finished"
+
+    def __str__(self):
+        return self.value
