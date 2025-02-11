@@ -51,7 +51,7 @@ class FileIssue(BaseModel):
         return values
 
 
-class ReviewerOutput(BaseModel):
+class IssuesReport(BaseModel):
     """
     Represents the output of a review process, which includes a list of issues found in
     files.

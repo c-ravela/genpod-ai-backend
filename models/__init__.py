@@ -13,18 +13,30 @@ Please refer to the individual files for more details about each model or Enum
 class.
 """
 from .constants import ChatRoles, PStatus, RagResponseType, Status
-from .models import Task
+from .models import (Issue, IssuesQueue, PlannedIssue, PlannedIssuesQueue,
+                     PlannedTask, PlannedTaskQueue, RequirementsDocument, Task,
+                     TaskQueue)
 from .rag_middleware_models import RagAgentDetail, RagSelectionResponse
 from .rag_models import BinaryScore, PromptResponse
+from .reviewer_models import IssuesReport
 
 __all__ = [
     'BinaryScore',
     'ChatRoles',
+    'Issue',
+    'IssuesQueue',
+    'IssuesReport',
+    'PlannedIssue',
+    'PlannedIssuesQueue',
+    'PlannedTask',
+    'PlannedTaskQueue',
     'PromptResponse',
     'PStatus',
     'RagAgentDetail',
     'RagResponseType',
     'RagSelectionResponse',
+    'RequirementsDocument',
     'Status',
     'Task',
+    'TaskQueue'
 ]
