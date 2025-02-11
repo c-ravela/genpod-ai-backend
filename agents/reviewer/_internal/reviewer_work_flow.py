@@ -1,69 +1,196 @@
-"""
-"""
 import os
 import subprocess
 
-from agents.base.base_agent import BaseAgent
-from agents.reviewer.reviewer_state import ReviewerState
+from agents.reviewer._internal.reviewer_mode_enum import (ReviewerMode,
+                                                          ReviewStage)
+from agents.reviewer._internal.reviewer_node_enum import ReviewerNodeEnum
+from agents.reviewer._internal.reviewer_prompt import ReviewerPrompts
+from agents.reviewer._internal.reviewer_state import (ReviewerOutput,
+                                                      ReviewerState)
+from core.decorators import (handle_errors_and_reset, record_node,
+                             route_on_errors)
+from core.workflow import BaseWorkFlow
 from llms.llm import LLM
-from models.constants import Status
-from models.models import Issue, IssuesQueue
-from models.reviewer_models import ReviewerOutput
-from prompts.reviewer_prompts import ReviewerPrompts
+from models import Issue, IssuesQueue, IssuesReport, Status
 from tools.semgrep import Semgrep
 from utils.logs.logging_utils import logger
 
 
-class ReviewerAgent(BaseAgent[ReviewerState, ReviewerPrompts]):
+class ReviewerWorkFlow(BaseWorkFlow[ReviewerPrompts]):
     """
-    The ReviewerAgent class is responsible for conducting comprehensive code reviews,
-    including code quality analysis, security analysis, linting, and documentation 
-    checks. It identifies bugs, vulnerabilities, inconsistencies, and missing documentation
-    in the codebase and generates issues based on the findings.
+    Implements the workflow for a code review agent, orchestrating various nodes (entry,
+    static analysis, and exit) based on the current state of the review.
 
-    The ReviewerAgent follows a structured, multi-step process to thoroughly analyze 
-    codebases. At each stage—whether it involves code quality checks, security assessments,
-    linting, or documentation verification—if an issue is detected, the agent halts the 
-    review process and escalates the issue to the supervisor for resolution. This ensures 
-    that problems are addressed immediately. To optimize resource usage and minimize 
-    unnecessary computational costs, the agent stops further analysis upon identifying an
-    issue, preventing redundant operations and conserving resources.
-    """
-
-    def __init__(
-        self,
-        agent_id: str,
-        agent_name: str,
-        llm: LLM
-    ) -> None:
+    This workflow leverages an LLM for processing static analysis results, prepares issue
+    reports, and updates the state accordingly.
+    """    
+    def __init__(self, agent_id: str, agent_name: str, llm: LLM, use_rag: bool):
         """
-        Initializes the ReviewerAgent with its state, prompts, and necessary configurations.
+        Initializes the ReviewerWorkFlow with the agent details and LLM instance.
 
         Args:
             agent_id (str): Unique identifier for the agent.
             agent_name (str): Name of the agent.
-            llm (LLM): The language model for processing prompts.
+            llm (LLM): An instance of the language model to be used.
+            use_rag (bool): Flag indicating whether Retrieval-Augmented Generation is enabled.
         """
-        super().__init__(
-            agent_id,
-            agent_name,
-            ReviewerState(),
-            ReviewerPrompts(),
-            llm
-        )
-
-        self.entry_node_name = "entry"
-        self.static_code_analysis_node_name = "static code analysis"
-        self.update_state_node_name = "update_state"
-
+        super().__init__(agent_id, agent_name, ReviewerPrompts(use_rag), llm, use_rag)
         self.project_path = ""
 
-    def prepare_issues(self, output: ReviewerOutput) -> IssuesQueue:
+    @route_on_errors
+    def router(self, state: ReviewerState) -> str:
+        """
+        Routes the current state to the appropriate workflow node based on the operational mode
+        and current review stage.
+
+        Args:
+            state (ReviewerState): The current state of the reviewer.
+
+        Returns:
+            str: The node identifier to which the workflow should route next.
+        """
+        logger.debug(
+            f"{self.agent_name}: Routing state with mode '{state.operational_mode}' "
+            f"and stage '{state.current_mode_stage}'"
+        )
+        if state.operational_mode == ReviewerMode.UNDER_REVIEW:
+            if state.current_mode_stage == ReviewStage.STATIC_ANALYSIS:
+                return str(ReviewerNodeEnum.STATIC_CODE_ANALYSIS)
+            elif state.current_mode_stage == ReviewStage.FINISHED:
+                return str(ReviewerNodeEnum.EXIT)
+
+        return str(ReviewerNodeEnum.EXIT)
+
+    @record_node(ReviewerNodeEnum.ENTRY)
+    def entry_node(self, state: ReviewerState) -> ReviewerState:
+        """
+        Entry node to initialize the project environment by setting the project path and
+        ensuring the Git repository is ready.
+
+        The method sets the project path, configures the operational mode and current stage,
+        and initializes Git if it is not already set up.
+
+        Args:
+            state (ReviewerState): The current state of the reviewer, including 'project_directory'
+                                   and 'project_name'.
+
+        Returns:
+            ReviewerState: The updated state after initialization.
+        """
+        self.project_path = os.path.join(state.project_directory, state.project_name)
+        logger.info(
+            f"{self.agent_name}: Entry node initialized. Project path set to '{self.project_path}'."
+        )
+
+        state.operational_mode = ReviewerMode.UNDER_REVIEW
+        state.current_mode_stage = ReviewStage.STATIC_ANALYSIS
+
+        logger.info(f"{self.agent_name}: Initializing Git repository if necessary.")
+        self._initialize_git()
+        return state
+
+    @record_node(ReviewerNodeEnum.STATIC_CODE_ANALYSIS)
+    @handle_errors_and_reset
+    def static_code_analysis_node(self, state: ReviewerState) -> ReviewerState:
+        """
+        Performs static code analysis using Semgrep and updates the reviewer state with the
+        discovered issues.
+
+        This method performs a simple Semgrep scan on the project, invokes the LLM to process
+        the scan results, and then extracts and appends any issues to the reviewer's state.
+
+        Args:
+            state (ReviewerState): The current state of the reviewer, including any pre-existing
+                                   error messages and issues.
+
+        Returns:
+            ReviewerState: The updated state after performing static code analysis.
+        """
+        logger.info(f"{self.agent_name}: Performing static code analysis at '{self.project_path}'.")
+        semgrep = Semgrep()
+        semgrep_scan_result = semgrep.simple_scan(self.project_path)
+        logger.debug(f"{self.agent_name}: Semgrep scan result obtained.")
+
+        llm_response = self.invoke_with_pydantic_model(
+            self.prompts.static_code_analysis_prompt,
+            {
+                'static_analysis_tool': semgrep.name(),
+                'tool_result': semgrep_scan_result,
+                'error_message': state.error_message
+            },
+            IssuesReport
+        )
+        logger.debug(f"{self.agent_name}: Received LLM response for static code analysis.")
+
+        issues_report = llm_response.response
+        issues: IssuesQueue = self._prepare_issues(issues_report)
+        logger.info(f"{self.agent_name}: Prepared {len(issues)} issues from static code analysis.")
+
+        state.issues.extend(issues)
+        state.current_mode_stage = ReviewStage.FINISHED
+        logger.info(f"{self.agent_name}: Static code analysis completed; stage set to '{state.current_mode_stage}'.")
+
+        return state
+
+    @record_node(ReviewerNodeEnum.EXIT)
+    def exit_node(self, state: ReviewerState) -> ReviewerOutput:
+        """
+        Finalizes the review workflow by marking the current task as completed and generating
+        the final review output.
+
+        The method updates the task status to 'DONE' and returns a ReviewerOutput object that
+        encapsulates the issues found during the review process.
+
+        Args:
+            state (ReviewerState): The current state of the reviewer.
+
+        Returns:
+            ReviewerOutput: The final output of the review process containing the issues report.
+        """
+        logger.info(f"{self.agent_name}: Exiting workflow. Finalizing task and generating output.")
+
+        if state.operational_mode == ReviewerMode.UNDER_REVIEW:
+            if state.current_mode_stage == ReviewStage.FINISHED:
+                state.current_task.task_status = Status.DONE
+                logger.info(f"{self.agent_name}: Review stage is finished. Task marked as DONE.")
+            else:
+                logger.warning(f"{self.agent_name}: Review stage is not finished. Marking task as INCOMPLETE.")
+                state.current_task.task_status = Status.INCOMPLETE
+        else:
+            logger.warning(f"{self.agent_name}: Operational mode is not UNDER_REVIEW. Task status remains unchanged.")
+
+        logger.info(f"{self.agent_name}: Workflow exit complete. Total issues reported: {len(state.issues)}.")
+        return state
+
+    def _initialize_git(self) -> None:
+        """
+        Initializes a Git repository in the project directory if one does not already exist.
+
+        This method ensures that the project directory exists, changes into that directory,
+        checks for the existence of a Git repository by looking for a ".git" folder, and initializes
+        a new repository using 'git init' if necessary. The original working directory is restored
+        after the operation completes.
+
+        Raises:
+            subprocess.CalledProcessError: If the Git initialization command fails.
+        """
+        os.makedirs(self.project_path, exist_ok=True)
+        try:
+            os.chdir(self.project_path)
+            if not os.path.isdir(".git"):
+                logger.info(f"{self.agent_name}: Initializing Git in the project directory.")
+                subprocess.run(["git", "init"], check=True)
+        except Exception as e:
+            logger.error(f"{self.agent_name}: Error during Git initialization: {e}")
+        finally:
+            os.chdir("..")
+
+    def _prepare_issues(self, output: IssuesReport) -> IssuesQueue:
         """
         Prepares a queue of issues based on the output from the analysis.
 
         Args:
-            output (ReviewerOutput): Validated response containing detected issues.
+            output (IssuesReport): Validated response containing detected issues.
 
         Returns:
             IssuesQueue: Queue of issues prepared for further processing.
@@ -83,118 +210,6 @@ class ReviewerAgent(BaseAgent[ReviewerState, ReviewerPrompts]):
             logger.debug(f"{self.agent_name}: Added issue: {issue}")
 
         return issues
-                   
-    def router(self, state: ReviewerState) -> str:
-        """
-        Routes the process based on detected issues.
-
-        If issues are found, the process halts, ensuring efficient handling and avoiding
-        redundant analyses.
-
-        Args:
-            state (ReviewerState): Current state of the reviewer.
-
-        Returns:
-            str: Next node name to be executed.
-        """
-        logger.info(f"{self.agent_name}: Routing to the next step based on current state")
-        
-        # This router is triggered after each analysis node invocation.
-        # If any issues are found, the Reviewer process halts to address and resolve 
-        # them. It is inefficient to run all types of analysis in every review cycle 
-        # because if an issue is encountered early (e.g., at step 1) and we continue
-        # with the other analyses before resolving it, we waste computational resources.
-        #  Halting the process as soon as an issue is detected is the most efficient 
-        # approach, as even small changes require a complete re-analysis once the issue
-        # is resolved.
-
-        if len(state['issues']) > 0:
-            logger.info(f"{self.agent_name}: Issues detected. Halting further analysis and updating state.")
-            return self.update_state_node_name
-
-        return self.update_state_node_name
-   
-    def entry_node(self, state: ReviewerState) -> ReviewerState:
-        """
-        Entry node to initialize the project path and prepare the environment.
-
-        Ensures that the project directory is set up and initializes Git if not already present.
-
-        Args:
-            state (ReviewerState): Current state of the reviewer.
-
-        Returns:
-            ReviewerState: Updated state after initialization.
-        """
-        logger.info(f"{self.agent_name}: Entering entry node")
-        state['issues'] = IssuesQueue()
-        state['error_message'] = BaseAgent.ensure_value(state['error_message'], "")
-        self.project_path = os.path.join(state['project_path'], state['project_name'])
-
-        os.makedirs(self.project_path, exist_ok=True)
-        try:
-            os.chdir(self.project_path)
-            if not os.path.isdir(".git"):
-                logger.info(f"{self.agent_name}: Initializing Git in the project directory.")
-                subprocess.run(["git", "init"], check=True)
-        except Exception as e:
-            logger.error(f"{self.agent_name}: Error during Git initialization: {e}")
-            state['error_message'] = str(e)
-        finally:
-            os.chdir("..")
-
-        return state
-
-    # TODO: Each and every analysis node has to be assigned with priority id
-    # Factors to consider:
-    #   amount of tokens that prompt and response might consume
-    #   most major changes can happen due to analysis
-    def static_code_analysis_node(self, state: ReviewerState) -> ReviewerState:
-        """
-        Performs static code analysis using Semgrep.
-
-        Args:
-            state (ReviewerState): Current state of the reviewer.
-
-        Returns:
-            ReviewerState: Updated state after analysis.
-        """
-        logger.info(f"{self.agent_name}: Performing static code analysis at {self.project_path}")
-        sg = Semgrep()
-
-        # TODO: For now we are only doing simple scan but later we need to enhance 
-        # this with Pro rules scan.
-        # Reasons: One we need to login to get access to pro rules analysis, other 
-        # there has to be proper git repo setuped at the project location for 
-        # semgrep to work properly.
-
-        try:
-            result = sg.simple_scan(self.project_path)
-            while True:
-                try:
-                    llm_output = self.llm.invoke_with_pydantic_model(
-                        self.prompts.static_code_analysis_prompt, 
-                        {
-                            'static_analysis_tool': sg.name(),
-                            'tool_result': result,
-                            'error_message': state['error_message']
-                        },
-                        ReviewerOutput
-                    )
-                    validated_response = llm_output.response
-                    state['error_message'] = ""
-                    break  # while loop exit
-                except Exception as e:
-                    logger.error(f"{self.agent_name}: Error during LLM invocation: {e}")
-                    state['error_message'] = str(e)
-       
-            issues: IssuesQueue = self.prepare_issues(validated_response)
-            state['issues'].extend(issues)
-        except Exception as e:
-            logger.error(f"Error during static code analysis: {e}")
-            state['error_message'] = str(e)
-
-        return state
 
     def package_dependencies_analysis_node(self, state: ReviewerState) -> ReviewerState:
         """

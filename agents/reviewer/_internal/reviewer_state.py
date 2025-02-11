@@ -1,79 +1,67 @@
-"""
-ReviewerState
 
-Defines the state structure for the ReviewerAgent, including project details,
-requirements, and identified issues.
-"""
+from pydantic import Field
 
-from typing import Annotated, TypedDict
-
-from agents.base.base_state import BaseState
+from core.state import BaseInputState, BaseOutputState, BaseState
+from models import RequirementsDocument
 from models.models import IssuesQueue
 
 
-class ReviewerState(TypedDict):
+class ReviewerInput(BaseInputState):
     """
-    Represents the state for the ReviewerAgent, encapsulating project details,
-    requirements, and identified issues.
+    Represents the input state for the reviewer agent.
 
     Attributes:
-        project_name (str): Name of the project under review.
-        project_path (str): Absolute path where the project is stored.
-        license_text (str): License information associated with the project.
-        requirements_document (str): Requirements in markdown format serving as
-            a guide for the review process.
-        issues (IssuesQueue): A queue of issues identified during the review phase.
-        error_message (str): An internal field to store any error messages
-            encountered during the review process.
+        project_name (str): Name of the project.
+        license_header (str): License text to be added at the top of each generated file.
+        requirements_document (RequirementsDocument): Requirements documents for the project.
     """
+    project_name: str = Field(
+        description="Name of the project"
+    )
+    license_header: str = Field(
+        default="",
+        description="License text to be added at the top of each generated file."
+    )
+    requirements_document: RequirementsDocument = Field(
+        description="Requirements documents for the project"
+    )
 
-    # @in 
-    project_name: Annotated[
-        str, 
-        BaseState.in_field(
-            "The name of the project under review."
-        )
-    ]
 
-    # @in
-    project_path: Annotated[
-        str,
-        BaseState.in_field(
-            "The absolute path in the file system where the project is being generated. "
-            "This path is used to store all project-related files and directories."
-        )
-    ]
+class ReviewerOutput(BaseOutputState):
+    """
+    Represents the output state for the reviewer agent.
 
-    # @in
-    license_text: Annotated[
-        str,
-        BaseState.in_field(
-            "The license text associated with the project."
-        )
-    ]
+    Attributes:
+        issues (IssuesQueue): List of issues found during the review process.
+    """
+    issues: IssuesQueue = Field(
+        description="List of issues found during the review process."
+    )
 
-    # @in 
-    requirements_document: Annotated[
-        str, 
-        BaseState.in_field(
-            "A comprehensive, well-structured document in markdown format that outlines "
-            "the project's requirements derived from the user's request. This serves as a "
-            "guide for the development process."
-        )
-    ]
-    
-    # @out
-    issues: Annotated[
-        IssuesQueue,
-        BaseState.out_field(
-            "A queue of issues identified in the project during the review phase."
-        )
-    ]
 
-    # @internal
-    error_message: Annotated[
-        str,
-        BaseState.internal_field(
-            "Stores error messages encountered during the review process for debugging and logging purposes."
-        )
-    ]
+class ReviewerState(BaseState):
+    """
+    Represents the overall state for the reviewer agent.
+
+    Attributes:
+        project_name (str): Name of the project.
+        license_header (str): License text to be added at the top of each generated file.
+        requirements_document (RequirementsDocument): Requirements documents for the project.
+        issues (IssuesQueue): List of issues found during the review process.
+    """
+    project_name: str = Field(
+        default="",
+        description="Name of the project"
+    )
+    license_header: str = Field(
+        default="",
+        description="License text to be added at the top of each generated file."
+    )
+    requirements_document: RequirementsDocument = Field(
+        default_factory=RequirementsDocument,
+        description="Requirements documents for the project"
+    )
+    issues: IssuesQueue = Field(
+        default_factory=IssuesQueue,
+        description="List of issues found during the review process."
+    )
