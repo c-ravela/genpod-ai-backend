@@ -8,59 +8,436 @@ from typing import List
 from pydantic import ValidationError
 
 from agents.base.base_agent import BaseAgent
-from agents.planner.planner_state import PlannerState
+from agents.planner._internal.planner_mode_enum import (IssuePlanningStage,
+                                                        PlannerMode,
+                                                        TaskPlanningStage)
+from agents.planner._internal.planner_node_enum import PlannerNodeEnum
+from agents.planner._internal.planner_prompt import PlannerPrompts
+from agents.planner._internal.planner_state import PlannerOutput, PlannerState
+from core.decorators import (handle_errors_and_reset, record_node,
+                             route_on_errors)
+from core.workflow import BaseWorkFlow
 from llms.llm import LLM
 from models.constants import PStatus, Status
 from models.models import (PlannedIssue, PlannedIssuesQueue, PlannedTask,
                            PlannedTaskQueue)
 from models.planner_models import BacklogList, Segregation
-from prompts.planner_prompts import PlannerPrompts
 from tools.file_system import FS
 from utils.logs.logging_utils import logger
 
 
-class PlannerAgent(BaseAgent[PlannerState, PlannerPrompts]):
-    """
-    PlannerAgent handles the breakdown of tasks, requirement analysis, and preparation of planned issues 
-    for efficient execution.
-    """
+class PlannerWorkFlow(BaseWorkFlow[PlannerPrompts]):
+
     def __init__(
         self,
         agent_id: str,
         agent_name: str,
-        llm: LLM
-    ) -> None:
-        
+        llm: LLM,
+        use_rag = False
+    ):
+        super().__init__(agent_id, agent_name, PlannerPrompts(use_rag), llm, use_rag)
+        self.file_count = 0
+
+    @route_on_errors
+    def router(self, state: PlannerState) -> str:
         """
-        Initializes the PlannerAgent with the given parameters.
+        Routes the planner workflow to the appropriate node based on the current state.
+
+        The router inspects the operational mode and current mode stage within the PlannerState,
+        and determines the next node in the workflow. The routing logic is as follows:
+
+        For TASK_PLANNING:
+        - If the current mode stage is TASK_BREAKDOWN, route to the TASK_BREAKDOWN node.
+        - If the current mode stage is REQUIREMENTS_ANALYZER, route to the REQUIREMENTS_ANALYZER node.
+        - If the current mode stage is FINISHED (using IssuePlanningStage.FINISHED in this branch), route to the EXIT node.
+
+        For ISSUE_PLANNING:
+        - If the current mode stage is ISSUE_BREAKDOWN, route to the ISSUE_BREAKDOWN node.
+        - If the current mode stage is FINISHED, route to the EXIT node.
+
+        If an unexpected operational mode or mode stage is encountered, a warning is logged and
+        the router defaults to the EXIT node.
 
         Args:
-            agent_id (str): Unique identifier for the agent.
-            agent_name (str): Name of the agent.
-            llm (LLM): Language model instance for generating responses.
+            state (PlannerState): The current state of the planner, which includes the operational mode
+                                    and the current mode stage.
+
+        Returns:
+            str: The string representation of the next node in the planner workflow.
         """
-        super().__init__(
-            agent_id,
-            agent_name,
-            PlannerState(),
-            PlannerPrompts(),
-            llm
-        )
+        logger.debug("Routing invoked with operational_mode: %s and current_mode_stage: %s",
+                    state.operational_mode, state.current_mode_stage)
+                    
+        if state.operational_mode == PlannerMode.TASK_PLANNING:
+            logger.debug("Operational mode set to TASK_PLANNING")
+            if state.current_mode_stage == TaskPlanningStage.TASK_BREAKDOWN:
+                logger.debug("Current stage is TASK_BREAKDOWN; routing to TASK_BREAKDOWN node")
+                return str(PlannerNodeEnum.TASK_BREAKDOWN)
+            elif state.current_mode_stage == TaskPlanningStage.REQUIREMENTS_ANALYZER:
+                logger.debug("Current stage is REQUIREMENTS_ANALYZER; routing to REQUIREMENTS_ANALYZER node")
+                return str(PlannerNodeEnum.REQUIREMENTS_ANALYZER)
+            elif state.current_mode_stage == IssuePlanningStage.FINISHED:
+                logger.debug("Current stage is FINISHED (from IssuePlanningStage); routing to EXIT node")
+                return str(PlannerNodeEnum.EXIT)
+            else:
+                logger.warning("Unexpected Task Planning stage encountered: %s. Defaulting to EXIT node.",
+                            state.current_mode_stage)
+        elif state.operational_mode == PlannerMode.ISSUE_PLANNING:
+            logger.debug("Operational mode set to ISSUE_PLANNING")
+            if state.current_mode_stage == IssuePlanningStage.ISSUE_BREAKDOWN:
+                logger.debug("Current stage is ISSUE_BREAKDOWN; routing to ISSUE_BREAKDOWN node")
+                return str(PlannerNodeEnum.ISSUE_BREAKDOWN)
+            elif state.current_mode_stage == IssuePlanningStage.FINISHED:
+                logger.debug("Current stage is FINISHED; routing to EXIT node")
+                return str(PlannerNodeEnum.EXIT)
+            else:
+                logger.warning("Unexpected Issue Planning stage encountered: %s. Defaulting to EXIT node.",
+                            state.current_mode_stage)
 
-        self.task_breakdown_node_name = "task_breakdown"
-        self.requirements_analyzer_node_name = "requirements_analyzer"
-        self.issues_preparation_node_name = "issues_preparation"
-        self.agent_response_node_name = "agent_response"
-        self.update_state_node_name = "update_state"
+        logger.debug("No matching stage found; routing to EXIT node by default")
+        return str(PlannerNodeEnum.EXIT)
 
-        self.error_count = 0
-        self.max_retries = 3
-        self.error_messages = []
-        self.file_count = 0
+    @record_node(PlannerNodeEnum.ENTRY)
+    def entry_node(self, state: PlannerState) -> PlannerState:
+        """
+        Entry node for the Planner Workflow.
+
+        This method initializes the planner's operational mode and current mode stage based on the
+        project's status and the current task's status. Specifically:
+
+        - For a project in the EXECUTING status:
+            - If the current task is NEW, the planner switches to TASK_PLANNING mode and sets the stage to TASK_BREAKDOWN.
+            - Otherwise, a warning is logged indicating an unexpected task status.
         
-        logger.info(f"{self.agent_name}: PlannerAgent initialized successfully.")
+        - For a project in the RESOLVING status:
+            - If the current task is NEW, the planner switches to ISSUE_PLANNING mode and sets the stage to ISSUE_BREAKDOWN.
+            - Otherwise, a warning is logged indicating an unexpected task status.
+        
+        - For any other project status, a warning is logged.
 
-    def write_workpackages_to_files(
+        Args:
+            state (PlannerState): The current state of the planner, including project and task statuses.
+
+        Returns:
+            PlannerState: The updated planner state with the operational mode and mode stage set accordingly.
+        """
+        logger.debug("Entering entry_node with project_status: %s and task_status: %s",
+                    state.project_status, state.current_task.task_status)
+
+        if state.project_status == PStatus.EXECUTING:
+            logger.debug("Project status is EXECUTING")
+            if state.current_task.task_status == Status.NEW:
+                logger.debug("Task status is NEW. Switching to TASK_PLANNING mode with TASK_BREAKDOWN stage.")
+                state.operational_mode = PlannerMode.TASK_PLANNING
+                state.current_mode_stage = TaskPlanningStage.TASK_BREAKDOWN
+            else:
+                logger.warning("Unexpected task status '%s' for a project in EXECUTING status.",
+                            state.current_task.task_status)
+        elif state.project_status == PStatus.RESOLVING:
+            logger.debug("Project status is RESOLVING")
+            if state.current_task.task_status == Status.NEW:
+                logger.debug("Task status is NEW. Switching to ISSUE_PLANNING mode with ISSUE_BREAKDOWN stage.")
+                state.operational_mode = PlannerMode.ISSUE_PLANNING
+                state.current_mode_stage = IssuePlanningStage.ISSUE_BREAKDOWN
+            else:
+                logger.warning("Unexpected task status '%s' for a project in RESOLVING status.",
+                            state.current_task.task_status)
+        else:
+            logger.warning("Unexpected project status '%s'. No changes made to the operational mode or stage.",
+                        state.project_status)
+
+        logger.debug("Exiting entry_node with operational_mode: %s and current_mode_stage: %s",
+                    state.operational_mode, state.current_mode_stage)
+        return state
+
+    @record_node(PlannerNodeEnum.TASK_BREAKDOWN)
+    @handle_errors_and_reset
+    def task_breakdown_node(self, state: PlannerState) -> PlannerState:
+        """
+        Process the task breakdown stage of the planning workflow.
+
+        In this node, the planner invokes a language model (LLM) using the task breakdown prompt,
+        passing in the current task description, requirements document (formatted as Markdown), any
+        additional information, and feedback from previous errors. The LLM's response is expected to
+        be a string representation of a list of backlog items. This response is parsed and used to update
+        the state's planned backlogs. After processing the LLM response, the state is advanced to the
+        REQUIREMENTS_ANALYZER stage.
+
+        Args:
+            state (PlannerState): The current state of the planner, which includes details about the current task,
+                                    requirements, and any error messages.
+
+        Returns:
+            PlannerState: The updated planner state with the planned backlogs and the current mode stage set to
+                        REQUIREMENTS_ANALYZER.
+        """
+        logger.debug("Entering task_breakdown_node with task description: %s", state.current_task.description)
+    
+        llm_response = self.invoke(
+            self.prompts.task_breakdown_prompt,
+            {
+                "deliverable": state.current_task.description,
+                "context": f"{state.requirements_document.to_markdown()}\n\n{state.additional_information}",
+                "feedback": state.error_message
+            }, 'string'
+        )
+        logger.debug("Received LLM response: %s", llm_response.response)
+
+        backlogs_list = ast.literal_eval(llm_response.response)
+        logger.debug("Parsed LLM response into backlogs_list: %s", backlogs_list)
+
+        state.planned_backlogs = BacklogList(backlogs=backlogs_list).backlogs
+        logger.info("Updated planned_backlogs in state.")
+
+        state.current_mode_stage = TaskPlanningStage.REQUIREMENTS_ANALYZER
+        logger.debug("Updated current_mode_stage to: %s", state.current_mode_stage)
+
+        logger.debug("Exiting task_breakdown_node with updated state.")
+        return state
+
+    @record_node(PlannerNodeEnum.REQUIREMENTS_ANALYZER)
+    @handle_errors_and_reset
+    def requirements_analyzer_node(self, state: PlannerState) -> PlannerState:
+        """
+        Analyze detailed requirements for each backlog item and update the planner state with planned tasks.
+
+        For each backlog item in the state's planned backlogs, this node:
+        1. Invokes the detailed requirements prompt via the language model (LLM) to gather additional
+            information on the task.
+        2. Cleans and parses the LLM's JSON response.
+        3. Determines if function generation is required for the given backlog using the _task_segregation method.
+        4. Creates a new PlannedTask using the parsed details and augments its description with the parsed
+            response along with task identifiers.
+        5. Adds the newly created PlannedTask to the state's planned tasks queue.
+
+        After processing all backlog items, the method:
+        - Writes the planned tasks (work packages) to files.
+        - Updates the state's file count with the total number of files written.
+        - Transitions the state's current mode stage to FINISHED.
+
+        Args:
+            state (PlannerState): The current planner state containing the planned backlogs, task details, and other relevant information.
+
+        Returns:
+            PlannerState: The updated planner state including the newly added planned tasks and file count.
+        """
+        logger.debug("Entering requirements_analyzer_node with %d planned backlog item(s).", len(state.planned_backlogs))
+      
+        for backlog in state.planned_backlogs:
+            logger.debug("Processing backlog item: '%s'", backlog)
+            
+            llm_response = self.invoke(
+                self.prompts.detailed_requirements_prompt,
+                {
+                    'backlog': backlog,
+                    'deliverable': state.current_task.description,
+                    'context': f"{state.requirements_document.to_markdown()}\n\n{state.additional_information}",
+                    'feedback': state.error_message
+                },
+                'string'
+            )
+            logger.debug("Received LLM response for backlog '%s': %s", backlog, llm_response.response)
+        
+
+            cleaned_response = self._clean_json_response(llm_response.response)
+            logger.debug("Cleaned LLM response for backlog '%s': %s", backlog, cleaned_response)
+        
+            parsed_response: dict = json.loads(cleaned_response)
+            logger.debug("Parsed response for backlog '%s': %s", backlog, parsed_response)
+
+            is_function_generation_required = self._task_segregation(backlog, parsed_response)
+            logger.debug("Function generation required for backlog '%s': %s", backlog, is_function_generation_required)
+
+            planned_task = PlannedTask(
+                parent_task_id=state.current_task.task_id,
+                task_status=Status.NEW,
+                is_function_generation_required=is_function_generation_required
+            )
+            logger.debug("Created PlannedTask with task ID: %s", planned_task.task_id)
+        
+            task_details = {
+                "task_id": planned_task.task_id,
+                "work_package_name": backlog,
+                **parsed_response
+            }
+            planned_task.description = json.dumps(task_details)
+            logger.debug("Updated PlannedTask description for backlog '%s': %s", backlog, planned_task.description)
+        
+            state.planned_tasks.add_item(planned_task)
+            logger.info("Added PlannedTask for backlog '%s' with task ID: %s", backlog, planned_task.task_id)
+
+        files_written, total_files_written = self._write_workpackages_to_files(state.project_directory, state.planned_tasks)
+        state.file_count = total_files_written
+        logger.info("Work packages written to files. Files written: %d, Total files: %d", files_written, total_files_written)
+
+        state.current_mode_stage = TaskPlanningStage.FINISHED
+        logger.debug("Transitioned current_mode_stage to FINISHED")
+        
+        logger.debug("Exiting requirements_analyzer_node")
+        return state
+
+    @record_node(PlannerNodeEnum.ISSUE_BREAKDOWN)
+    @handle_errors_and_reset
+    def issues_preparation_node(self, state: PlannerState) -> PlannerState:
+        """
+        Prepare issues by segregating issue details and generating planned issues.
+
+        This node processes the current issue by:
+        1. Reading the file content from the current issue's file path.
+        2. Invoking the language model (LLM) using the issues segregation prompt with the issue details
+            and file content. The LLM response is validated against the Segregation model.
+        3. Creating a new PlannedIssue using the current issue's data combined with the LLM's validated response.
+        4. Adding the newly created PlannedIssue to the state's collection of planned issues.
+
+        Args:
+            state (PlannerState): The current state of the planner, which includes the current issue.
+
+        Returns:
+            PlannerState: The updated state with the new planned issue added.
+        """
+        logger.debug("Entering issues_preparation_node for issue_id: %s", state.current_issue.issue_id)
+
+        file_content = FS.read_file(state.current_issue.file_path)
+        logger.debug("Read file content from %s", state.current_issue.file_path)
+        
+        llm_output = self.invoke_with_pydantic_model(
+            self.prompts.issues_segregation_prompt,
+            {
+                "issue_details": state.current_issue.issue_details(),
+                "file_content": file_content
+            },
+            Segregation
+        )
+        logger.debug("LLM output received for issue_id %s: %s", state.current_issue.issue_id, llm_output.response)
+    
+        validated_response = llm_output.response
+        logger.debug("Validated response: %s", validated_response)
+    
+        planned_issue = PlannedIssue(
+            parent_id=state.current_issue.issue_id,
+            status=Status.NEW,
+            file_path=state.current_issue.file_path,
+            line_number=state.current_issue.line_number,
+            description=state.current_issue.description,
+            suggestions=state.current_issue.suggestions,
+            is_function_generation_required=validated_response.requires_function_creation
+        )
+        logger.info("Created PlannedIssue for issue_id %s with status %s", state.current_issue.issue_id, planned_issue.status)
+    
+        state.planned_issues.add_item(planned_issue)
+        logger.info("Added PlannedIssue with parent_id %s to planned issues", planned_issue.parent_id)
+        
+        state.current_mode_stage = IssuePlanningStage.FINISHED
+        logger.debug("Exiting issues_preparation_node")
+        return state
+
+    @record_node(PlannerNodeEnum.EXIT)
+    def exit_node(self, state: PlannerState) -> PlannerOutput:
+        """
+        Finalize the planning process and update the status of the current task or issue.
+
+        Depending on the operational mode and the current mode stage, this node sets the status of:
+        - The current task (in TASK_PLANNING mode):
+            - To INPROGRESS if the TaskPlanningStage is FINISHED.
+            - To ABANDONED if the TaskPlanningStage is not FINISHED.
+        - The current issue (in ISSUE_PLANNING mode):
+            - To INPROGRESS if the IssuePlanningStage is FINISHED.
+            - To ABANDONED if the IssuePlanningStage is not FINISHED.
+
+        If an unknown operational mode is encountered, a warning is logged.
+
+        Args:
+            state (PlannerState): The current state of the planner, including operational mode and current mode stage.
+
+        Returns:
+            PlannerOutput: The updated state with the task or issue status adjusted accordingly.
+        """
+        logger.debug("Entering exit_node with operational_mode: %s and current_mode_stage: %s",
+                    state.operational_mode, state.current_mode_stage)
+
+        if state.operational_mode == PlannerMode.TASK_PLANNING:
+            logger.debug("Operational mode: TASK_PLANNING")
+            if state.current_mode_stage == TaskPlanningStage.FINISHED:
+                state.current_task.task_status = Status.INPROGRESS
+                logger.info("Task planning finished; setting current task status to INPROGRESS.")
+            else:
+                state.current_task.task_status = Status.ABANDONED
+                logger.info("Task planning not finished; setting current task status to ABANDONED.")
+        elif state.operational_mode == PlannerMode.ISSUE_PLANNING:
+            logger.debug("Operational mode: ISSUE_PLANNING")
+            if state.current_mode_stage == IssuePlanningStage.FINISHED:
+                state.current_issue.issue_status = Status.INPROGRESS
+                logger.info("Issue planning finished; setting current issue status to INPROGRESS.")
+            else:
+                state.current_issue.issue_status = Status.ABANDONED
+                logger.info("Issue planning not finished; setting current issue status to ABANDONED.")
+        else:
+            logger.warning("Unknown operational mode encountered: %s", state.operational_mode)
+
+        logger.debug("Exiting exit_node with updated state: %s", state)
+        return state
+
+    def _clean_json_response(self, response: str) -> str:
+        """
+        Cleans a JSON response string by removing unnecessary code block markers.
+
+        Args:
+            response (str): JSON response string.
+
+        Returns:
+            str: Cleaned JSON string.
+        """
+        logger.info(f"{self.agent_name}: Cleaning JSON response.")
+        cleaned_response = response.strip()
+
+        if cleaned_response.startswith('```json') and cleaned_response.endswith('```'):
+            cleaned_json = cleaned_response.removeprefix('```json').removesuffix('```').strip()
+            logger.debug(f"{self.agent_name}: Removed JSON code block markers.")
+        else:
+            cleaned_json = cleaned_response
+
+        return cleaned_json
+
+    def _task_segregation(self, workpackage_name: str, requirements: dict) -> bool:
+        """
+        Determines if a work package requires function creation.
+
+        Args:
+            workpackage_name (str): Name of the work package.
+            requirements (dict): Detailed requirements for the work package.
+
+        Returns:
+            bool: True if function creation is required, otherwise False.
+        """
+        logger.info(f"{self.agent_name}: Initiating task segregation for work package: {workpackage_name}")
+
+        max_retries = 3
+        while(True):
+            try:
+                llm_output = self.invoke_with_pydantic_model(
+                    self.prompts.segregation_prompt,
+                    {"work_package": f"{workpackage_name} \n {requirements}"},
+                    Segregation
+                )
+
+                validated_response = llm_output.response
+                logger.info(f"{self.agent_name}: Segregation result for work package '{workpackage_name}': {validated_response}")
+
+                self.error_count = 0
+                self.error_messages = []
+
+                return validated_response.requires_function_creation
+            except Exception as e:
+                logger.error(f"{self.agent_name}: Error during task segregation for work package '{workpackage_name}': {e}")
+                self.error_count += 1
+                self.error_messages.append(str(e))
+
+                if self.error_count >= max_retries:
+                    logger.error(f"{self.agent_name}: Max retries reached for work package '{workpackage_name}'.")
+                    self.error_count = 0
+                    return False
+
+    def _write_workpackages_to_files(
         self,
         output_dir: str,
         planned_tasks: PlannedTaskQueue
@@ -106,318 +483,3 @@ class PlannerAgent(BaseAgent[PlannerState, PlannerPrompts]):
             self.file_count += 1
             session_file_count += 1
         return session_file_count, self.file_count
-    
-    def new_deliverable_check(self, state: PlannerState) -> str:
-        """
-        Determines the next node in the workflow based on the project status and current task/issue.
-
-        Args:
-            state (PlannerState): Current state of the planner.
-
-        Returns:
-            str: Name of the next node.
-        """
-        self.error_messages = []
-        self.file_count = BaseAgent.ensure_value(state['file_count'], 0)
-
-        if state['project_status'] == PStatus.EXECUTING:
-            if state['current_task'].task_status == Status.NEW:
-                logger.info(f"{self.agent_name}: New deliverable detected. Proceeding to task breakdown.")
-                return self.task_breakdown_node_name
-            return self.requirements_analyzer_node_name
-        elif state['project_status'] == PStatus.RESOLVING:
-            if state['current_issue'].issue_status == Status.NEW:
-                logger.info(f"{self.agent_name}: New issue detected. Preparing planned issues.")
-                return self.issues_preparation_node_name
-        
-        logger.warning(f"{self.agent_name}: Invalid state detected. Unable to determine the next node.")
-        return ""
-
-    # TODO - MEDIUM: We have to segeregate the backlogs into categories
-    # like Documents, Coding, Config so on. all possible options
-    def task_breakdown_node(self, state: PlannerState) -> PlannerState:
-        """
-        Handles the breakdown of deliverables into planned tasks.
-
-        Args:
-            state (PlannerState): Current state of the planner.
-
-        Returns:
-            PlannerState: Updated state with planned tasks.
-        """
-        state['mode'] = 'preparing_planned_tasks'
-        state['planned_tasks'] = PlannedTaskQueue()
-
-        while True:
-            try:
-                logger.info(f"{self.agent_name}: Building backlogs for the deliverable: {state['current_task'].description}")
-                llm_output = self.llm.invoke(self.prompts.task_breakdown_prompt, {
-                    "deliverable": state['current_task'].description,
-                    "context": state['context'],
-                    "feedback": self.error_messages
-                }, 'string')
-
-                backlogs_list = ast.literal_eval(llm_output.response)
-                
-                # Validate the response using Pydantic
-                state['planned_backlogs'] = BacklogList(backlogs=backlogs_list).backlogs
-                logger.info(f"{self.agent_name}: Backlogs successfully generated and validated.")
-                self.error_count = 0
-                self.error_messages = []
-                break # while loop exit
-            except (ValidationError, ValueError, SyntaxError) as e:
-                self.error_count += 1
-                error_message = f"Error generating backlogs: {e}"
-                
-                logger.error(f"{self.agent_name}: {error_message}")
-                self.error_messages.append(error_message)
-                
-                if self.error_count >= self.max_retries:
-                    logger.error(f"{self.agent_name}: Max retries reached. Halting backlog generation.")
-                    self.error_count = 0
-                    break # while loop exit
-        
-        return state
-
-    def requirements_analyzer_node(self, state: PlannerState) -> PlannerState:
-        """
-        Generates detailed requirements for each backlog in planned backlogs.
-
-        Args:
-            state (PlannerState): Current state of the planner.
-
-        Returns:
-            PlannerState: Updated state with detailed requirements.
-        """
-        state['mode'] = 'preparing_planned_tasks'
-        
-        for backlog in state['planned_backlogs']:
-            while True:
-                try:
-                    logger.info(f"{self.agent_name}: Generating detailed requirements for backlog: {backlog}")
-
-                    if state['current_task'].task_status == Status.RESPONDED:
-                        context = f"{state['context']}\n{state['current_task'].additional_info}"
-                    else:
-                        context = state['context']
-
-                    llm_output = self.llm.invoke(self.prompts.detailed_requirements_prompt, {
-                        "backlog": backlog, 
-                        "deliverable": state['current_task'].description, 
-                        "context": context, 
-                        "feedback": self.error_messages
-                    }, 'string')
-
-                    cleaned_response = self.clean_json_response(llm_output.response)
-                    parsed_response: dict = json.loads(cleaned_response)
-
-                    if "question" in parsed_response.keys():
-                        state['current_task'].task_status = Status.AWAITING
-                        state['current_task'].question = parsed_response['question']
-                        logger.info(f"{self.agent_name}: Awaiting additional information for backlog: {backlog}")
-                        return state
-                    elif "description" in parsed_response.keys():
-                        is_function_generation_required = self.task_segregation(backlog, parsed_response)
-                        planned_task = PlannedTask(
-                                parent_task_id=state['current_task'].task_id,
-                                task_status=Status.NEW,
-                                is_function_generation_required=is_function_generation_required,
-                        )
-
-                        parsed_response = {
-                            "task_id": planned_task.task_id,
-                            "work_package_name": backlog,
-                            **parsed_response
-                        }
-
-                        planned_task.description = json.dumps(parsed_response)
-                        state['planned_tasks'].add_item(planned_task)
-
-                        logger.info(f"{self.agent_name}: Detailed requirements generated and added for backlog: {backlog}")
-                        self.error_count = 0
-                        self.error_messages = []
-                        break # for while loop
-                except Exception as e:
-                    self.error_count += 1
-                    error_message = f"Error in detailed requirements: {e}"
-                    logger.error(f"{self.agent_name}: {error_message}")
-                    self.error_messages.append(error_message)
-
-                    if self.error_count >= self.max_retries:
-                        logger.error(f"{self.agent_name}: Max retries reached for backlog: {backlog}")
-                        self.error_count = 0
-                        return state             
-
-        files_written, total_files_written = self.write_workpackages_to_files(state['project_path'], state['planned_tasks'])
-        state['file_count'] = total_files_written
-        logger.info(f"{self.agent_name}:Wrote %d work packages. Total files written: %d", files_written, total_files_written)
-
-        state['current_task'].task_status = Status.INPROGRESS
-        return state
-
-    def issues_preparation_node(self, state: PlannerState) -> PlannerState:
-        """
-        Prepares planned issues for resolving a detected issue in the project.
-
-        Args:
-            state (PlannerState): Current state of the planner.
-
-        Returns:
-            PlannerState: Updated state with planned issues.
-        """
-        state['mode'] = 'preparing_planned_issues'
-        state['planned_issues'] = PlannedIssuesQueue()
-       
-        while True:
-            try:
-                logger.info(f"{self.agent_name}: Preparing planned issues for issue ID: {state['current_issue'].issue_id}.")
-                logger.debug(f"{self.agent_name}: Issue Details: {state['current_issue']}")
-
-                llm_output = self.llm.invoke_with_pydantic_model(
-                    self.prompts.issues_segregation_prompt,
-                    {
-                        "issue_details": state['current_issue'].issue_details(),
-                        "file_content": FS.read_file(state['current_issue'].file_path)
-                    },
-                    Segregation
-                )
-
-                validated_response = llm_output.response
-                logger.info(f"{self.agent_name}: Issue ID {state['current_issue'].issue_id} segregated successfully. Details: {validated_response}")
-
-                planned_issue = PlannedIssue(
-                    parent_id=state['current_issue'].issue_id,
-                    status=Status.NEW,
-                    file_path=state['current_issue'].file_path,
-                    line_number=state['current_issue'].line_number,
-                    description=state['current_issue'].description,
-                    suggestions=state['current_issue'].suggestions,
-                    is_function_generation_required=validated_response.requires_function_creation
-                )
-
-                state['planned_issues'].add_item(planned_issue)
-
-                self.error_count = 0
-                self.error_messages = []
-
-                break  # while loop exit
-            except FileNotFoundError as ffe:
-                logger.error(f"{self.agent_name}: File not found while processing issue ID {state['current_issue'].issue_id}: {ffe}")
-                self.error_count += 1
-                self.error_messages.append(str(ffe))
-            except Exception as e:
-                logger.error(f"{self.agent_name}: Error processing issue ID {state['current_issue'].issue_id}: {e}")
-                self.error_count += 1
-                self.error_messages.append(str(e))
-
-                if self.error_count >= self.max_retries:
-                    logger.error(f"{self.agent_name}: Max retries reached for issue ID {state['current_issue'].issue_id}. Halting processing.")
-                    self.error_count = 0
-                    return state
-              
-        state['current_issue'].issue_status = Status.INPROGRESS
-        return state
-
-    def agent_response_node(self, state: PlannerState) -> PlannerState:
-        """
-        Finalizes the agent's response based on the state of planned tasks or issues.
-
-        Args:
-            state (PlannerState): Current state of the planner.
-
-        Returns:
-            PlannerState: Updated state with finalized task or issue status.
-        """
-        logger.info(f"{self.agent_name}: Preparing response for the current state.")
-
-        if state['mode'] == 'preparing_planned_tasks':
-            # After attempting to handle the current task with planner chains, check the task's status.
-            # If the task status is:
-            # - Status.INPROGRESS: The planner has successfully prepared planned tasks.
-            # - Status.AWAITING: The task is waiting for some condition or input before it can proceed.
-            # - Status.NEW: An error occurred during the task execution, and it was not handled properly.
-            # In the case of Status.NEW, we need to abandon the task since it could not be successfully addressed by the planner.
-            if state['current_task'].task_status == Status.NEW:
-                state['current_task'].task_status = Status.ABANDONED
-                logger.warning(f"{self.agent_name}: Task abandoned as it could not be successfully addressed.")
-        elif state['mode'] == 'preparing_planned_issues':
-            if state['current_issue'].issue_status == Status.NEW:
-                state['current_issue'].issue_status = Status.ABANDONED
-                logger.warning(f"{self.agent_name}: Issue abandoned as it could not be successfully addressed.")
-
-        return state
-    
-    def parse_backlog_tasks(self, response: str) -> List[str]:
-
-        # Split the response into lines
-        lines = response.split('\n')
-        
-        # Extract tasks using regex
-        tasks = []
-        for line in lines:
-            # Match lines that start with numbers or bullet points
-            match = re.match(r'^(\d+\.|\*|\-)\s*\*{0,2}([^:]+)(:|\*{0,2})', line.strip())
-            if match:
-                task = match.group(2).strip()
-                tasks.append(task)
-        
-        return tasks
-    
-    def task_segregation(self, workpackage_name: str, requirements: dict) -> bool:
-        """
-        Determines if a work package requires function creation.
-
-        Args:
-            workpackage_name (str): Name of the work package.
-            requirements (dict): Detailed requirements for the work package.
-
-        Returns:
-            bool: True if function creation is required, otherwise False.
-        """
-        logger.info(f"{self.agent_name}: Initiating task segregation for work package: {workpackage_name}")
-
-        while(True):
-            try:
-                llm_output = self.llm.invoke_with_pydantic_model(
-                    self.prompts.segregation_prompt,
-                    {"work_package": f"{workpackage_name} \n {requirements}"},
-                    Segregation
-                )
-
-                validated_response = llm_output.response
-                logger.info(f"{self.agent_name}: Segregation result for work package '{workpackage_name}': {validated_response}")
-
-                self.error_count = 0
-                self.error_messages = []
-
-                return validated_response.requires_function_creation
-            except Exception as e:
-                logger.error(f"{self.agent_name}: Error during task segregation for work package '{workpackage_name}': {e}")
-                self.error_count += 1
-                self.error_messages.append(str(e))
-
-                if self.error_count >= self.max_retries:
-                    logger.error(f"{self.agent_name}: Max retries reached for work package '{workpackage_name}'.")
-                    self.error_count = 0
-                    return False
-
-    def clean_json_response(self, response: str) -> str:
-        """
-        Cleans a JSON response string by removing unnecessary code block markers.
-
-        Args:
-            response (str): JSON response string.
-
-        Returns:
-            str: Cleaned JSON string.
-        """
-        logger.info(f"{self.agent_name}: Cleaning JSON response.")
-        cleaned_response = response.strip()
-
-        if cleaned_response.startswith('```json') and cleaned_response.endswith('```'):
-            cleaned_json = cleaned_response.removeprefix('```json').removesuffix('```').strip()
-            logger.debug(f"{self.agent_name}: Removed JSON code block markers.")
-        else:
-            cleaned_json = cleaned_response
-
-        return cleaned_json
