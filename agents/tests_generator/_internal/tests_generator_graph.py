@@ -2,158 +2,121 @@
 
 from langgraph.graph import END, StateGraph
 
-from agents.base.base_graph import BaseGraph
-from agents.tests_generator.tests_generator_agent import TestCoderAgent
-from agents.tests_generator.tests_generator_state import TestCoderState
-from llms.llm import LLM
+from agents.tests_generator._internal.tests_generator_node_enum import \
+    TestsGeneratorNodeEnum
+from agents.tests_generator._internal.tests_generator_state import (
+    TestCoderInput, TestCoderOutput, TestCoderState)
+from agents.tests_generator._internal.tests_generator_work_flow import \
+    TestCoderWorkFlow
+from core.graph import BaseGraph
 from utils.logs.logging_utils import logger
 
 
-class TestCoderGraph(BaseGraph[TestCoderAgent]):
+class TestCoderGraph(BaseGraph[TestCoderWorkFlow]):
     """
-    Defines the workflow for the TestCoder agent, managing the flow of tasks
-    such as skeleton generation, test code generation, and writing test code.
-    """
+    Graph representation for the Test Coder workflow.
 
+    This graph defines the state transitions for the Test Coder agent's workflow,
+    including nodes for entry, skeleton generation/updation, test code generation/updation,
+    writing generated code, and exit. The graph leverages the TestCoderWorkFlow to set up
+    the nodes and transitions, enabling conditional routing based on the workflow's state.
+    """
     def __init__(
         self,
-        graph_id: str,
-        graph_name: str,
-        agent_id: str,
-        agent_name: str,
-        llm: LLM,
-        persistance_db_path: str
-    ) -> None:
+        work_flow: TestCoderWorkFlow,
+        recursion_limit: int,
+        persistence_db_path: str
+    ):
         """
-        Initializes the TestCoderGraph and compiles it with persistence.
+        Initialize the TestCoderGraph.
 
         Args:
-            graph_id (str): Unique identifier for the graph.
-            graph_name (str): Descriptive name of the graph.
-            agent_id (str): Unique identifier for the agent.
-            agent_name (str): Descriptive name of the agent.
-            llm (LLM): The language model used by the agent.
-            persistance_db_path (str): Path for persisting graph state.
+            work_flow (TestCoderWorkFlow): The workflow object containing node implementations.
+            recursion_limit (int): The recursion limit for the graph processing.
+            persistence_db_path (str): The path to the persistence database.
         """
-        logger.info(f"Initializing TestCoderGraph with ID: {graph_id}, Name: {graph_name}")
-        super().__init__(
-            graph_id,
-            graph_name,
-            TestCoderAgent(agent_id, agent_name, llm),
-            persistance_db_path
+        logger.debug(
+            "Initializing TestCoderGraph with recursion_limit: %s and persistence_db_path: %s",
+            recursion_limit, persistence_db_path
         )
-
-        self.compile_graph_with_persistence()
-        logger.info("TestCoderGraph compiled with persistence successfully.")
+        super().__init__(work_flow, recursion_limit, persistence_db_path)
 
     def define_graph(self) -> StateGraph:
         """
-        Defines the state graph for the TestCoder agent.
+        Define the state graph for the Test Coder workflow.
+
+        This method creates a StateGraph using TestCoderState for state management,
+        TestCoderInput as the input schema, and TestCoderOutput as the output schema.
+        It adds the workflow nodes (entry, skeleton generation/updation, test code generation/updation,
+        code writing, and exit), configures the edges between nodes—including conditional edges
+        determined by the workflow's router—and sets the entry and finish points.
 
         Returns:
-            StateGraph: Configured state graph for the agent.
+            StateGraph: The fully defined state graph for the Test Coder workflow.
         """
-        logger.info("Defining the TestCoderGraph workflow...")
-        unit_test_coder_flow = StateGraph(TestCoderState)
+        logger.debug("Defining the TestCoderGraph state graph.")
+        tests_generator_work_flow = StateGraph(TestCoderState, input=TestCoderInput, output=TestCoderOutput)
 
-        # node
-        logger.debug("Adding nodes to the graph...")
-        unit_test_coder_flow.add_node(
-            self.agent.entry_node_name,
-            self.agent.entry_node
-        )
-        unit_test_coder_flow.add_node(
-            self.agent.skeleton_generation_node_name,
-            self.agent.skeleton_generation_node
-        )
-        unit_test_coder_flow.add_node(
-            self.agent.test_code_generation_node_name,
-            self.agent.test_code_generation_node
-        )
-        unit_test_coder_flow.add_node(
-            self.agent.skeleton_updation_node_name,
-            self.agent.skeleton_updation_node
-        )
-        unit_test_coder_flow.add_node(
-            self.agent.test_code_updation_node_name,
-            self.agent.test_code_updation_node
-        )
-        unit_test_coder_flow.add_node(
-            self.agent.write_skeleton_node_name,
-            self.agent.write_skeleton_node
-        )
-        unit_test_coder_flow.add_node(
-            self.agent.write_generated_code_node_name,
-            self.agent.write_code_node
-        )
-        unit_test_coder_flow.add_node(
-            self.agent.update_state_node_name, 
-            self.agent.update_state
-        )
+        nodes = {
+            TestsGeneratorNodeEnum.ENTRY: self.work_flow.entry_node,
+            TestsGeneratorNodeEnum.SKELETON_GENERATION: self.work_flow.skeleton_generation_node,
+            TestsGeneratorNodeEnum.SKELETON_UPDATION: self.work_flow.skeleton_updation_node,
+            TestsGeneratorNodeEnum.WRITE_SKELETON: self.work_flow.write_skeleton_node,
+            TestsGeneratorNodeEnum.TEST_CODE_GENERATION: self.work_flow.test_code_generation_node,
+            TestsGeneratorNodeEnum.TEST_CODE_UPDATION: self.work_flow.test_code_updation_node,
+            TestsGeneratorNodeEnum.WRITE_GENERATED_CODE: self.work_flow.write_generated_code_node,
+            TestsGeneratorNodeEnum.EXIT: self.work_flow.exit_node
+        }
 
-        # edges
-        logger.debug("Adding edges between nodes...")
-        unit_test_coder_flow.add_conditional_edges(
-            self.agent.entry_node_name,
-            self.agent.router,
+        for node_name, node_function in nodes.items():
+            tests_generator_work_flow.add_node(str(node_name), node_function)
+            logger.debug("Added node: %s", node_name)
+
+        tests_generator_work_flow.add_conditional_edges(
+            str(TestsGeneratorNodeEnum.ENTRY),
+            self.work_flow.router,
             {
-                self.agent.skeleton_generation_node_name:
-                    self.agent.skeleton_generation_node_name,
-                self.agent.skeleton_updation_node_name:
-                    self.agent.skeleton_updation_node_name,
+                str(TestsGeneratorNodeEnum.SKELETON_GENERATION): str(TestsGeneratorNodeEnum.SKELETON_GENERATION),
+                str(TestsGeneratorNodeEnum.SKELETON_UPDATION): str(TestsGeneratorNodeEnum.SKELETON_UPDATION)
             }
         )
 
-        unit_test_coder_flow.add_edge(
-            self.agent.skeleton_generation_node_name,
-            self.agent.write_skeleton_node_name
-        )
-        unit_test_coder_flow.add_edge(
-            self.agent.skeleton_updation_node_name,
-            self.agent.write_skeleton_node_name
+        tests_generator_work_flow.add_edge(
+            str(TestsGeneratorNodeEnum.SKELETON_GENERATION),
+            str(TestsGeneratorNodeEnum.WRITE_SKELETON)
         )
 
-        unit_test_coder_flow.add_conditional_edges(
-            self.agent.write_skeleton_node_name,
-            self.agent.router,
+        tests_generator_work_flow.add_edge(
+            str(TestsGeneratorNodeEnum.SKELETON_UPDATION),
+            str(TestsGeneratorNodeEnum.WRITE_SKELETON)
+        )
+
+        tests_generator_work_flow.add_conditional_edges(
+            str(TestsGeneratorNodeEnum.WRITE_SKELETON),
+            self.work_flow.router,
             {
-                self.agent.test_code_generation_node_name: 
-                    self.agent.test_code_generation_node_name,
-                self.agent.test_code_updation_node_name: 
-                    self.agent.test_code_updation_node_name
+                str(TestsGeneratorNodeEnum.TEST_CODE_GENERATION): str(TestsGeneratorNodeEnum.TEST_CODE_GENERATION),
+                str(TestsGeneratorNodeEnum.TEST_CODE_UPDATION): str(TestsGeneratorNodeEnum.TEST_CODE_UPDATION)
             }
         )
 
-        unit_test_coder_flow.add_edge(
-            self.agent.test_code_generation_node_name,
-            self.agent.write_generated_code_node_name
-        )
-        unit_test_coder_flow.add_edge(
-            self.agent.test_code_updation_node_name,
-            self.agent.write_generated_code_node_name
-        )
-        unit_test_coder_flow.add_edge(
-            self.agent.write_generated_code_node_name,
-            self.agent.update_state_node_name
-        )
-        unit_test_coder_flow.add_edge(
-            self.agent.update_state_node_name,
-            END
+        tests_generator_work_flow.add_edge(
+            str(TestsGeneratorNodeEnum.TEST_CODE_GENERATION),
+            str(TestsGeneratorNodeEnum.WRITE_GENERATED_CODE)
         )
 
-        # entry point
-        logger.debug("Setting the entry point for the graph.")
-        unit_test_coder_flow.set_entry_point(self.agent.entry_node_name)
+        tests_generator_work_flow.add_edge(
+            str(TestsGeneratorNodeEnum.TEST_CODE_UPDATION),
+            str(TestsGeneratorNodeEnum.WRITE_GENERATED_CODE)
+        )
 
-        logger.info("TestCoderGraph workflow defined successfully.")
-        return unit_test_coder_flow
+        tests_generator_work_flow.add_edge(
+            str(TestsGeneratorNodeEnum.WRITE_GENERATED_CODE),
+            str(TestsGeneratorNodeEnum.EXIT)
+        )
 
-    def get_current_state(self) -> TestCoderState:
-        """
-        Fetches the current state of the TestCoder agent.
+        tests_generator_work_flow.set_entry_point(str(TestsGeneratorNodeEnum.ENTRY))
+        tests_generator_work_flow.set_finish_point(str(TestsGeneratorNodeEnum.EXIT))
+        logger.debug("Set entry point to ENTRY and finish point to EXIT.")
 
-        Returns:
-            TestCoderState: Current state of the TestCoder agent.
-        """
-        logger.info("Fetching the current state of the TestCoder agent.")
-        return self.agent.state
+        return tests_generator_work_flow
