@@ -2,122 +2,118 @@
 Coder Graph
 """
 from langgraph.graph import END, StateGraph
-from langgraph.graph.graph import CompiledGraph
 
-from agents.base.base_graph import BaseGraph
-from agents.coder.coder_agent import CoderAgent
-from agents.coder.coder_state import CoderState
-from llms.llm import LLM
+from agents.coder._internal.coder_node_enum import CoderNodeEnum
+from agents.coder._internal.coder_state import (CoderInput, CoderOutput,
+                                                CoderState)
+from agents.coder._internal.coder_work_flow import CoderWorkFlow
+from core.graph import BaseGraph
 from utils.logs.logging_utils import logger
 
 
-class CoderGraph(BaseGraph[CoderAgent]):
+class CoderGraph(BaseGraph[CoderWorkFlow]):
     """
-    CoderGraph Class
+    Graph representation for the coder workflow.
 
-    Defines and manages the state graph for the CoderAgent, handling code generation,
-    issue resolution, and related workflows.
+    This class defines the state graph for a coder workflow. It sets up nodes representing each
+    step of the workflow, along with the corresponding edges, conditional transitions, and
+    entry/exit points.
     """
-
-    def __init__(self, graph_id: str, graph_name: str, agent_id: str, agent_name: str, llm: LLM, persistance_db_path: str) -> None:
+    def __init__(
+        self,
+        work_flow: CoderWorkFlow,
+        recursion_limit: int,
+        persistence_db_path: str
+    ):
         """
-        Initializes the CoderGraph with the specified parameters.
+        Initializes the CoderGraph.
 
         Args:
-            graph_id (str): Unique identifier for the graph.
-            graph_name (str): Name of the graph.
-            agent_id (str): Unique identifier for the associated agent.
-            agent_name (str): Name of the associated agent.
-            llm (LLM): Language learning model used by the agent.
-            persistance_db_path (str): Path to the persistence database for state saving.
+            work_flow (CoderWorkFlow): The coder workflow instance containing all workflow nodes.
+            recursion_limit (int): The recursion limit for processing the graph.
+            persistence_db_path (str): Path to the persistence database.
         """
-        logger.info(f"Initializing CoderGraph with ID: {graph_id} and Name: {graph_name}")
-        super().__init__(
-            graph_id,
-            graph_name, 
-            CoderAgent(agent_id, agent_name, llm),
-            persistance_db_path
+        super().__init__(work_flow, recursion_limit, persistence_db_path)
+        logger.debug(
+            "Initialized CoderGraph with recursion_limit=%d and persistence_db_path='%s'.",
+            recursion_limit,
+            persistence_db_path
         )
 
-        self.compile_graph_with_persistence()
-        logger.info(f"CoderGraph {graph_name} initialized and compiled successfully.")
-
-    def define_graph(self) -> CompiledGraph:
+    def define_graph(self) -> StateGraph:
         """
-        Defines the state graph for the CoderAgent.
+        Defines the state graph for the coder workflow.
+
+        This method sets up the state graph with nodes corresponding to each step in the coder workflow,
+        adds edges and conditional edges to define the transitions between nodes, and sets the entry and exit points.
 
         Returns:
-            CompiledGraph: The compiled state graph for the agent.
+            StateGraph: The fully defined state graph representing the coder workflow.
         """
-        logger.info(f"Defining the state graph for CoderAgent.")
-        coder_flow = StateGraph(CoderState)
+        coder_work_flow = StateGraph(CoderState, input=CoderInput, output=CoderOutput)
+        logger.debug("Created StateGraph for CoderGraph.")
 
-        # node
-        logger.debug("Adding nodes to the state graph.")
-        coder_flow.add_node(self.agent.entry_node_name, self.agent.entry_node)
-        coder_flow.add_node(self.agent.code_generation_node_name, self.agent.code_generation_node)
-        coder_flow.add_node(self.agent.general_task_node_name, self.agent.general_task_node)
-        coder_flow.add_node(self.agent.resolve_issue_node_name, self.agent.resolve_issue_node)
-        # coder_flow.add_node(self.agent.run_commands_node_name, self.agent.run_commands_node)
-        coder_flow.add_node(self.agent.write_generated_code_node_name, self.agent.write_code_node)
-        coder_flow.add_node(self.agent.add_license_node_name, self.agent.add_license_text_node)
-        coder_flow.add_node(self.agent.download_license_node_name, self.agent.download_license_node)
-        coder_flow.add_node(self.agent.agent_response_node_name, self.agent.agent_response_node)
-        coder_flow.add_node(self.agent.update_state_node_name, self.agent.update_state)
+        nodes = {
+            CoderNodeEnum.ENTRY: self.work_flow.entry_node,
+            CoderNodeEnum.CODE_GENERATION: self.work_flow.generate_code_node,
+            CoderNodeEnum.CODE_GENERATION_FROM_SKELETON: self.work_flow.generate_code_from_skeletons_node,
+            CoderNodeEnum.WRITE_GENERATED_CODE: self.work_flow.write_generated_code_node,
+            CoderNodeEnum.ADD_LICENSE: self.work_flow.add_license_text_node,
+            CoderNodeEnum.DOWNLOAD_LICENSE: self.work_flow.download_license_node,
+            CoderNodeEnum.RESOLVE_ISSUE: self.work_flow.resolve_issue_node,
+            CoderNodeEnum.EXIT: self.work_flow.exit_node,
+        }
+        for node_name, node_function in nodes.items():
+            coder_work_flow.add_node(str(node_name), node_function)
+            logger.debug("Added node: %s", node_name)
 
-        # edges
-        logger.debug("Adding conditional edges to the state graph.")
-        coder_flow.add_conditional_edges(
-            self.agent.entry_node_name,
-            self.agent.router,
+
+        coder_work_flow.add_conditional_edges(
+            str(CoderNodeEnum.ENTRY),
+            self.work_flow.router,
             {
-                self.agent.code_generation_node_name: self.agent.code_generation_node_name,
-                self.agent.general_task_node_name: self.agent.general_task_node_name,
-                self.agent.resolve_issue_node_name: self.agent.resolve_issue_node_name
+                str(CoderNodeEnum.CODE_GENERATION): str(CoderNodeEnum.CODE_GENERATION),
+                str(CoderNodeEnum.CODE_GENERATION_FROM_SKELETON): str(CoderNodeEnum.CODE_GENERATION_FROM_SKELETON),
+                str(CoderNodeEnum.RESOLVE_ISSUE): str(CoderNodeEnum.RESOLVE_ISSUE),
             }
         )
 
-        logger.debug("Adding direct edges to the state graph.")
-        coder_flow.add_edge(self.agent.general_task_node_name, self.agent.write_generated_code_node_name)
-        coder_flow.add_edge(self.agent.resolve_issue_node_name, self.agent.write_generated_code_node_name)
-        coder_flow.add_edge(self.agent.code_generation_node_name, self.agent.write_generated_code_node_name)
-        coder_flow.add_edge(self.agent.write_generated_code_node_name, self.agent.add_license_node_name)
+        coder_work_flow.add_edge(
+            str(CoderNodeEnum.CODE_GENERATION),
+            str(CoderNodeEnum.WRITE_GENERATED_CODE)
+        )
 
-        # coder_flow.add_conditional_edges(
-        #     self.agent.run_commands_node_name,
-        #     self.agent.router,
-        #     {
-        #         self.agent.run_commands_node_name: self.agent.run_commands_node_name,
-        #         self.agent.write_generated_code_node_name: self.agent.write_generated_code_node_name,
-        #     }
-        # )
+        coder_work_flow.add_edge(
+            str(CoderNodeEnum.CODE_GENERATION_FROM_SKELETON),
+            str(CoderNodeEnum.WRITE_GENERATED_CODE)
+        )
 
-        coder_flow.add_conditional_edges(
-            self.agent.add_license_node_name,
-            self.agent.router,
+        coder_work_flow.add_edge(
+            str(CoderNodeEnum.RESOLVE_ISSUE),
+            str(CoderNodeEnum.WRITE_GENERATED_CODE)
+        )
+
+        coder_work_flow.add_edge(
+            str(CoderNodeEnum.WRITE_GENERATED_CODE),
+            str(CoderNodeEnum.ADD_LICENSE)
+        )
+
+        coder_work_flow.add_conditional_edges(
+            str(CoderNodeEnum.ADD_LICENSE),
+            self.work_flow.router,
             {
-                self.agent.download_license_node_name: self.agent.download_license_node_name,
-                self.agent.agent_response_node_name: self.agent.agent_response_node_name
+                str(CoderNodeEnum.DOWNLOAD_LICENSE): str(CoderNodeEnum.DOWNLOAD_LICENSE),
+                str(CoderNodeEnum.EXIT): str(CoderNodeEnum.EXIT),
             }
         )
 
-        coder_flow.add_edge(self.agent.download_license_node_name, self.agent.agent_response_node_name)
-        coder_flow.add_edge(self.agent.agent_response_node_name, self.agent.update_state_node_name)
-        coder_flow.add_edge(self.agent.update_state_node_name, END)
+        coder_work_flow.add_edge(
+            str(CoderNodeEnum.DOWNLOAD_LICENSE),
+            str(CoderNodeEnum.EXIT)
+        )
 
-        # entry point
-        logger.debug(f"Setting entry point to {self.agent.entry_node_name}.")
-        coder_flow.set_entry_point(self.agent.entry_node_name)
+        coder_work_flow.set_entry_point(str(CoderNodeEnum.ENTRY))
+        coder_work_flow.set_finish_point(str(CoderNodeEnum.EXIT))
 
-        logger.info(f"State graph for CoderAgent defined successfully.")
-        return coder_flow
-    
-    def get_current_state(self) -> CoderState:
-        """
-        Fetches the current state of the graph.
-
-        Returns:
-            CoderState: The current state of the agent.
-        """
-        logger.info(f"Fetching the current state of the CoderGraph.")
-        return self.agent.state
+        logger.debug("Set entry point to ENTRY and finish point to EXIT.")
+        return coder_work_flow
