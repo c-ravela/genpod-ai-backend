@@ -1,13 +1,37 @@
 from langgraph.graph import END, StateGraph
 
-from agents.base.base_graph import BaseGraph
-from agents.supervisor.supervisor_agent import SupervisorAgent
-from agents.supervisor.supervisor_state import SupervisorState
-from llms.llm import LLM
+from agents.supervisor._internal.supervisor_state import (SupervisorInput,
+                                                          SupervisorOuptut,
+                                                          SupervisorState)
+from agents.supervisor._internal.supervisor_work_flow import SupervisorWorkFlow
+from core.graph import BaseGraph
 from utils.logs.logging_utils import logger
 
 
-class SupervisorWorkflow(BaseGraph[SupervisorAgent]):
+class SupervisorGraph(BaseGraph[SupervisorWorkFlow]):
+
+    def __init__(self, work_flow: SupervisorWorkFlow, recursion_limit: int, persistence_db_path: str):
+        super().__init__(work_flow, recursion_limit, persistence_db_path)
+
+    def define_graph(self) -> StateGraph:
+        supervisor_work_flow = StateGraph(SupervisorState, input=SupervisorInput, output=SupervisorOuptut)
+
+        nodes = {
+            'entry': self.work_flow.entry_node,
+            'exit': self.work_flow.exit_node
+        }
+
+        for node_name, node_function in nodes.items():
+            supervisor_work_flow.add_node(node_name, node_function)
+            logger.debug("Added node: %s", node_name)
+
+        supervisor_work_flow.set_entry_point('entry')
+        supervisor_work_flow.set_finish_point('exit')
+
+        return supervisor_work_flow
+
+
+class SupervisorWorkflow1(BaseGraph[SupervisorAgent]):
     """
     A workflow class that defines the state graph for the SupervisorAgent.
 
