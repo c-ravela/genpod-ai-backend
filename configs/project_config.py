@@ -6,6 +6,7 @@ from typing import Any, Dict, Iterator, Optional, Tuple
 from pydantic import BaseModel, Field, field_validator
 
 from llms import LLM, llm_factory
+from utils.decorators import auto_repr
 from utils.yaml_utils import read_yaml
 
 # Supported LLMs categorized by provider
@@ -532,6 +533,7 @@ class RAGAgentsConfig(Enum):
             yield agent.value
 
 
+@auto_repr
 class ProjectConfig:
     """
     Configuration for the entire project, including agent configurations and vector database settings.
@@ -652,15 +654,3 @@ class ProjectConfig:
         max_retries = provider_config.setting.max_retries or default_config.max_retries
         retry_backoff = provider_config.setting.retry_backoff or default_config.retry_backoff
         return max_retries, retry_backoff
-
-    def __repr__(self):
-        agents_repr = "\n    ".join(repr(agent.value) for agent in self.agents)
-        rag_agents_repr = "\n    ".join(repr(rag_agent.value) for rag_agent in self.rag_agents)
-        
-        return (
-            f"{self.__class__.__name__}(\n"
-            f"  max_graph_recursion_limit={self.max_graph_recursion_limit},\n"
-            f"  agents=[\n    {agents_repr}\n  ],\n"
-            f"  rag_agents=[\n    {rag_agents_repr}\n  ]\n"
-            f")"
-        )
