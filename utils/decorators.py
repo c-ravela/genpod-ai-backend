@@ -61,17 +61,17 @@ def _unwrap_enums(obj):
     - Otherwise, process containers (lists, tuples, sets, dicts) recursively.
     """
     if isinstance(obj, Enum):
-        return unwrap_enums(obj.value)
+        return _unwrap_enums(obj.value)
     elif isinstance(obj, type) and issubclass(obj, Enum):
-        return [unwrap_enums(member) for member in obj]
+        return [_unwrap_enums(member) for member in obj]
     elif isinstance(obj, list):
-        return [unwrap_enums(item) for item in obj]
+        return [_unwrap_enums(item) for item in obj]
     elif isinstance(obj, tuple):
-        return tuple(unwrap_enums(item) for item in obj)
+        return tuple(_unwrap_enums(item) for item in obj)
     elif isinstance(obj, set):
-        return {unwrap_enums(item) for item in obj}
+        return {_unwrap_enums(item) for item in obj}
     elif isinstance(obj, dict):
-        return {key: unwrap_enums(value) for key, value in obj.items()}
+        return {key: _unwrap_enums(value) for key, value in obj.items()}
     return obj
 
 def auto_repr(_cls=None, *, include_private=False):
