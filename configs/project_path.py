@@ -39,4 +39,3 @@ def set_project_path(project_path: str=os.path.join(os.getcwd(), "output", "proj
         os.makedirs(new_directory_path)
 
     return new_directory_path
-
