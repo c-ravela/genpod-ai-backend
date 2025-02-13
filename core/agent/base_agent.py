@@ -18,6 +18,7 @@ class BaseAgent(Generic[GenericAgentGraph]):
         self,
         id: str,
         name: str,
+        description: str,
         llm: LLM,
         graph: GenericAgentGraph,
         use_rag: bool = False
@@ -28,6 +29,7 @@ class BaseAgent(Generic[GenericAgentGraph]):
         Args:
             id (str): Unique identifier for the agent.
             name (str): Human-readable name for the agent.
+            description (str): A brief description of the agent's role.
             llm (LLM): Instance of a language model.
             graph (GenericAgentGraph): The graph associated with this agent.
             use_rag (bool, optional): Flag to enable retrieval-augmented generation. Defaults to False.
@@ -35,6 +37,7 @@ class BaseAgent(Generic[GenericAgentGraph]):
         logger.info("Initializing BaseAgent with id: %s, name: %s, use_rag: %s", id, name, use_rag)
         self.id = id
         self.name = name
+        self.description = description
         self.llm = llm
         self.graph = graph
         self.use_rag = use_rag
