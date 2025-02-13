@@ -7,7 +7,6 @@ from typing import Dict
 
 from pydantic import Field
 
-from agents.base.base_state import BaseState
 from core.state import BaseInputState, BaseOutputState, BaseState
 from models.coder_models import CodeGenerationPlan
 from models.models import (Issue, PlannedIssue, PlannedTask,

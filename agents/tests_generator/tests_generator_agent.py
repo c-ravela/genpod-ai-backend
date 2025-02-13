@@ -19,6 +19,7 @@ class TestsGeneratorAgent(BaseAgent[TestCoderGraph]):
         self,
         id: str,
         name: str,
+        description: str,
         llm: LLM,
         recursion_limit: int,
         persistance_db_path: str,
@@ -30,16 +31,26 @@ class TestsGeneratorAgent(BaseAgent[TestCoderGraph]):
         Args:
             id (str): Unique identifier for the agent.
             name (str): Name of the agent.
+            description (str): Brief description of the agent's functionality.
             llm (LLM): The language model instance to be used for generating tests.
             recursion_limit (int): The maximum recursion depth allowed for the graph processing.
             persistance_db_path (str): The file path to the persistence database.
             use_rag (bool, optional): Flag indicating whether to use retrieval-augmented generation. Defaults to False.
         """
-        logger.debug("Initializing TestsGeneratorAgent with id: '%s', name: '%s', recursion_limit: %d, persistance_db_path: '%s', use_rag: %s",
-                     id, name, recursion_limit, persistance_db_path, use_rag)
+        logger.debug(
+            "Initializing TestsGeneratorAgent | ID: %s | Name: %s | Recursion Limit: %d | Persistence DB: %s | RAG Enabled: %s",
+            id, name, recursion_limit, persistance_db_path, use_rag
+        )
         
         work_flow = TestCoderWorkFlow(id, name, llm, use_rag)
+        logger.debug("TestCoderWorkFlow initialized for agent: %s", name)
+        
         graph = TestCoderGraph(work_flow, recursion_limit, persistance_db_path)
+        logger.debug(
+            "TestCoderGraph created for agent: %s with recursion_limit=%d and persistence_db_path=%s",
+            name, recursion_limit, persistance_db_path
+        )
 
-        super().__init__(id, name, llm, graph, use_rag)
-        logger.info("TestsGeneratorAgent '%s' initialized successfully.", name)
+        super().__init__(id, name, description, llm, graph, use_rag)
+        
+        logger.info("TestsGeneratorAgent successfully initialized | ID: %s | Name: %s", id, name)

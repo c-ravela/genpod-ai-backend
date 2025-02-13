@@ -7,17 +7,18 @@ from utils.logs.logging_utils import logger
 
 class PlannerAgent(BaseAgent[PlannerGraph]):
     """
-    PlannerAgent orchestrates the planning workflow by integrating the PlannerWorkFlow and PlannerGraph.
+    PlannerAgent orchestrates the planning workflow by integrating PlannerWorkFlow and PlannerGraph.
 
-    This agent is responsible for initializing the planning workflow with the provided language model (LLM),
-    recursion limit, persistence database path, and optional Retrieval-Augmented Generation (RAG) settings.
-    It constructs a PlannerGraph from a PlannerWorkFlow instance and passes it to the BaseAgent for further processing.
+    This agent is responsible for initializing the planning workflow with a provided language model (LLM),
+    defining recursion limits, setting up a persistence database, and optionally enabling Retrieval-Augmented Generation (RAG).
+    It constructs a PlannerGraph from a PlannerWorkFlow instance and passes it to the BaseAgent for execution.
     """
 
     def __init__(
         self,
         id: str,
         name: str,
+        description: str,
         llm: LLM,
         recursion_limit: int,
         persistance_db_path: str,
@@ -29,21 +30,23 @@ class PlannerAgent(BaseAgent[PlannerGraph]):
         Args:
             id (str): Unique identifier for the agent.
             name (str): Name of the agent.
-            llm (LLM): Language model instance used by the agent.
-            recursion_limit (int): The maximum recursion depth allowed for the planner graph.
-            persistance_db_path (str): Path to the persistence database for storing the planner state.
-            use_rag (bool, optional): Flag indicating whether to enable Retrieval-Augmented Generation (RAG). Defaults to False.
+            description (str): Brief description of the agent's functionality.
+            llm (LLM): Language model instance utilized by the agent.
+            recursion_limit (int): Maximum depth for recursive planning operations.
+            persistance_db_path (str): File path for the persistence database storing planner state.
+            use_rag (bool, optional): Enables Retrieval-Augmented Generation (RAG) if set to True. Defaults to False.
         """
-        logger.debug(
-            "Initializing PlannerAgent with id: %s, name: %s, recursion_limit: %d, persistance_db_path: %s, use_rag: %s",
+        logger.info(
+            "Initializing PlannerAgent | ID: %s | Name: %s | Recursion Limit: %d | Persistence DB: %s | RAG Enabled: %s",
             id, name, recursion_limit, persistance_db_path, use_rag
         )
-        # Initialize the planning workflow with the provided parameters.
+        
         work_flow = PlannerWorkFlow(id, name, llm, use_rag)
-        logger.debug("Created PlannerWorkFlow for agent %s", name)
+        logger.debug("PlannerWorkFlow created for agent: %s", name)
         
         planner_graph = PlannerGraph(work_flow, recursion_limit, persistance_db_path)
-        logger.debug("Created PlannerGraph for agent %s", name)
+        logger.debug("PlannerGraph initialized for agent: %s", name)
         
-        super().__init__(id, name, llm, planner_graph, use_rag)
-        logger.info("Initialized PlannerAgent with id: %s, name: %s", id, name)
+        super().__init__(id, name, description, llm, planner_graph, use_rag)
+        
+        logger.info("PlannerAgent successfully initialized | ID: %s | Name: %s", id, name)

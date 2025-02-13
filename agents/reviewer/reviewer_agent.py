@@ -10,19 +10,12 @@ class ReviewerAgent(BaseAgent[ReviewerGraph]):
     A ReviewerAgent orchestrates the code review process by leveraging a workflow and graph-based
     approach. It utilizes an LLM to process review prompts and manage review states throughout
     the review process.
-
-    Attributes:
-        id (str): Unique identifier for the agent.
-        name (str): Human-readable name of the agent.
-        llm (LLM): Language model instance used for processing review tasks.
-        recursion_limit (int): Maximum depth of recursive operations allowed during review.
-        persistance_db_path (str): Path to the persistence database for storing review data.
-        use_rag (bool): Flag indicating whether to use Retrieval-Augmented Generation.
     """
     def __init__(
         self,
         id: str,
         name: str,
+        description: str,
         llm: LLM,
         recursion_limit: int,
         persistance_db_path: str,
@@ -37,17 +30,25 @@ class ReviewerAgent(BaseAgent[ReviewerGraph]):
         Args:
             id (str): Unique identifier for the agent.
             name (str): Human-readable name of the agent.
+            description (str): Brief description of the agent's functionality.
             llm (LLM): Instance of the language model to be used.
             recursion_limit (int): Maximum number of recursive operations allowed.
             persistance_db_path (str): File path to the persistence database.
             use_rag (bool, optional): Whether to use Retrieval-Augmented Generation. Defaults to False.
         """
         logger.info(
-            f"Initializing ReviewerAgent with id: {id}, name: {name}, "
-            f"recursion_limit: {recursion_limit}, persistance_db_path: {persistance_db_path}, use_rag: {use_rag}"
+            "Initializing ReviewerAgent | ID: %s | Name: %s | Recursion Limit: %d | Persistence DB: %s | RAG Enabled: %s",
+            id, name, recursion_limit, persistance_db_path, use_rag
         )        
+        
         work_flow = ReviewerWorkFlow(id, name, llm, use_rag)
+        logger.debug("ReviewerWorkFlow initialized for agent: %s", name)
+        
         reviewer_graph = ReviewerGraph(work_flow, recursion_limit, persistance_db_path)
+        logger.debug(
+            "ReviewerGraph created for agent: %s with recursion_limit=%d and persistence_db_path=%s",
+            name, recursion_limit, persistance_db_path
+        )
 
-        super().__init__(id, name, llm, reviewer_graph, use_rag)
-        logger.info("ReviewerAgent initialized successfully.")
+        super().__init__(id, name, description, llm, reviewer_graph, use_rag)
+        logger.info("ReviewerAgent successfully initialized | ID: %s | Name: %s", id, name)

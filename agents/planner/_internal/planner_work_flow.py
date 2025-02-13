@@ -2,12 +2,7 @@ import ast
 import codecs
 import json
 import os
-import re
-from typing import List
 
-from pydantic import ValidationError
-
-from agents.base.base_agent import BaseAgent
 from agents.planner._internal.planner_mode_enum import (IssuePlanningStage,
                                                         PlannerMode,
                                                         TaskPlanningStage)
@@ -19,8 +14,7 @@ from core.decorators import (handle_errors_and_reset, record_node,
 from core.workflow import BaseWorkFlow
 from llms.llm import LLM
 from models.constants import PStatus, Status
-from models.models import (PlannedIssue, PlannedIssuesQueue, PlannedTask,
-                           PlannedTaskQueue)
+from models.models import PlannedIssue, PlannedTask, PlannedTaskQueue
 from models.planner_models import BacklogList, Segregation
 from tools.file_system import FS
 from utils.logs.logging_utils import logger

@@ -3,13 +3,11 @@
 Agent graph state
 """
 
-from typing import Annotated, Any, Dict, Literal, TypedDict
+from typing import Dict
 
 from pydantic import Field
 
-from agents.base.base_state import BaseState
 from core.state import BaseInputState, BaseOutputState, BaseState
-from models.constants import ChatRoles, PStatus
 from models.models import PlannedIssue, PlannedTask, RequirementsDocument
 from models.tests_generator_models import FileFunctionSignatures
 
