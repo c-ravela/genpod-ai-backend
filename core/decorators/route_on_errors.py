@@ -1,8 +1,6 @@
 from functools import wraps
 
 from core.decorators.utils import validate_workflow_node_signature
-from core.state import BaseState
-from core.workflow import BaseWorkFlow
 from utils.logs.logging_utils import logger
 
 
@@ -18,6 +16,9 @@ def route_on_errors(func=None, *, max_error_threshold=3):
     
     Otherwise, it calls the wrapped router function and logs the successful execution.
     """
+    from core.state import BaseState
+    from core.workflow import BaseWorkFlow
+
     decorator_name = "route_on_errors"
 
     def decorator(func):

@@ -3,12 +3,10 @@ from functools import wraps
 from pydantic import ValidationError
 
 from core.decorators.utils import validate_workflow_node_signature
-from core.state import BaseState
-from core.workflow import BaseWorkFlow
 from utils.logs.logging_utils import logger
 
 
-def _update_state_on_error(state: BaseState, error_detail: str, exc: Exception) -> None:
+def _update_state_on_error(state: 'BaseState', error_detail: str, exc: Exception) -> None:
     """
     Updates the given state with error details.
 
@@ -28,8 +26,12 @@ def handle_errors_and_reset(func):
     A decorator that handles errors by updating the state's error_count and error_message.
     If the decorated function completes successfully, it resets the error state.
     """
+    from core.state import BaseState
+    from core.workflow import BaseWorkFlow
+
     decorator_name = "handle_errors_and_reset"
     func_name = validate_workflow_node_signature(func, decorator_name)
+
 
     @wraps(func)
     def wrapper(*args, **kwargs):
@@ -74,7 +76,6 @@ def handle_errors_and_reset(func):
             _update_state_on_error(state, error_detail, re)
             raise
         except Exception as e:
-            print(type(e))
             error_detail = (
                 f"[{decorator_name}] An error occurred in '{func_name}' "
                 f"of '{self.agent_name}': {e}"

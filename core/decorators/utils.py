@@ -1,7 +1,5 @@
 from inspect import _empty, signature
 
-from core.state import BaseState
-from core.workflow import BaseWorkFlow
 from utils.logs.logging_utils import logger
 
 
@@ -22,6 +20,9 @@ def validate_workflow_node_signature(func, decorator_name: str):
     Returns:
         str: The name of the function.
     """
+    from core.state import BaseState
+    from core.workflow import BaseWorkFlow
+
     func_name = func.__name__
     sig_obj = signature(func)
     params = list(sig_obj.parameters.values())
