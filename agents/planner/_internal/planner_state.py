@@ -21,6 +21,7 @@ class PlannerInput(BaseInputState):
     )
 
     additional_information: str = Field(
+        default='',
         description="Supplementary contextual data or insights that support and enrich the requirements document."
     )
 
@@ -72,6 +73,7 @@ class PlannerState(BaseState):
     )
 
     additional_information: str = Field(
+        default='',
         description="Supplementary contextual data or insights that support and enrich the requirements document."
     )
 

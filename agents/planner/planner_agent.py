@@ -21,7 +21,7 @@ class PlannerAgent(BaseAgent[PlannerGraph]):
         description: str,
         llm: LLM,
         recursion_limit: int,
-        persistance_db_path: str,
+        persistence_db_path: str,
         use_rag: bool = False
     ):
         """
@@ -33,18 +33,18 @@ class PlannerAgent(BaseAgent[PlannerGraph]):
             description (str): Brief description of the agent's functionality.
             llm (LLM): Language model instance utilized by the agent.
             recursion_limit (int): Maximum depth for recursive planning operations.
-            persistance_db_path (str): File path for the persistence database storing planner state.
+            persistence_db_path (str): File path for the persistence database storing planner state.
             use_rag (bool, optional): Enables Retrieval-Augmented Generation (RAG) if set to True. Defaults to False.
         """
         logger.info(
             "Initializing PlannerAgent | ID: %s | Name: %s | Recursion Limit: %d | Persistence DB: %s | RAG Enabled: %s",
-            id, name, recursion_limit, persistance_db_path, use_rag
+            id, name, recursion_limit, persistence_db_path, use_rag
         )
         
         work_flow = PlannerWorkFlow(id, name, llm, use_rag)
         logger.debug("PlannerWorkFlow created for agent: %s", name)
         
-        planner_graph = PlannerGraph(work_flow, recursion_limit, persistance_db_path)
+        planner_graph = PlannerGraph(work_flow, recursion_limit, persistence_db_path)
         logger.debug("PlannerGraph initialized for agent: %s", name)
         
         super().__init__(id, name, description, llm, planner_graph, use_rag)

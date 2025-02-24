@@ -119,25 +119,30 @@ class PlannerWorkFlow(BaseWorkFlow[PlannerPrompts]):
                     state.project_status, state.current_task.task_status)
 
         if state.project_status == PStatus.EXECUTING:
-            logger.debug("Project status is EXECUTING")
+            logger.debug("Project status is EXECUTING.")
             if state.current_task.task_status == Status.NEW:
-                logger.debug("Task status is NEW. Switching to TASK_PLANNING mode with TASK_BREAKDOWN stage.")
+                logger.debug("Current task status is NEW. Preparing for task planning: Clearing planned tasks, setting operational mode to TASK_PLANNING, and stage to TASK_BREAKDOWN.")
+                state.planned_tasks.clear()
                 state.operational_mode = PlannerMode.TASK_PLANNING
                 state.current_mode_stage = TaskPlanningStage.TASK_BREAKDOWN
+                logger.info("Operational mode updated to TASK_PLANNING with stage TASK_BREAKDOWN. Planned tasks queue cleared.")
             else:
-                logger.warning("Unexpected task status '%s' for a project in EXECUTING status.",
+                logger.warning("Unexpected current task status '%s' for a project in EXECUTING status. No operational mode change performed.",
                             state.current_task.task_status)
         elif state.project_status == PStatus.RESOLVING:
-            logger.debug("Project status is RESOLVING")
-            if state.current_task.task_status == Status.NEW:
-                logger.debug("Task status is NEW. Switching to ISSUE_PLANNING mode with ISSUE_BREAKDOWN stage.")
+            logger.debug("Project status is RESOLVING.")
+            if state.current_issue.issue_status == Status.NEW:
+                logger.debug("Current issue status is NEW. Preparing for issue planning: Clearing planned issues, setting operational mode to ISSUE_PLANNING, and stage to ISSUE_BREAKDOWN.")
+                state.planned_issues.clear()
                 state.operational_mode = PlannerMode.ISSUE_PLANNING
                 state.current_mode_stage = IssuePlanningStage.ISSUE_BREAKDOWN
+                logger.info("Operational mode updated to ISSUE_PLANNING with stage ISSUE_BREAKDOWN. Planned issues queue cleared.")
             else:
-                logger.warning("Unexpected task status '%s' for a project in RESOLVING status.",
-                            state.current_task.task_status)
+                logger.warning("Unexpected current issue status '%s' for a project in RESOLVING status. No operational mode change performed.",
+                            state.current_issue.issue_status)
         else:
-            logger.warning("Unexpected project status '%s'. No changes made to the operational mode or stage.",
+            state.operational_mode = PlannerMode.FINISHED
+            logger.warning("Unexpected project status '%s'. Operational mode set to FINISHED; no changes made to mode stage.",
                         state.project_status)
 
         logger.debug("Exiting entry_node with operational_mode: %s and current_mode_stage: %s",
