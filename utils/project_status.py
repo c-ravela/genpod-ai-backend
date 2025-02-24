@@ -1,5 +1,7 @@
 from tabulate import tabulate
+
 from utils.logs.logging_utils import logger
+
 
 class ProjectStatus:
     def __init__(self, data):
@@ -56,13 +58,12 @@ class ProjectStatus:
             completion_percentage = self._calculate_completion_percentage()
 
             project_info = [
-                ["Project Name", self.data.get("project_name", "N/A")],
+                ["Service Name", self.data.get("microservice_name", "N/A")],
                 ["Project Status", self.data.get("project_status", "N/A")],
                 ["Completion Percentage", completion_percentage],
                 ["Agents Status", self.data.get("agents_status", "N/A")],
-                ["Microservice Name", self.data.get("microservice_name", "N/A")],
-                ["Original Input", self._truncate_text(self.data.get("original_user_input", "N/A"), max_length=38)],
-                ["Project Path", self.data.get("project_path", "N/A")]
+                ["Original Input", self._truncate_text(self.data.get("user_prompt", "N/A"), max_length=38)],
+                ["Project Path", self.data.get("project_directory", "N/A")]
             ]
 
             current_task = self.data.get("current_task", {})
@@ -76,6 +77,7 @@ class ProjectStatus:
 
             current_planned_task = self.data.get("current_planned_task", {})
             planned_tasks = getattr(self.data.get("planned_tasks"), "items", [])
+
             current_planned_task_index = next((i + 1 for i, task in enumerate(planned_tasks) if getattr(task, "task_id", None) == getattr(current_planned_task, "task_id", None)), 0)
             planned_task_info = [
                 ["Current Planned Task Index", current_planned_task_index],
