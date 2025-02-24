@@ -12,6 +12,7 @@ from utils.logs.logging_utils import logger
 from utils.time import get_timestamp
 from utils.yaml_utils import read_yaml
 
+
 def main():
     logger.info("Initializing Genpod main execution.")
 
@@ -76,10 +77,8 @@ def main():
     try:
         action_obj = Action(
             config.agents,
-            config.graphs,
+            config.rag_agents,
             db_path,
-            "MISMO-version-3.6-docs",
-            setup_config['vector_database_path'],
             config.max_graph_recursion_limit
         )
         logger.debug(f"Action object initialized with configuration: {action_obj}")
@@ -102,7 +101,9 @@ def main():
             logger.info(f"Generated project path: {project_path}")
             logger.info("Context successfully updated for the 'generate' action.")
 
-            action_obj.generate(project_id, user_id, project_path)
+            license_header = "SPDX-License-Identifier: Apache-2.0\nCopyright 2024 Authors of CRBE & the Organization created CRBE"
+            license_url = "https://raw.githubusercontent.com/intelops/tarian-detector/8a4ff75fe31c4ffcef2db077e67a36a067f1437b/LICENSE"
+            action_obj.generate(project_id, user_id, project_path, license_header, license_url)
             logger.info("'Generate' action executed successfully.")
         elif requested_action == "resume":
             if len(sys.argv) < 3:
@@ -190,4 +191,4 @@ if __name__ == "__main__":
         logger.info("Genpod script executed successfully.")
     except Exception as e:
         logger.critical(f"Unhandled exception in script execution: {e}", exc_info=True)
-        sys.exit(1)
+        raise 
