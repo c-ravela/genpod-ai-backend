@@ -1,11 +1,16 @@
 from typing import Dict, List
 
-from agents.rag_middleware._internal.rag_middleware_mode_enum import *
-from agents.rag_middleware._internal.rag_middleware_node_enum import *
-from agents.rag_middleware._internal.rag_middleware_prompt import *
-from agents.rag_middleware._internal.rag_middleware_state import *
+from agents.rag_middleware._internal.rag_middleware_mode_enum import (
+    RAGMiddlewareMode, RAGQueryStage)
+from agents.rag_middleware._internal.rag_middleware_node_enum import \
+    RAGMiddlewareNode
+from agents.rag_middleware._internal.rag_middleware_prompt import \
+    RAGMiddlewarePrompts
+from agents.rag_middleware._internal.rag_middleware_state import (
+    RAGMiddlewareOutput, RAGMiddlewareState)
 from agents.rag_middleware.registry import RagAgentEntry
-from core.decorators import *
+from core.decorators import (handle_errors_and_reset, record_node,
+                             route_on_errors)
 from core.state import RAGQueryInput, RAGQueryOutput
 from core.workflow import BaseWorkFlow
 from llms import LLM
@@ -168,7 +173,7 @@ class RAGMiddlewareWorkFlow(BaseWorkFlow[RAGMiddlewarePrompts]):
             return state
 
         # Use a key based on agent and task to track error count.
-        key = (agent_id, task_id)
+        key = self._make_error_key(agent_id, task_id)
         current_error_count = state.error_registry.get(key, 0)
         logger.debug("%s: Current error count for agent '%s' and task '%s' is %d.", func_name, agent_id, task_id, current_error_count)
 
@@ -246,12 +251,20 @@ class RAGMiddlewareWorkFlow(BaseWorkFlow[RAGMiddlewarePrompts]):
             state.current_mode_stage = RAGQueryStage.FINISHED
             return state
 
-        state.selected_rag_agent = self.rag_agent_dict.get(selected_rag_agent_id)
+        agent_entry = self.rag_agent_dict.get(selected_rag_agent_id)
+        if agent_entry is None:
+            logger.warning("%s: No agent found for the selected agent ID '%s'.", func_name, selected_rag_agent_id)
+            state.response_type = RagResponseType.REJECTED
+            state.current_mode_stage = RAGQueryStage.FINISHED
+            return state
+
+        state.selected_rag_agent = {
+            'id': agent_entry.agent.id,
+            'name': agent_entry.agent.name,
+            'description': agent_entry.description
+        }
         state.selection_details = llm_output.response.details
 
-        if state.selected_rag_agent is None:
-            logger.warning("%s: No agent found for the selected agent ID '%s'.", func_name, selected_rag_agent_id)
-        
         state.current_mode_stage = RAGQueryStage.FORWARD_TO_RAG
         logger.debug("%s: Updated state.current_mode_stage to %s.", func_name, state.current_mode_stage)
         return state
@@ -278,7 +291,7 @@ class RAGMiddlewareWorkFlow(BaseWorkFlow[RAGMiddlewarePrompts]):
         func_name = "forward_to_rag_node"
         logger.info("%s: Forwarding query to the selected RAG agent.", func_name)
 
-        rag_agent = state.selected_rag_agent.agent
+        rag_agent = self.rag_agent_dict.get(state.selected_rag_agent['id']).agent
         logger.debug("%s: Selected RAG agent: %s", func_name, rag_agent)
 
         # Construct input state for the RAG agent.
@@ -291,7 +304,7 @@ class RAGMiddlewareWorkFlow(BaseWorkFlow[RAGMiddlewarePrompts]):
         logger.debug("%s: Constructed RAG agent input: %s", func_name, rag_agent_input)
 
         # Invoke the RAG agent with the constructed input.
-        rag_agent_output_raw = rag_agent.invoke(**rag_agent_input.model_dump())
+        rag_agent_output_raw = rag_agent.invoke(rag_agent_input.model_dump())
         logger.debug("%s: Raw output from RAG agent: %s", func_name, rag_agent_output_raw)
 
         # Populate the output state with the raw output from the agent.
@@ -364,6 +377,8 @@ class RAGMiddlewareWorkFlow(BaseWorkFlow[RAGMiddlewarePrompts]):
             if state.current_mode_stage == RAGQueryStage.FINISHED:
                 logger.info("%s: Query processing is finished. Marking current task as DONE.", func_name)
                 state.current_task.task_status = Status.DONE
+
+                self._update_error_registry_and_cache(state, func_name)
             else:
                 state.current_task.task_status = Status.INCOMPLETE
                 logger.warning("%s: Operational mode is PROCESSING_QUERY but current mode stage is not FINISHED (current stage: '%s'). Setting task status to INCOMPLETE.",
@@ -389,20 +404,22 @@ class RAGMiddlewareWorkFlow(BaseWorkFlow[RAGMiddlewarePrompts]):
         """
         func_name = '_reset_or_cleanup_errors_for_agent'
         logger.info("%s: Checking if cleanup is needed for agent '%s' with current task '%s'.", func_name, agent_id, current_task_id)
-        
+
+        current_key = self._make_error_key(agent_id, current_task_id)
+    
         # Check if the agent has a recorded task that differs from the current task.
         if agent_id in state.agent_last_task and state.agent_last_task[agent_id] != current_task_id:
             logger.debug("%s: Detected task change for agent '%s' (previous task: '%s', current task: '%s').", 
                         func_name, agent_id, state.agent_last_task[agent_id], current_task_id)
 
             # Remove error registry entries for this agent that belong to previous tasks.
-            keys_to_remove = [key for key in state.error_registry if key[0] == agent_id and key[1] != current_task_id]
+            keys_to_remove = [key for key in state.error_registry.keys() if key.startswith(f"{agent_id}:") and key != current_key]
             logger.debug("%s: Removing error registry entries for agent '%s': %s", func_name, agent_id, keys_to_remove)
             for key in keys_to_remove:
                 del state.error_registry[key]
             
             # Initialize error count for the current task.
-            state.error_registry[(agent_id, current_task_id)] = 0
+            state.error_registry[current_key] = 0
             logger.info("%s: Initialized error count for agent '%s' on task '%s'.", func_name, agent_id, current_task_id)
             
             # Update the last task for this agent.
@@ -412,3 +429,50 @@ class RAGMiddlewareWorkFlow(BaseWorkFlow[RAGMiddlewarePrompts]):
             # No previous task recorded; simply record the current task.
             state.agent_last_task[agent_id] = current_task_id
             logger.debug("%s: Recorded current task '%s' for agent '%s' (no previous task was found).", func_name, current_task_id, agent_id)
+
+    def _update_error_registry_and_cache(self, state: RAGMiddlewareState, func_name: str) -> None:
+        """
+        Updates the error registry and in-memory cache based on the final response.
+        
+        Args:
+            state (RAGMiddlewareState): The current middleware state.
+            func_name (str): Name of the calling function (for logging purposes).
+        """
+        error_key = self._make_error_key(state.agent_id, state.task_id)
+    
+        # Update error registry.
+        if state.response_type in [RagResponseType.ANSWERED, RagResponseType.FROM_CACHE]:
+            state.error_registry[error_key] = 0
+            logger.debug("%s: Reset error count for agent '%s', task '%s' because response type is '%s'.", 
+                        func_name, state.agent_id, state.task_id, state.response_type)
+        else:
+            current_error_count = state.error_registry.get(error_key, 0)
+            state.error_registry[error_key] = current_error_count + 1
+            logger.info("%s: Incremented error registry for agent '%s', task '%s' to %d.",
+                        func_name, state.agent_id, state.task_id, state.error_registry[error_key])
+        
+        # Update the cache.
+        if state.response_type == RagResponseType.ANSWERED:
+            # If in_memory_query_lookup is a dictionary, use:
+            state.in_memory_query_lookup.add(state.query, state.response)
+            logger.info("%s: Cached response for query: '%s'.", func_name, state.query)
+        elif state.response_type == RagResponseType.FROM_CACHE:
+            state.response_type = RagResponseType.ANSWERED
+        else:
+            logger.debug("%s: Response type '%s' is not cacheable; skipping cache update.", func_name, state.response_type)
+
+    @staticmethod
+    def _make_error_key(agent_id: str, task_id: str) -> str:
+        """
+        Constructs a unique key for the error registry based on the agent ID and task ID.
+
+        Args:
+            agent_id (str): The unique identifier of the agent.
+            task_id (str): The unique identifier of the task.
+
+        Returns:
+            str: A string key in the format "agent_id:task_id" suitable for use in the error registry.
+        """
+        key = f"{agent_id}:{task_id}"
+        logger.debug("Constructed error key: %s", key)
+        return key

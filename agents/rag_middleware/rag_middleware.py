@@ -4,33 +4,36 @@ from agents.rag_middleware._internal.rag_middleware_work_flow import \
     RAGMiddlewareWorkFlow
 from agents.rag_middleware._internal.rag_middlware_graph import \
     RAGMiddlewareGraph
-from agents.rag_middleware.registry import (get_registered_agent_count,
+from agents.rag_middleware.registry import (get_rag_agents,
+                                            get_registered_agent_count,
                                             register_rag_agent)
 from core.agent import BaseAgent
+from core.decorators import Singleton, singleton
 from llms import LLM
 from utils.logs.logging_utils import logger
-
-dummy_rag_agent = BaseAgent(
-    id="_dummy_rag_agent_01_",
-    name="Dummy Rag Agent",
-    llm=None,
-    graph=None,
-)
 
 dummy_rag_agent_description = (
     "Fallback agent: Used when no suitable RAG agent is found (e.g., when all agents have a confidence value of 0). "
     "The LLM should return this agent's ID in such cases."
 )
 
-# Register the dummy agent only if there is at least one registered RAG agent.
-if get_registered_agent_count() > 0:
-    logger.info("Registered RAG agents exist; registering dummy agent as fallback.")
-    register_rag_agent(dummy_rag_agent, dummy_rag_agent_description)
-else:
-    logger.info("No RAG agents registered; dummy agent will not be added.")
+dummy_rag_agent = BaseAgent(
+    id="_dummy_rag_agent_01_",
+    name="Dummy Rag Agent",
+    description=dummy_rag_agent_description,
+    llm=None,
+    graph=None,
+)
 
+def register_dummy_agent_if_needed():
+    if get_registered_agent_count() > 0:
+        logger.info("Registered RAG agents exist; registering dummy agent as fallback.")
+        register_rag_agent(dummy_rag_agent, dummy_rag_agent_description)
+    else:
+        logger.info("No RAG agents registered; dummy agent will not be added.")
 
-class RAGMiddleware(BaseAgent[RAGMiddlewareGraph]):
+@singleton
+class RAGMiddleware(BaseAgent[RAGMiddlewareGraph], Singleton):
     """
     RAGMiddleware integrates retrieval-augmented generation (RAG) agents into a processing workflow.
 
@@ -47,7 +50,6 @@ class RAGMiddleware(BaseAgent[RAGMiddlewareGraph]):
         llm: LLM,
         recursion_limit: int,
         persistence_db_path: str,
-        rag_agents: List[BaseAgent],
     ) -> None:
         """
         Initializes the RAG middleware.
@@ -61,10 +63,12 @@ class RAGMiddleware(BaseAgent[RAGMiddlewareGraph]):
             persistence_db_path (str): Path to the persistence database.
             rag_agents (List[BaseAgent]): A list of available RAG agent instances.
         """
-        self.rag_agents = rag_agents
+        register_dummy_agent_if_needed()
+        rag_agents = get_rag_agents()
+
         logger.info(
             "Initializing RAGMiddleware | ID: %s | Name: %s | Number of RAG Agents: %d",
-            id, name, len(self.rag_agents)
+            id, name, len(rag_agents)
         )
 
         # Initialize the RAG workflow with the provided parameters.
@@ -80,5 +84,4 @@ class RAGMiddleware(BaseAgent[RAGMiddlewareGraph]):
 
         # Initialize the BaseAgent with the configured graph.
         super().__init__(id, name, description, llm, graph)
-        
         logger.info("RAGMiddleware successfully initialized | ID: %s | Name: %s", id, name)

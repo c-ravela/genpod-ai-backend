@@ -1,10 +1,9 @@
-from typing import Any, Dict, Optional, Tuple
+from typing import Any, Dict
 
 from pydantic import Field
 
-from agents.rag_middleware.registry import RagAgentEntry
-from core.state import *
-from models import RagAgentDetail, RagResponseType
+from core.state import BaseInputState, BaseOutputState, BaseState
+from models import ErrorRegistry, RagAgentDetail, RagResponseType
 from utils import FuzzyRAGCache
 
 
@@ -36,7 +35,7 @@ class RAGMiddlewareOutput(BaseOutputState):
         response_type (RagResponseType): Indicates how the query was addressed (e.g., 'rag_answered',
             'no_rag_to_answer', 'rag_cache', 'rejected').
         response (str): The response generated for the query.
-        selected_rag_agent (Optional[RagAgentEntry]): The RAG agent entry selected to answer the query.
+        selected_rag_agent (RagAgentEntry): The RAG agent entry selected to answer the query.
             This field is populated after the agent selection process.
         selection_details (Dict[str, RagAgentDetail]): Additional details from the agent selection process, such as
             confidence scores or reasoning.
@@ -70,9 +69,9 @@ class RAGMiddlewareState(BaseState):
         response_type (RagResponseType): How the query was addressed.
         response (str): The response generated for the query.
         selected_rag_agent (RagAgentEntry): The RAG agent entry selected to answer the query.
-        selection_details (Optional[Dict[str, RagAgentDetail]]): Details from the agent selection process.
+        selection_details (Dict[str, RagAgentDetail]): Details from the agent selection process.
         in_memory_query_lookup (FuzzyRAGCache): In-memory lookup that holds query-response pairs.
-        error_registry (Dict[Tuple[str, str], int]): Error counts for each (agent_id, task_id) pair.
+        error_registry (ErrorRegistry): Error counts for each (agent_id, task_id) pair.
         agent_last_task (Dict[str, str]): Tracks the most recent task for each agent.
         rag_agent_output (Any): Raw output from the invoked RAG agent.
     """
@@ -99,7 +98,7 @@ class RAGMiddlewareState(BaseState):
         default="",
         description="The response generated for the query."
     )
-    selected_rag_agent: RagAgentEntry = Field(
+    selected_rag_agent: Dict[str, Any] = Field(
         default_factory=dict,
         description=(
             "The RAG agent entry selected to answer the query. Populated after the agent selection process."
@@ -115,8 +114,8 @@ class RAGMiddlewareState(BaseState):
         default_factory=FuzzyRAGCache,
         description="In-memory lookup that holds query-response pairs for fast retrieval."
     )
-    error_registry: Dict[Tuple[str, str], int] = Field(
-        default_factory=dict,
+    error_registry: ErrorRegistry = Field(
+        default_factory=ErrorRegistry,
         description="Error count for each (agent_id, task_id) pair."
     )
     agent_last_task: Dict[str, str] = Field(
