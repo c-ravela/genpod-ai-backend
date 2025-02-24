@@ -57,7 +57,7 @@ def check_model(provider: str, model: str) -> None:
         raise ValueError(f"Unsupported model: {model} for provider {provider}. Supported models for {provider} are: {SUPPORTED_LLMS[provider]}")
 
 
-class LLMConfig(BaseModel):
+class LLMSettings(BaseModel):
     """Configuration for a specific LLM."""
     provider: str
     model: str
@@ -102,7 +102,7 @@ class LLMConfig(BaseModel):
         return value
 
 
-class ProviderModelConfig(BaseModel):
+class ProviderModelSettings(BaseModel):
     """Configuration for a specific provider's model."""
     
     name: str
@@ -110,7 +110,7 @@ class ProviderModelConfig(BaseModel):
     api_key: str = Field(required=False, default=None)
 
 
-class ProviderSetting(BaseModel):
+class ProviderConnectionSettings(BaseModel):
     """Settings for a provider."""
     
     api_key: str = Field(required=False, default=None)
@@ -118,12 +118,12 @@ class ProviderSetting(BaseModel):
     retry_backoff: int  = Field(ge=0, required=False, default=None)
 
 
-class ProviderConfig(BaseModel):
+class ProviderSettings(BaseModel):
     """Configuration for a specific provider."""
 
     name: str
-    setting: ProviderSetting = Field(default=None)
-    models: dict[str, ProviderModelConfig] = Field(default=None)
+    setting: ProviderConnectionSettings = Field(default=None)
+    models: dict[str, ProviderModelSettings] = Field(default=None)
 
     @field_validator("name")
     def validate_name(cls, value):
@@ -144,20 +144,20 @@ class ProviderConfig(BaseModel):
         return value
 
 
-class AgentConfig(BaseModel):
+class AgentSettings(BaseModel):
     """Configuration for an agent."""
 
     description: str
-    llm_config: LLMConfig = Field(required=False, default=None)
+    llm_config: LLMSettings = Field(required=False, default=None)
 
 
-class RAGAgentConfig(BaseModel):
+class RAGAgentSettings(BaseModel):
     """Configuration for an agent."""
 
     description: str
     vector_database_path: str
     collection_name: str
-    llm_config: LLMConfig = Field(required=False, default=None)
+    llm_config: LLMSettings = Field(required=False, default=None)
 
     @field_validator('vector_database_path', mode='before')
     def valid_vector_database_path(cls, v: str) -> str:
@@ -177,22 +177,22 @@ class RAGAgentConfig(BaseModel):
         return v
 
 
-class DefaultConfig(BaseModel):
+class DefaultSettings(BaseModel):
     """Default configuration settings for the project."""
     
-    llm_config: LLMConfig
+    llm_config: LLMSettings
     max_retries: int = Field(ge=1, required=True)
     retry_backoff: int = Field(ge=0, required=True)
     max_graph_recursion_limit: Optional[int] = Field(ge=1, required=True)
 
 
-class GenpodConfig(BaseModel):
+class GenpodSettings(BaseModel):
     """Configuration for the Genpod project."""
     
-    default: DefaultConfig
-    providers: Dict[str, ProviderConfig]
-    agents: Dict[str, AgentConfig]
-    rag_agents: Dict[str, RAGAgentConfig]
+    default: DefaultSettings
+    providers: Dict[str, ProviderSettings]
+    agents: Dict[str, AgentSettings]
+    rag_agents: Dict[str, RAGAgentSettings]
     max_graph_recursion_limit: Optional[int] = Field(
         ge=1, 
         required=False, 
@@ -248,7 +248,7 @@ class RAGAgentInfo:
     recursion_limit: int = 0
 
 
-class AgentsConfig(Enum):
+class AgentRegistry(Enum):
     """
     Enum representing configuration for all project agents.
     Each member is an AgentInfo instance detailing an agent's role, settings, and behavior.
@@ -277,7 +277,7 @@ class AgentsConfig(Enum):
             "laying the foundation for the project's architectural framework."
         ),
         recursion_limit=25,
-        use_rag=False
+        use_rag=True
     )
 
     coder: AgentInfo = AgentInfo(
@@ -301,7 +301,7 @@ class AgentsConfig(Enum):
             "and similarly refines issues identified by the reviewer into manageable tasks for execution."
         ),
         recursion_limit=25,
-        use_rag=False
+        use_rag=True
     )
 
     tests_generator: AgentInfo = AgentInfo(
@@ -340,16 +340,6 @@ class AgentsConfig(Enum):
         recursion_limit=25,
         use_rag=False
     )
-
-    @property
-    def agent_name(self) -> str:
-        """
-        Get the name of the agent.
-
-        Returns:
-            str: The agent's name.
-        """
-        return self.value.agent_name
 
     @property
     def agent_name(self) -> str:
@@ -429,11 +419,11 @@ class AgentsConfig(Enum):
         Yields:
             AgentInfo: Yields each AgentInfo object from the enum.
         """
-        for agent in AgentsConfig:
+        for agent in AgentRegistry:
             yield agent.value
 
 
-class RAGAgentsConfig(Enum):
+class RAGAgentRegistry(Enum):
     """
     Enum representing the configuration for specialized RAG agents.
     Each member is an instance of RAGAgentInfo tailored to handle specific Retrieval-Augmented Generation queries.
@@ -529,7 +519,7 @@ class RAGAgentsConfig(Enum):
         Yields:
             RAGAgentInfo: Each RAGAgentInfo object stored in the enum.
         """
-        for agent in RAGAgentsConfig:
+        for agent in RAGAgentRegistry:
             yield agent.value
 
 
@@ -539,11 +529,11 @@ class ProjectConfig:
     Configuration for the entire project, including agent configurations and vector database settings.
     """
 
-    agents: AgentsConfig
-    rag_agents: RAGAgentsConfig
+    agents: AgentRegistry
+    rag_agents: RAGAgentRegistry
     max_graph_recursion_limit: int
     __config_path: str
-    __genpod_config: GenpodConfig
+    __genpod_config: GenpodSettings
 
     def __init__(self, config_path: str) -> None:
         """
@@ -551,8 +541,8 @@ class ProjectConfig:
         and vector database collection paths.
         """
 
-        self.agents = AgentsConfig
-        self.rag_agents = RAGAgentsConfig
+        self.agents = AgentRegistry
+        self.rag_agents = RAGAgentRegistry
         self.max_graph_recursion_limit = -1
         self.__config_path = config_path
 
@@ -561,7 +551,7 @@ class ProjectConfig:
         Loads the configuration data from a YAML file and updates the project settings accordingly.
         
         This method reads the YAML configuration from the file path specified during initialization, 
-        parses the configuration into the internal `GenpodConfig` structure, and applies the configurations 
+        parses the configuration into the internal `GenpodSettings` structure, and applies the configurations 
         by calling the appropriate update methods.
         """
         try:
@@ -571,7 +561,7 @@ class ProjectConfig:
         except Exception as e:
             raise ValueError(f"Error parsing YAML config: {e}")
     
-        self.__genpod_config = GenpodConfig(**__yaml_data)
+        self.__genpod_config = GenpodSettings(**__yaml_data)
         self.__update_config()
 
     def __update_config(self) -> None:
@@ -640,7 +630,7 @@ class ProjectConfig:
             rag_agent.collection_name = config.collection_name
             rag_agent.vector_database_path = config.vector_database_path
 
-    def __get_retry_settings(self, provider_config: ProviderConfig, default_config: DefaultConfig) -> Tuple[int, float]:
+    def __get_retry_settings(self, provider_config: ProviderSettings, default_config: DefaultSettings) -> Tuple[int, float]:
         """
         Helper method to extract retry settings for LLM configuration.
 
