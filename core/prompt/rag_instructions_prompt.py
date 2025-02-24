@@ -4,7 +4,8 @@ from typing import Any, Dict
 from pydantic import Field
 
 from core.prompt.base_prompt import BasePrompt
-from core.prompt.prompt_template_adapters.base_prompt_template_adapter import *
+from core.prompt.prompt_template_adapters.base_prompt_template_adapter import \
+    BasePromptTemplateAdapter
 from core.prompt.utils import load_instructions_from_yaml
 from utils.logs.logging_utils import logger
 
@@ -41,20 +42,23 @@ class RagInstructionsPrompt(BasePrompt):
 
         The YAML file is expected to contain an "instructions" key whose value is an array
         of objects. Each object should have:
-            - 'template': A multi-line string that represents the RAG instruction text.
+            - 'template': A multi-line string representing the RAG instruction text.
             - 'position': A string indicating where the instruction should be applied,
                           either "top" or "bottom". If no position is provided, "top" is assumed.
 
         Returns:
-            dict: A dictionary with keys "top" and "bottom" containing the aggregated RAG instructions.
+            Dict[str, str]: A dictionary with keys "top" and "bottom" containing the aggregated RAG instructions.
+
+        Raises:
+            Exception: If loading instructions fails.
         """
         logger.info("Loading RAG instructions from %s", filepath)
         try:
             instructions = load_instructions_from_yaml(filepath)
-            logger.debug("RAG instructions loaded: %s", instructions)
+            logger.debug("RAG instructions loaded successfully: %s", instructions)
             return instructions
         except Exception as e:
-            logger.error("Failed to load RAG instructions from %s: %s", filepath, e)
+            logger.error("Failed to load RAG instructions from %s: %s", filepath, e, exc_info=True)
             raise
 
     def __init__(self, *, adapter: BasePromptTemplateAdapter, use_rag: bool):
@@ -68,40 +72,49 @@ class RagInstructionsPrompt(BasePrompt):
         Raises:
             Exception: Propagates exceptions from loading RAG instructions.
         """
+        logger.debug("Initializing RagInstructionsPrompt with use_rag=%s", use_rag)
         super().__init__(adapter=adapter, use_rag=use_rag)
         if not self.rag_instructions:
             self.rag_instructions = self.load_rag_instructions()
-        logger.debug("RagInstructionsPrompt initialized with rag_instructions: %s and use_rag: %s", 
-                     self.rag_instructions, self.use_rag)
+            logger.debug("RAG instructions set to: %s", self.rag_instructions)
+        logger.info("RagInstructionsPrompt initialized with use_rag=%s", self.use_rag)
 
     def _format_prompt(self, **kwargs: Any) -> str:
         """
         Generates the core prompt text, optionally wrapping it with RAG-specific instructions.
 
-        If use_rag is True, the output will be:
-            <RAG Top Instructions>
-            <Actual Prompt Content (formatted by the adapter)>
-            <RAG Bottom Instructions>
-        Otherwise, it simply returns the adapter's formatted prompt.
+        The method first generates the base prompt using the adapter. If use_rag is True,
+        it then formats the RAG instructions (both top and bottom) using the same kwargs,
+        and inserts them around the base prompt.
 
         Args:
             **kwargs: Keyword arguments for prompt formatting.
 
         Returns:
-            str: The core prompt text.
+            str: The complete prompt text including RAG instructions if enabled.
         """
-        logger.info("Formatting prompt in RagInstructionsPrompt with kwargs: %s", kwargs)
-        
+        logger.info("Starting prompt formatting in RagInstructionsPrompt with kwargs: %s", kwargs)
         base_text = self.adapter.format(**kwargs)
-        logger.debug("Base prompt text from adapter: %s", base_text)
+        logger.debug("Base prompt text from adapter: '%s'", base_text)
        
         if not self.use_rag:
-            logger.info("use_rag is False; returning prompt text without RAG instructions.")
+            logger.info("use_rag is False; returning base prompt without RAG instructions.")
             return base_text
 
-        rag_top = self.rag_instructions.get("top", "")
-        rag_bottom = self.rag_instructions.get("bottom", "")
+        rag_top_template = self.rag_instructions.get("top", "")
+        logger.debug("RAG top template: '%s'", rag_top_template)
+        rag_bottom_template = self.rag_instructions.get("bottom", "")
+        logger.debug("RAG bottom template: '%s'", rag_bottom_template)
+
+        try:
+            rag_top = self.safe_format(rag_top_template, **kwargs)
+            logger.debug("Formatted RAG top: '%s'", rag_top)
+            rag_bottom = self.safe_format(rag_bottom_template, **kwargs)
+            logger.debug("Formatted RAG bottom: '%s'", rag_bottom)
+        except ValueError as e:
+            logger.error("Error formatting RAG instructions: %s", e, exc_info=True)
+            raise
 
         formatted_text = f"{rag_top}\n{base_text}\n{rag_bottom}".strip()
-        logger.debug("Core prompt text after adding RAG instructions: %s", formatted_text)
+        logger.info("Final prompt text after applying RAG instructions: '%s'", formatted_text)
         return formatted_text

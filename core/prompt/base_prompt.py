@@ -1,10 +1,12 @@
 from abc import ABC, abstractmethod
 from os import getcwd, path
+from string import Formatter
 from typing import Any, Dict
 
 from pydantic import BaseModel, ConfigDict, Field
 
-from core.prompt.prompt_template_adapters.base_prompt_template_adapter import *
+from core.prompt.prompt_template_adapters.base_prompt_template_adapter import \
+    BasePromptTemplateAdapter
 from core.prompt.utils import load_instructions_from_yaml
 from utils.logs.logging_utils import logger
 
@@ -15,13 +17,14 @@ class BasePrompt(BaseModel, ABC):
     """
     BasePrompt provides basic prompt rendering functionality.
 
-    This class integrates with a prompt template adapter that implements the 
-    BasePromptTemplateAdapter interface. It automatically loads common 
-    instructions from a separate YAML configuration file and prepends them to 
-    the final prompt text.
+    It integrates with a prompt template adapter (implementing BasePromptTemplateAdapter) to format 
+    the core prompt. It automatically loads common instructions from a YAML configuration file and 
+    wraps the formatted prompt with these instructions.
 
     Attributes:
-        adapter (BasePromptTemplateAdapter): An adapter instance that formats the prompt template.
+        adapter (BasePromptTemplateAdapter): Adapter instance for formatting the prompt template.
+        common_instructions (Dict[str, str]): A dictionary containing common instructions under keys 
+                                              'top' and 'bottom'.
     """
     model_config = ConfigDict(arbitrary_types_allowed=True)
 
@@ -32,13 +35,17 @@ class BasePrompt(BaseModel, ABC):
     def load_common_instructions(cls, filepath: str = GLOBAL_INSTRUCTIONS_PATH) -> Dict[str, str]:
         """
         Loads and aggregates common instructions from a YAML configuration file.
-        Delegates the actual file reading and aggregation to load_instructions_from_yaml().
-        
+
+        This method delegates file reading and aggregation to `load_instructions_from_yaml`.
+
         Args:
             filepath (str): The path to the YAML file containing common instructions.
-        
+
         Returns:
-            dict: A dictionary with keys "top" and "bottom" containing the aggregated common instructions.
+            Dict[str, str]: A dictionary with keys "top" and "bottom" containing the aggregated instructions.
+
+        Raises:
+            Exception: Propagates any exception raised during instruction loading.
         """
         logger.info("Loading common instructions from file: %s", filepath)
         try:
@@ -56,10 +63,11 @@ class BasePrompt(BaseModel, ABC):
         **kwargs: Any
     ):
         """
-        Initializes the BasePrompt instance with explicit typed parameters.
+        Initializes the BasePrompt instance with a prompt template adapter and additional parameters.
 
         Args:
-            adapter (BasePromptTemplateAdapter): The prompt template adapter used for formatting.
+            adapter (BasePromptTemplateAdapter): The adapter used for prompt formatting.
+            **kwargs: Additional keyword arguments.
 
         Raises:
             Exception: Propagates exceptions from loading common instructions.
@@ -73,57 +81,102 @@ class BasePrompt(BaseModel, ABC):
     @abstractmethod
     def _format_prompt(self, **kwargs: Any) -> str:
         """
-        Abstract method that generates the core prompt text.
-        Subclasses must implement this to return the prompt text with all substitutions performed.
-        
+        Abstract method to generate the core prompt text.
+
+        Subclasses must implement this method to perform all necessary substitutions in the prompt.
+
         Args:
             **kwargs: Keyword arguments for prompt formatting.
-        
+
         Returns:
-            str: The core prompt text.
+            str: The fully formatted core prompt text.
         """
         pass
 
     def wrap_with_common(self, text: str) -> str:
         """
-        Wraps the given text with the common instructions.
-        
+        Wraps the given prompt text with the common top and bottom instructions.
+
         Args:
-            text (str): The prompt text to be wrapped.
-            
+            text (str): The core prompt text to be wrapped.
+
         Returns:
-            str: The prompt text wrapped with common top and bottom instructions.
+            str: The complete prompt with common instructions appended.
         """
         common_top = self.common_instructions.get("top", "")
         common_bottom = self.common_instructions.get("bottom", "")
         wrapped = f"{common_top}\n{text}\n{common_bottom}".strip()
-        logger.debug("Wrapped text with common instructions: %s", wrapped)
+        logger.debug("Wrapped prompt with common instructions: %s", wrapped)
         return wrapped
 
     def render(self, **kwargs: Any) -> str:
         """
-        Renders the final prompt by calling the subclass's _format_prompt method to generate
-        the core prompt text, then replacing literal braces (to escape them), and finally wrapping
-        the result with the common instructions.
+        Renders the final prompt.
+
+        This method first generates the core prompt text by invoking the subclass's `_format_prompt` 
+        method, then escapes any literal curly braces, and finally wraps the result with the common instructions.
 
         Args:
-            **kwargs: Keyword arguments for substitution into the prompt template.
-        
+            **kwargs: Keyword arguments for substituting into the prompt template.
+
         Returns:
-            str: The complete rendered prompt, including common instructions.
+            str: The complete rendered prompt including common instructions.
+
+        Raises:
+            Exception: Propagates any exception that occurs during formatting or wrapping.
         """
         logger.info("Rendering prompt with arguments: %s", kwargs)
         try:
             core_text = self._format_prompt(**kwargs)
-            logger.debug("Core prompt text before escaping: %s", core_text)
+            logger.debug("Core prompt text generated: %s", core_text)
 
-            # Replace literal curly braces with escaped versions.
-            core_text = core_text.replace("{", "{{").replace("}", "}}")
-            logger.debug("Core prompt text after escaping: %s", core_text)
+            # Escape literal curly braces.
+            escaped_text = core_text.replace("{", "{{").replace("}", "}}")
+            logger.debug("Core prompt text after escaping braces: %s", escaped_text)
 
-            final_prompt = self.wrap_with_common(core_text)
-            logger.debug("BasePrompt rendered: %s", final_prompt)
+            final_prompt = self.wrap_with_common(escaped_text)
+            logger.debug("Final rendered prompt: %s", final_prompt)
             return final_prompt
         except Exception as e:
             logger.error("Error rendering prompt: %s", e, exc_info=True)
             raise
+
+    @staticmethod
+    def safe_format(template: str, **kwargs: Any) -> str:
+        """
+        Strictly validates and formats a template string using provided keyword arguments.
+
+        The method ensures that all placeholders in the template have corresponding keys in the provided
+        kwargs. If any required key is missing, it raises a ValueError with a detailed message including 
+        the missing keys, all expected keys, and the keys that were provided.
+
+        Args:
+            template (str): The template string containing placeholders.
+            **kwargs: Keyword arguments for populating the template.
+
+        Returns:
+            str: The formatted string if all required keys are present.
+
+        Raises:
+            ValueError: If one or more required placeholders are missing in the kwargs.
+        """
+        logger.debug("Starting safe_format on template: '%s' with kwargs: %s", template, kwargs)
+        formatter = Formatter()
+        # Extract all required keys from the template.
+        required_keys = {field_name for _, field_name, _, _ in formatter.parse(template) if field_name}
+        logger.debug("Extracted required keys: %s", required_keys)
+
+        missing_keys = required_keys - set(kwargs.keys())
+        if missing_keys:
+            error_message = (
+                f"Template formatting error: Missing required keys: {', '.join(sorted(missing_keys))}. "
+                f"Expected keys: {', '.join(sorted(required_keys))}. "
+                f"Provided keys: {', '.join(sorted(kwargs.keys()))}. "
+                "Please ensure all required keys are included."
+            )
+            logger.error(error_message)
+            raise ValueError(error_message)
+
+        result = template.format(**kwargs)
+        logger.debug("Formatted template result: '%s'", result)
+        return result
