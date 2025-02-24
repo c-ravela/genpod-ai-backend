@@ -1,6 +1,7 @@
 from agents.supervisor._internal.supervisor_graph import SupervisorGraph
 from agents.supervisor._internal.supervisor_work_flow import SupervisorWorkFlow
 from core.agent import BaseAgent
+from genpod import Team
 from llms import LLM
 from utils.logs.logging_utils import logger
 
@@ -45,10 +46,10 @@ class SupervisorAgent(BaseAgent[SupervisorGraph]):
             id, name, recursion_limit, persistence_db_path, use_rag
         )
 
-        work_flow = SupervisorWorkFlow(id, name, llm, use_rag)
+        self.work_flow = SupervisorWorkFlow(id, name, llm, use_rag)
         logger.debug("SupervisorWorkFlow initialized for agent: %s", name)
 
-        graph = SupervisorGraph(work_flow, recursion_limit, persistence_db_path)
+        graph = SupervisorGraph(self.work_flow, recursion_limit, persistence_db_path)
         logger.debug(
             "SupervisorGraph created for agent: %s with recursion_limit=%d and persistence_db_path=%s",
             name, recursion_limit, persistence_db_path
@@ -57,3 +58,6 @@ class SupervisorAgent(BaseAgent[SupervisorGraph]):
         super().__init__(id, name, description, llm, graph, use_rag)
         
         logger.info("SupervisorAgent successfully initialized | ID: %s | Name: %s", id, name)
+    
+    def setup_team(self, team: Team) -> None:
+        self.work_flow.setup_team(team)
