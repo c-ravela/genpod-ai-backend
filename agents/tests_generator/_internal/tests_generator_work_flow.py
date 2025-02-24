@@ -96,7 +96,7 @@ class TestCoderWorkFlow(BaseWorkFlow[TestsGeneratorPrompts]):
                     "Setting operational_mode to GENERATING_TEST_CODE and current_mode_stage to SKELETON_GENERATION."
                 )
                 state.operational_mode = TestsGeneratorMode.GENERATING_TEST_CODE
-                state.current_mode_stage = TestsGeneratorNodeEnum.SKELETON_GENERATION
+                state.current_mode_stage = TestsGenerationStage.GENERATE_SKELETON
         elif state.project_status == PStatus.RESOLVING:
             if state.current_planned_issue.status == Status.NEW:
                 logger.debug(
@@ -104,7 +104,7 @@ class TestCoderWorkFlow(BaseWorkFlow[TestsGeneratorPrompts]):
                     "Setting operational_mode to RESOLVING_ISSUES and current_mode_stage to SKELETON_UPDATION."
                 )
                 state.operational_mode = TestsGeneratorMode.RESOLVING_ISSUES
-                state.current_mode_stage = TestsGeneratorNodeEnum.SKELETON_UPDATION
+                state.current_mode_stage = ResolveIssueStage.UPDATE_SKELETON
         else:
             logger.debug("Project status is neither EXECUTING nor RESOLVING. Setting operational_mode to FINISHED.")
             state.operational_mode = TestsGeneratorMode.FINISHED

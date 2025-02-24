@@ -22,7 +22,7 @@ class TestsGeneratorAgent(BaseAgent[TestCoderGraph]):
         description: str,
         llm: LLM,
         recursion_limit: int,
-        persistance_db_path: str,
+        persistence_db_path: str,
         use_rag: bool = False
     ):
         """
@@ -34,21 +34,21 @@ class TestsGeneratorAgent(BaseAgent[TestCoderGraph]):
             description (str): Brief description of the agent's functionality.
             llm (LLM): The language model instance to be used for generating tests.
             recursion_limit (int): The maximum recursion depth allowed for the graph processing.
-            persistance_db_path (str): The file path to the persistence database.
+            persistence_db_path (str): The file path to the persistence database.
             use_rag (bool, optional): Flag indicating whether to use retrieval-augmented generation. Defaults to False.
         """
         logger.debug(
             "Initializing TestsGeneratorAgent | ID: %s | Name: %s | Recursion Limit: %d | Persistence DB: %s | RAG Enabled: %s",
-            id, name, recursion_limit, persistance_db_path, use_rag
+            id, name, recursion_limit, persistence_db_path, use_rag
         )
         
         work_flow = TestCoderWorkFlow(id, name, llm, use_rag)
         logger.debug("TestCoderWorkFlow initialized for agent: %s", name)
         
-        graph = TestCoderGraph(work_flow, recursion_limit, persistance_db_path)
+        graph = TestCoderGraph(work_flow, recursion_limit, persistence_db_path)
         logger.debug(
             "TestCoderGraph created for agent: %s with recursion_limit=%d and persistence_db_path=%s",
-            name, recursion_limit, persistance_db_path
+            name, recursion_limit, persistence_db_path
         )
 
         super().__init__(id, name, description, llm, graph, use_rag)

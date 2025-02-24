@@ -3,7 +3,7 @@
 Agent graph state
 """
 
-from typing import Dict
+from typing import Any, Dict
 
 from pydantic import Field
 
@@ -48,7 +48,7 @@ class TestCoderOutput(BaseOutputState):
             "and framework standards."
         )
     )
-    function_signatures: FileFunctionSignatures = Field(
+    function_signatures: Dict = Field(
         description="Detailed function skeleton for the code."
     )
 
@@ -79,13 +79,13 @@ class TestCoderState(BaseState):
             "and framework standards."
         )
     )
-    function_signatures: FileFunctionSignatures = Field(
-        default_factory=FileFunctionSignatures,
+    function_signatures: Dict = Field(
+        default_factory=dict,
         description="Detailed function skeleton for the code."
     )
 
     # internal
-    current_test_generation: Dict[str, str] = Field(
+    current_test_generation: Dict[str, Any] = Field(
         default_factory=dict,
         description=(
             "Intermediate data related to the current test generation process, including function signatures "
