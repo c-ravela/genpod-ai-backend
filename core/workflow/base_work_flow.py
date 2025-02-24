@@ -4,6 +4,7 @@ from typing import Any, Dict, Generic, Literal, Type, TypeVar, Union
 from langchain_core.messages import AIMessage
 from pydantic import BaseModel
 
+from core.decorators import rag_query_handler
 from core.prompt import BasePrompt
 from llms import LLM, LLMOutput
 from utils.decorators import auto_repr
@@ -63,6 +64,7 @@ class BaseWorkFlow(ABC, Generic[GenericAgentPrompt]):
         """
         pass
 
+    @rag_query_handler
     def invoke(
         self,
         prompt: BasePrompt,
@@ -86,6 +88,7 @@ class BaseWorkFlow(ABC, Generic[GenericAgentPrompt]):
         logger.debug(f"LLM invocation completed with output: {output}")
         return output
 
+    @rag_query_handler
     def invoke_with_pydantic_model(
         self,
         prompt: BasePrompt,
