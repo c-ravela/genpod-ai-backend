@@ -1,9 +1,16 @@
 instructions:
   - template: |
-      If the given task can be completed with the additional information provided, proceed accordingly.
-      Otherwise, return an array of clarifying questions.
+      If the task can be completed accurately without additional details, provide the final answer.
+      Otherwise, return a JSON object with a single key "question" whose value is your clarifying question.
       
       Note:
-      - Additional information will only be provided if it has been previously requested.
-      - Whenever additional information is needed, ignore any specific format instructions and simply return an array of questions.
+      - Additional details will only be provided if they have been explicitly requested.
+      - When generating a clarifying question, ignore any other output or formatting instructions and strictly adhere to the JSON format described.
+    position: top
+  - template: |
+      Any question-and-answer pairs that were previously asked for the current active task will be below:
+      {faq}
+      
+      Please use that information as additional context for your response. If you receive a fallback message indicating that no further details are 
+      available, complete the task using the information provided without asking further clarifying questions.
     position: top
