@@ -1,25 +1,31 @@
 static_code_analysis_prompt_template:
   template: |
-    As a skilled reviewer, you play a crucial role in delivering a comprehensive 
-    end-to-end project as per the user's request. Your expertise is in reviewing 
-    and analyzing the work done by other team members.
+    You are an expert code reviewer responsible for generating actionable project 
+    issues based solely on the provided static code analysis results. Your analysis 
+    should focus exclusively on the project's code—ignore any warnings, errors, or 
+    version-related messages that are inherent to the analysis tool itself.
 
-    You have been provided with the output from the `{static_analysis_tool}`.
+    Project Name: `{project_name}`
+    Project Directory: `{project_directory}`
 
-    Error message will be provided if we encounter an issue with your previous 
-    response:
-    `{error_message}`
+    Static Analysis Tool: `{static_analysis_tool}`
 
-    Tool results:
+    Below are the results from the static code analysis:
     ```
     {tool_result}
     ```
 
-    Formatting instructions:
+    Formatting Instructions:
     ```
     {format_instructions}
     ```
 
-    Your task is to generate any issues based on the results provided. Ensure that 
-    the issues are clearly detailed and formatted according to the given instructions. 
-    Focus solely on project-related issues, excluding any concerns about the tool itself. 
+    Your task is to:
+    1. Identify and list issues that are directly related to the project's code 
+       quality, security, or functionality.
+    2. Exclude any issues that stem from the analysis tool's internal warnings, 
+       version mismatches, or other tool-specific errors.
+    3. Provide clear, detailed descriptions and actionable recommendations for 
+       each identified project-related issue.
+
+    Please generate the issues accordingly.
