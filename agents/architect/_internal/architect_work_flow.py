@@ -6,7 +6,8 @@ from agents.architect._internal.architect_mode_enum import *
 from agents.architect._internal.architect_node_enum import ArchitectNodeEnum
 from agents.architect._internal.architect_prompt import ArchitectPrompts
 from agents.architect._internal.architect_state import *
-from core.decorators import *
+from core.decorators import (handle_errors_and_reset, record_node,
+                             route_on_errors)
 from core.workflow import BaseWorkFlow
 from llms import LLM
 from models.architect_models import ProjectDetails, TaskList, TaskResponse
@@ -115,6 +116,7 @@ class ArchitectWorkFlow(BaseWorkFlow[ArchitectPrompts]):
                 logger.info("Agent '%s': Function '%s': Project status is INITIAL.", self.agent_name, func_name)
                 if state.current_task.task_status == Status.NEW:
                     logger.info("Agent '%s': Function '%s': Task status is NEW. Setting operational mode to DOCUMENT_GENERATION.", self.agent_name, func_name)
+                    state.tasks.clear()
                     state.operational_mode = ArchitectAgentMode.DOCUMENT_GENERATION
                     state.current_mode_stage = DocumentGenerationStage.GENERATE_REQUIREMENTS
                 else:
