@@ -99,6 +99,13 @@ class Queue(BaseModel, Generic[QueueType]):
         """
         return self.next < len(self.items)
 
+    def clear(self) -> None:
+        """
+        Empties the queue by removing all items and resetting the next index to 0.
+        """
+        self.items.clear()
+        self.next = 0
+
     def __str__(self) -> str:
         """
         Returns a string representation of the Queue.
@@ -144,13 +151,11 @@ class Task(BaseModel):
     task_status: Status = Field(
         description="The current status indicating the progress of the task",
         default=Status.NONE,
-        required=True
     )
 
     description: str = Field(
         description="A brief description outlining the objective of the task",
         default="",
-        required=True
     )
 
 
