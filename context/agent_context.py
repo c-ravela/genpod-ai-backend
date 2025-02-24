@@ -1,5 +1,6 @@
 from dataclasses import dataclass, field
 
+
 @dataclass
 class AgentContext:
     """A class to represent the context of an agent."""
