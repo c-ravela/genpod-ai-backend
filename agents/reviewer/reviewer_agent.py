@@ -18,7 +18,7 @@ class ReviewerAgent(BaseAgent[ReviewerGraph]):
         description: str,
         llm: LLM,
         recursion_limit: int,
-        persistance_db_path: str,
+        persistence_db_path: str,
         use_rag: bool = False
     ):
         """
@@ -33,21 +33,21 @@ class ReviewerAgent(BaseAgent[ReviewerGraph]):
             description (str): Brief description of the agent's functionality.
             llm (LLM): Instance of the language model to be used.
             recursion_limit (int): Maximum number of recursive operations allowed.
-            persistance_db_path (str): File path to the persistence database.
+            persistence_db_path (str): File path to the persistence database.
             use_rag (bool, optional): Whether to use Retrieval-Augmented Generation. Defaults to False.
         """
         logger.info(
             "Initializing ReviewerAgent | ID: %s | Name: %s | Recursion Limit: %d | Persistence DB: %s | RAG Enabled: %s",
-            id, name, recursion_limit, persistance_db_path, use_rag
+            id, name, recursion_limit, persistence_db_path, use_rag
         )        
         
         work_flow = ReviewerWorkFlow(id, name, llm, use_rag)
         logger.debug("ReviewerWorkFlow initialized for agent: %s", name)
         
-        reviewer_graph = ReviewerGraph(work_flow, recursion_limit, persistance_db_path)
+        reviewer_graph = ReviewerGraph(work_flow, recursion_limit, persistence_db_path)
         logger.debug(
             "ReviewerGraph created for agent: %s with recursion_limit=%d and persistence_db_path=%s",
-            name, recursion_limit, persistance_db_path
+            name, recursion_limit, persistence_db_path
         )
 
         super().__init__(id, name, description, llm, reviewer_graph, use_rag)

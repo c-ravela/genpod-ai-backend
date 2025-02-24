@@ -81,7 +81,7 @@ class ReviewerWorkFlow(BaseWorkFlow[ReviewerPrompts]):
         logger.info(
             f"{self.agent_name}: Entry node initialized. Project path set to '{self.project_path}'."
         )
-
+        state.issues.clear()
         state.operational_mode = ReviewerMode.UNDER_REVIEW
         state.current_mode_stage = ReviewStage.STATIC_ANALYSIS
 
@@ -113,7 +113,9 @@ class ReviewerWorkFlow(BaseWorkFlow[ReviewerPrompts]):
 
         llm_response = self.invoke_with_pydantic_model(
             self.prompts.static_code_analysis_prompt,
-            {
+            {   
+                'project_name': state.project_name,
+                'project_directory': state.project_directory,
                 'static_analysis_tool': semgrep.name(),
                 'tool_result': semgrep_scan_result,
                 'error_message': state.error_message
