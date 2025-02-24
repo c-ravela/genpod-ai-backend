@@ -2,7 +2,7 @@ from typing import Any, Dict
 
 from pydantic import Field
 
-from core.state.base_state import *
+from core.state.base_state import BaseInputState, BaseOutputState, BaseState
 
 
 class RAGQueryInput(BaseInputState):
