@@ -14,7 +14,6 @@ from core.workflow import BaseWorkFlow
 from llms.llm import LLM
 from models.coder_models import CodeGenerationPlan
 from models.constants import ChatRoles, PStatus, Status
-from prompts.coder_prompts import CoderPrompts
 from tools.code import CodeFileWriter
 from tools.file_system import FS
 from tools.license import License
@@ -23,40 +22,89 @@ from utils.logs.logging_utils import logger
 
 
 class CoderWorkFlow(BaseWorkFlow[CoderPrompts]):
+    """
+    CoderWorkFlow manages the workflow for code generation and issue resolution.
+
+    This class extends BaseWorkFlow and is responsible for handling prompts,
+    managing code generation plans, and maintaining the requirements document.
+
+    Attributes:
+        requirements_document (str): Stores the requirements document for the coding task.
+        current_code_generation_plan_list (list): Stores the list of code generation plans.
+    """
+
     def __init__(self, agent_id: str, agent_name: str, llm: LLM, use_rag: bool):
+        """
+        Initializes the CoderWorkFlow instance.
+
+        Args:
+            agent_id (str): Unique identifier for the agent.
+            agent_name (str): Name of the agent.
+            llm (LLM): The large language model used for processing.
+            use_rag (bool): Flag indicating whether retrieval-augmented generation (RAG) is used.
+        """
+        logger.info(f"Initializing CoderWorkFlow with agent_id={agent_id}, agent_name={agent_name}, use_rag={use_rag}")
         super().__init__(agent_id, agent_name, CoderPrompts(use_rag), llm, use_rag)
+
         self.requirements_document = ""
         self.current_code_generation_plan_list = []
 
+        logger.debug("CoderWorkFlow initialized successfully.")
+
     @route_on_errors
     def router(self, state: CoderState) -> str:
+        """
+        Routes the given state to the appropriate coder node based on the current 
+        operational mode and mode stage.
+        
+        Args:
+            state (CoderState): The current state of the coder, containing the 
+                                operational mode and mode stage.
+        
+        Returns:
+            str: The corresponding coder node enum as a string.
+        """
+        logger.info(f"Routing state: operational_mode={state.operational_mode}, current_mode_stage={state.current_mode_stage}")
+        
         if state.operational_mode == CoderMode.CODE_GENERATION:
             if state.current_mode_stage == CodeGenerationStage.GENERATE_CODE:
+                logger.debug("Routing to CODE_GENERATION")
                 return str(CoderNodeEnum.CODE_GENERATION)
             elif state.current_mode_stage == CodeGenerationStage.GENERATE_CODE_FROM_SKELETON:
+                logger.debug("Routing to CODE_GENERATION_FROM_SKELETON")
                 return str(CoderNodeEnum.CODE_GENERATION_FROM_SKELETON)
             elif state.current_mode_stage == CodeGenerationStage.SAVE_CODE:
+                logger.debug("Routing to WRITE_GENERATED_CODE")
                 return str(CoderNodeEnum.WRITE_GENERATED_CODE)
             elif state.current_mode_stage == CodeGenerationStage.ADD_LICENSE_HEADER:
+                logger.debug("Routing to ADD_LICENSE")
                 return str(CoderNodeEnum.ADD_LICENSE)
             elif state.current_mode_stage == CodeGenerationStage.DOWNLOAD_LICENSE_FILE:
+                logger.debug("Routing to DOWNLOAD_LICENSE")
                 return str(CoderNodeEnum.DOWNLOAD_LICENSE)
             elif state.current_mode_stage == CodeGenerationStage.FINISHED:
+                logger.debug("Routing to EXIT")
                 return str(CoderNodeEnum.EXIT)
             else:
-                logger.warning("")
+                logger.warning(f"Unhandled CodeGenerationStage: {state.current_mode_stage}")
+        
         elif state.operational_mode == CoderMode.ISSUE_RESOLUTION:
             if state.current_mode_stage == ResolveIssueStage.RESOLVE_ISSUE:
+                logger.debug("Routing to RESOLVE_ISSUE")
                 return str(CoderNodeEnum.RESOLVE_ISSUE)
             elif state.current_mode_stage == ResolveIssueStage.SAVE_CODE:
+                logger.debug("Routing to WRITE_GENERATED_CODE")
                 return str(CoderNodeEnum.WRITE_GENERATED_CODE)
             elif state.current_mode_stage == ResolveIssueStage.ADD_LICENSE_HEADER:
+                logger.debug("Routing to ADD_LICENSE")
                 return str(CoderNodeEnum.ADD_LICENSE)
             elif state.current_mode_stage == ResolveIssueStage.FINISHED:
+                logger.debug("Routing to EXIT")
                 return str(CoderNodeEnum.EXIT)
             else:
-                logger.warning("")
+                logger.warning(f"Unhandled ResolveIssueStage: {state.current_mode_stage}")
 
+        logger.warning("Unhandled operational mode, defaulting to EXIT")
         return str(CoderNodeEnum.EXIT)
 
     @record_node(CoderNodeEnum.ENTRY)
@@ -463,6 +511,7 @@ class CoderWorkFlow(BaseWorkFlow[CoderPrompts]):
 
         elif state.operational_mode == CoderMode.ISSUE_RESOLUTION:
             if state.current_mode_stage == ResolveIssueStage.FINISHED:
+                state.current_planned_issue.is_code_generated = True
                 state.current_planned_issue.status = Status.DONE
                 state.code_generation_plan_list = self.current_code_generation_plan_list
                 logger.info("%s: Issue resolved successfully. Marked as DONE.", self.agent_name)

@@ -39,5 +39,5 @@ class CoderAgent(BaseAgent[CoderGraph]):
         work_flow = CoderWorkFlow(id, name, llm, use_rag)
         graph = CoderGraph(work_flow, recursion_limit, persistence_db_path)
 
-        super.__init__(id, name, description, llm, graph, use_rag)
+        super().__init__(id, name, description, llm, graph, use_rag)
         logger.info(f"CoderAgent '{name}' initialized successfully.")

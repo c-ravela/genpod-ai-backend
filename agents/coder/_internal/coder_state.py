@@ -3,7 +3,7 @@ Coder State
 
 Defines the Agent's graph state for the CoderAgent.
 """
-from typing import Dict
+from typing import Dict, List
 
 from pydantic import Field
 
@@ -63,7 +63,7 @@ class CoderOutput(BaseOutputState):
         default_factory=Issue,
         description="The issue object representing the current problem being resolved."
     )
-    code_generation_plan_list: CodeGenerationPlan = Field(
+    code_generation_plan_list: List[CodeGenerationPlan] = Field(
         description="A collection of generated code plans detailing the outcomes of the code generation process."
     )
 
@@ -83,8 +83,8 @@ class CoderState(BaseState):
         default_factory=Issue,
         description="The issue object representing the current problem under investigation."
     )
-    code_generation_plan_list: CodeGenerationPlan = Field(
-        default_factory=CodeGenerationPlan,
+    code_generation_plan_list: List[CodeGenerationPlan] = Field(
+        default_factory=list,
         description="A collection of code generation plans that document the output of the code generation process."
     )
     project_name: str = Field(
