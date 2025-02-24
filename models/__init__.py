@@ -16,13 +16,16 @@ from .constants import ChatRoles, PStatus, RagResponseType, Status
 from .models import (Issue, IssuesQueue, PlannedIssue, PlannedIssuesQueue,
                      PlannedTask, PlannedTaskQueue, RequirementsDocument, Task,
                      TaskQueue)
-from .rag_middleware_models import RagAgentDetail, RagSelectionResponse
+from .rag_middleware_models import (AdditionalInfoRequest, ErrorRegistry,
+                                    RagAgentDetail, RagSelectionResponse)
 from .rag_models import BinaryScore, PromptResponse
 from .reviewer_models import IssuesReport
 
 __all__ = [
+    'AdditionalInfoRequest',
     'BinaryScore',
     'ChatRoles',
+    'ErrorRegistry',
     'Issue',
     'IssuesQueue',
     'IssuesReport',
