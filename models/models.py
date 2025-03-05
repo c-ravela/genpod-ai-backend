@@ -525,3 +525,13 @@ class RequirementsDocument(BaseModel):
         )
 
         return f"# Project Requirements Document\n\n{markdown_sections}"
+
+
+class WebSearchResult(BaseModel):
+    title: str = Field(default="No Title", description="The title of the search result.")
+    link: str = Field(default="", description="The URL of the search result.")
+    snippet: str = Field(default="No description", description="A brief description or snippet from the search result.")
+
+
+class WebSearchResults(BaseModel):
+    results: List[WebSearchResult] = Field(default_factory=list, description="A list of web search results.")
