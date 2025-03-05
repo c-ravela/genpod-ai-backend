@@ -381,8 +381,8 @@ class RAGWorkFlow(BaseWorkFlow[RAGPrompts]):
         state.hallucination_count = 0
         state.retry_count = 0
 
-        # if state.operational_mode == RAGMode.ANSWER_QUERY and state.response_type == RagResponseType.ANSWERED:
-        #     self._save_analytics_record(state)
+        if state.operational_mode == RAGMode.ANSWER_QUERY and state.response_type == RagResponseType.ANSWERED:
+            self._save_analytics_record(state)
 
         state.current_task.task_status = Status.DONE
         logger.info("Agent '%s': %s - Workflow completed; task marked as DONE.", self.agent_name, func_name)
