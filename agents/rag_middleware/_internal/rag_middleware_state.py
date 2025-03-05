@@ -49,6 +49,12 @@ class RAGMiddlewareOutput(BaseOutputState):
     response: str = Field(
         description="The response generated for the query."
     )
+    selected_rag_agent: Dict[str, Any] = Field(
+        default_factory=dict,
+        description=(
+            "The RAG agent entry selected to answer the query. Populated after the agent selection process."
+        )
+    )
     selection_details: Dict[str, RagAgentDetail] = Field(
         description="Additional details from the agent selection process, such as confidence scores or reasoning."
     )

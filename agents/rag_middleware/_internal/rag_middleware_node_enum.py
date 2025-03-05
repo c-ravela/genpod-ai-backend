@@ -10,6 +10,7 @@ class RAGMiddlewareNode(str, Enum):
     AGENT_SELECTION = "agent_selection_node"
     FORWARD_TO_RAG = "forward_to_rag_node"
     RESPONSE_REFINEMENT = "response_refinement_node"
+    RESEARCH = "research"
     EXIT = "exit"
 
     def __str__(self):

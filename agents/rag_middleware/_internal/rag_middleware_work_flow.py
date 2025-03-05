@@ -9,12 +9,13 @@ from agents.rag_middleware._internal.rag_middleware_prompt import \
 from agents.rag_middleware._internal.rag_middleware_state import (
     RAGMiddlewareOutput, RAGMiddlewareState)
 from agents.rag_middleware.registry import RagAgentEntry
+from core.agent import BaseAgent
 from core.decorators import (handle_errors_and_reset, record_node,
                              route_on_errors)
 from core.state import RAGQueryInput, RAGQueryOutput
 from core.workflow import BaseWorkFlow
 from llms import LLM
-from models import *
+from models import PStatus, RagResponseType, RagSelectionResponse, Status, Task
 from utils.logs.logging_utils import logger
 
 ERROR_THRESHOLD = 3
@@ -37,6 +38,8 @@ class RAGMiddlewareWorkFlow(BaseWorkFlow[RAGMiddlewarePrompts]):
         llm: LLM,
         rag_agent_entries: List[RagAgentEntry],
         dummy_agent_id: str,
+        research_agent: BaseAgent,
+        use_research_agent: bool = False
     ) -> None:
         """
         Initializes the RAG Middleware Workflow.
@@ -46,6 +49,9 @@ class RAGMiddlewareWorkFlow(BaseWorkFlow[RAGMiddlewarePrompts]):
             agent_name (str): The name of the middleware agent.
             llm (LLM): The language model instance used for agent selection and query processing.
             rag_agent_entries (List[RagAgentEntry]): A list of registered RAG agent entries. Each entry contains a RAG agent and its description.
+            dummy_agent_id (str): The ID of the fallback dummy agent.
+            research_agent (BaseAgent): The research agent to be used as a fallback.
+            use_research_agent (bool): Flag indicating whether the research agent should be invoked.
         """
         self.rag_agent_dict: Dict[str, RagAgentEntry] = {
             entry.agent.id: entry for entry in rag_agent_entries
@@ -53,6 +59,8 @@ class RAGMiddlewareWorkFlow(BaseWorkFlow[RAGMiddlewarePrompts]):
         logger.info("Initialized RAGMiddlewareWorkFlow with %d RAG agents.", len(self.rag_agent_dict))
 
         self.dummy_agent_id = dummy_agent_id
+        self.research_agent = research_agent
+        self.use_research_agent = use_research_agent
 
         super().__init__(
             agent_id,
@@ -89,6 +97,8 @@ class RAGMiddlewareWorkFlow(BaseWorkFlow[RAGMiddlewarePrompts]):
             elif state.current_mode_stage == RAGQueryStage.REFINE_RESPONSE:
                 logger.info("%s: Routing to RESPONSE_REFINEMENT node.", func_name)
                 return str(RAGMiddlewareNode.RESPONSE_REFINEMENT)
+            elif state.current_mode_stage == RAGQueryStage.FALLBACK_RESEARCH:
+                return str(RAGMiddlewareNode.RESEARCH)
             elif state.current_mode_stage == RAGQueryStage.FINISHED:
                 logger.info("%s: Routing to EXIT node.", func_name)
                 return str(RAGMiddlewareNode.EXIT)
@@ -119,6 +129,10 @@ class RAGMiddlewareWorkFlow(BaseWorkFlow[RAGMiddlewarePrompts]):
         try:
             if state.project_status == PStatus.MONITORING:
                 if state.current_task.task_status == Status.NEW:
+                    state.response_type = RagResponseType.NOT_ADDRESSED
+                    state.response = ""
+                    state.selection_details = {}
+                    state.selected_rag_agent = {}
                     state.operational_mode = RAGMiddlewareMode.PROCESSING_QUERY
                     state.current_mode_stage = RAGQueryStage.EVALUATE_QUERY
                     logger.info("%s: Set operational mode to PROCESSING_QUERY and stage to EVALUATE_QUERY.", func_name)
@@ -200,62 +214,70 @@ class RAGMiddlewareWorkFlow(BaseWorkFlow[RAGMiddlewarePrompts]):
     @handle_errors_and_reset
     def agent_selection_node(self, state: RAGMiddlewareState) -> RAGMiddlewareState:
         """
-        Selects the appropriate RAG agent to answer the query.
+        Selects the appropriate RAG agent to process the query.
 
-        The node performs the following:
-          - Constructs a formatted list of available RAG agents and their descriptions.
-          - If no agents are registered, updates the state to indicate that no agent is available and sets the stage to EXIT.
-          - Otherwise, invokes the LLM with the agent selection prompt and parses the response.
-          - Extracts the selected agent ID from the response.
-          - If the dummy agent is selected, updates the state to indicate no suitable agent is available and sets the stage to EXIT.
-          - Otherwise, updates the state with the selected agent entry and detailed selection metrics,
-            then sets the next stage to FORWARD_TO_RAG.
-        
+        This node performs the following steps:
+        1. Constructs a formatted list of available RAG agents and their descriptions.
+        2. If no agents are registered, it updates the state to indicate that no suitable agent is available
+            and transitions to the FALLBACK_RESEARCH stage.
+        3. Otherwise, it invokes the LLM using the agent selection prompt with the agent list and the query.
+        4. Parses the LLM response to extract the selected agent ID.
+        5. If the selected agent is the dummy agent or cannot be found, it updates the state accordingly and
+            transitions to FALLBACK_RESEARCH.
+        6. If a valid agent is selected, it updates the state with the agent's details and selection metrics,
+            and sets the next stage to FORWARD_TO_RAG.
+
         Args:
-            state (RAGMiddlewareState): The current middleware state.
-        
+            state (RAGMiddlewareState): The current middleware state, including the query and available agent information.
+
         Returns:
             RAGMiddlewareState: The updated state with the selected RAG agent and the appropriate processing stage.
         """
         func_name = "agent_selection_node"
-        logger.info("%s: Starting agent selection.", func_name)
+        logger.info("%s: Starting agent selection process.", func_name)
 
         # Check if there are any registered RAG agents.
         if not self.rag_agent_dict:
-            logger.warning("%s: No RAG agents registered. Marking state as NO_AGENT_AVAILABLE and setting stage to EXIT.", func_name)
+            logger.warning(
+                "%s: No RAG agents registered. Marking state as NO_AGENT_AVAILABLE and transitioning to FALLBACK_RESEARCH.",
+                func_name
+            )
             state.response_type = RagResponseType.NO_AGENT_AVAILABLE
-            state.current_mode_stage = RAGQueryStage.FINISHED
+            state.current_mode_stage = RAGQueryStage.FALLBACK_RESEARCH
             return state
-        
-        agent_list_str = "\n".join(f"{agent_id}: {entry.description}" 
-                                   for agent_id, entry in self.rag_agent_dict.items())
-        logger.debug("%s: Constructed agent list string:\n%s", func_name, agent_list_str)
-    
+
+        agent_list_str = "\n".join(
+            f"{agent_id}: {entry.description}" for agent_id, entry in self.rag_agent_dict.items()
+        )
+        logger.debug("%s: Constructed agent list:\n%s", func_name, agent_list_str)
+
         llm_output = self.invoke_with_pydantic_model(
             self.prompts.rag_agent_selection_prompt,
-            {
-                'agent_list': agent_list_str,
-                'query': state.query
-            },
+            {"agent_list": agent_list_str, "query": state.query},
             RagSelectionResponse
         )
-        logger.debug("%s: LLM output: %s", func_name, llm_output.response)
+        logger.debug("%s: Received LLM output: %s", func_name, llm_output.response)
 
         selected_rag_agent_id = llm_output.response.rag_agent_id.strip()
-        logger.info("%s: Selected RAG agent ID: %s", func_name, selected_rag_agent_id)
-        
-        # If the dummy agent is selected, update the state accordingly.
+        logger.info("%s: LLM selected RAG agent ID: %s", func_name, selected_rag_agent_id)
+
         if selected_rag_agent_id == self.dummy_agent_id:
-            logger.info("%s: Dummy agent selected. No suitable RAG agent available.", func_name)
+            logger.info(
+                "%s: Dummy agent selected. No suitable RAG agent available. Transitioning to FALLBACK_RESEARCH.",
+                func_name
+            )
             state.response_type = RagResponseType.NO_AGENT_AVAILABLE
-            state.current_mode_stage = RAGQueryStage.FINISHED
+            state.current_mode_stage = RAGQueryStage.FALLBACK_RESEARCH
             return state
 
         agent_entry = self.rag_agent_dict.get(selected_rag_agent_id)
         if agent_entry is None:
-            logger.warning("%s: No agent found for the selected agent ID '%s'.", func_name, selected_rag_agent_id)
-            state.response_type = RagResponseType.REJECTED
-            state.current_mode_stage = RAGQueryStage.FINISHED
+            logger.warning(
+                "%s: No agent found for the selected agent ID '%s'. Transitioning to FALLBACK_RESEARCH.",
+                func_name, selected_rag_agent_id
+            )
+            state.response_type = RagResponseType.NO_AGENT_AVAILABLE
+            state.current_mode_stage = RAGQueryStage.FALLBACK_RESEARCH
             return state
 
         state.selected_rag_agent = {
@@ -294,22 +316,11 @@ class RAGMiddlewareWorkFlow(BaseWorkFlow[RAGMiddlewarePrompts]):
         rag_agent = self.rag_agent_dict.get(state.selected_rag_agent['id']).agent
         logger.debug("%s: Selected RAG agent: %s", func_name, rag_agent)
 
-        # Construct input state for the RAG agent.
-        rag_agent_input = RAGQueryInput(**state.model_dump(include=set(RAGQueryInput.model_fields.keys())))
-        # Additionally, set the current task for the RAG agent.
-        rag_agent_input.current_task = Task(
-            task_status=Status.NEW,
-            description="Task to generate an appropriate answer for the incoming request for information."
+        self._invoke_agent(
+            agent=rag_agent,
+            task_description="Task to generate an appropriate answer for the incoming request for information.",
+            state=state
         )
-        logger.debug("%s: Constructed RAG agent input: %s", func_name, rag_agent_input)
-
-        # Invoke the RAG agent with the constructed input.
-        rag_agent_output_raw = rag_agent.invoke(rag_agent_input.model_dump())
-        logger.debug("%s: Raw output from RAG agent: %s", func_name, rag_agent_output_raw)
-
-        # Populate the output state with the raw output from the agent.
-        state.rag_agent_output = RAGQueryOutput(**rag_agent_output_raw)
-        logger.debug("%s: RAG agent output parsed into RAGQueryOutput: %s", func_name, state.rag_agent_output)
 
         state.current_mode_stage = RAGQueryStage.REFINE_RESPONSE
         logger.info("%s: Updated processing stage to '%s'.", func_name, state.current_mode_stage)
@@ -343,6 +354,10 @@ class RAGMiddlewareWorkFlow(BaseWorkFlow[RAGMiddlewarePrompts]):
         rag_output: RAGQueryOutput = state.rag_agent_output
         logger.debug("%s: Raw RAG output: %s", func_name, rag_output)
 
+        if self.use_research_agent and rag_output.response_type not in (RagResponseType.ANSWERED, RagResponseType.REJECTED, RagResponseType.FROM_CACHE):
+            state.current_mode_stage = RAGQueryStage.FALLBACK_RESEARCH
+            return state
+
         refined_response = rag_output.response.strip()
 
         state.rag_agent_output = rag_output
@@ -352,6 +367,41 @@ class RAGMiddlewareWorkFlow(BaseWorkFlow[RAGMiddlewarePrompts]):
         state.current_mode_stage = RAGQueryStage.FINISHED
         logger.info("%s: Completed response refinement. Updated processing stage to FINISHED.", func_name)
     
+        return state
+
+    @record_node(RAGMiddlewareNode.RESEARCH)
+    @handle_errors_and_reset
+    def research_agent_node(self, state: RAGMiddlewareState) -> RAGMiddlewareState:
+        """
+        Invokes the research agent to generate a response when the RAG agent's output is insufficient.
+
+        This node is called after the response refinement node if the response type is neither ANSWERED nor REJECTED.
+        The research agent is invoked with the same input format as the RAG agent, and its output is processed in a similar manner.
+
+        Args:
+            state (RAGMiddlewareState): The current middleware state.
+        
+        Returns:
+            RAGMiddlewareState: The updated state with the research agent's output.
+        """
+        func_name = "research_agent_node"
+        logger.info("%s: Invoking research agent fallback for query.", func_name)
+
+        state.selected_rag_agent = {
+            'id': self.research_agent.id,
+            'name': self.research_agent.name,
+            'description': self.research_agent.description
+        }
+
+        self._invoke_agent(
+            agent=self.research_agent,
+            task_description="Task to generate answer using research agent fallback.",
+            state=state
+        )
+
+        state.current_mode_stage = RAGQueryStage.REFINE_RESPONSE
+        logger.info("%s: Research agent invocation complete. Response updated.", func_name)
+
         return state
 
     @record_node(RAGMiddlewareNode.EXIT)
@@ -476,3 +526,27 @@ class RAGMiddlewareWorkFlow(BaseWorkFlow[RAGMiddlewarePrompts]):
         key = f"{agent_id}:{task_id}"
         logger.debug("Constructed error key: %s", key)
         return key
+
+    def _invoke_agent(self, agent: BaseAgent, task_description: str, state: RAGMiddlewareState) -> None:
+        """
+        Private method to invoke an agent (RAG or Research) with a standardized input.
+
+        Constructs the input for the agent using the current state, sets the task description,
+        invokes the agent, and parses its output into RAGQueryOutput which is stored in the state.
+
+        Args:
+            agent (BaseAgent): The agent to invoke.
+            task_description (str): The description for the current task.
+            state (RAGMiddlewareState): The current workflow state.
+        """
+        func_name = "_invoke_agent"
+        agent_input = RAGQueryInput(**state.model_dump(include=set(RAGQueryInput.model_fields.keys())))
+        agent_input.current_task = Task(
+            task_status=Status.NEW,
+            description=task_description
+        )
+        logger.debug("%s: Constructed input: %s", func_name, agent_input)
+        agent_output_raw = agent.invoke(agent_input.model_dump())
+        logger.debug("%s: Raw output from agent: %s", func_name, agent_output_raw)
+        state.rag_agent_output = RAGQueryOutput(**agent_output_raw)
+        logger.debug("%s: Parsed agent output: %s", func_name, state.rag_agent_output)

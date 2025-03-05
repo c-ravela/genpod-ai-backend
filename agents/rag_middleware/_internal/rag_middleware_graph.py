@@ -22,34 +22,19 @@ class RAGMiddlewareGraph(BaseGraph[RAGMiddlewareWorkFlow]):
 
         rag_middleware_flow_graph = StateGraph(RAGMiddlewareState, input=RAGMiddlewareInput, output=RAGMiddlewareOutput)
 
-        rag_middleware_flow_graph.add_node(
-            str(RAGMiddlewareNode.ENTRY),
-            self.work_flow.entry_node
-        )
+        nodes = {
+            RAGMiddlewareNode.ENTRY: self.work_flow.entry_node,
+            RAGMiddlewareNode.QUERY_EVALUATION: self.work_flow.query_evaluation_node,
+            RAGMiddlewareNode.AGENT_SELECTION: self.work_flow.agent_selection_node,
+            RAGMiddlewareNode.FORWARD_TO_RAG: self.work_flow.forward_to_rag_node,
+            RAGMiddlewareNode.RESPONSE_REFINEMENT: self.work_flow.response_refinement_node,
+            RAGMiddlewareNode.RESEARCH: self.work_flow.research_agent_node,
+            RAGMiddlewareNode.EXIT: self.work_flow.exit_node
+        }
         
-        rag_middleware_flow_graph.add_node(
-            str(RAGMiddlewareNode.QUERY_EVALUATION),
-            self.work_flow.query_evaluation_node
-        )
-        rag_middleware_flow_graph.add_node(
-            str(RAGMiddlewareNode.AGENT_SELECTION),
-            self.work_flow.agent_selection_node
-        )
-
-        rag_middleware_flow_graph.add_node(
-            str(RAGMiddlewareNode.FORWARD_TO_RAG),
-            self.work_flow.forward_to_rag_node
-        )
-
-        rag_middleware_flow_graph.add_node(
-            str(RAGMiddlewareNode.RESPONSE_REFINEMENT),
-            self.work_flow.response_refinement_node
-        )
-
-        rag_middleware_flow_graph.add_node(
-            str(RAGMiddlewareNode.EXIT),
-            self.work_flow.exit_node
-        )
+        for node_name, node_function in nodes.items():
+            rag_middleware_flow_graph.add_node(str(node_name), node_function)
+            logger.debug("Added node: %s", node_name)
 
         rag_middleware_flow_graph.add_conditional_edges(
             str(RAGMiddlewareNode.ENTRY),
@@ -68,6 +53,7 @@ class RAGMiddlewareGraph(BaseGraph[RAGMiddlewareWorkFlow]):
         rag_middleware_flow_graph.add_conditional_edges(
             str(RAGMiddlewareNode.AGENT_SELECTION),
             self.work_flow.router, {
+            str(RAGMiddlewareNode.RESEARCH):str(RAGMiddlewareNode.RESEARCH),
             str(RAGMiddlewareNode.FORWARD_TO_RAG):str(RAGMiddlewareNode.FORWARD_TO_RAG),
             str(RAGMiddlewareNode.EXIT):str(RAGMiddlewareNode.EXIT)
         })
@@ -81,7 +67,14 @@ class RAGMiddlewareGraph(BaseGraph[RAGMiddlewareWorkFlow]):
         rag_middleware_flow_graph.add_conditional_edges(
             str(RAGMiddlewareNode.RESPONSE_REFINEMENT),
             self.work_flow.router, {
+            str(RAGMiddlewareNode.RESEARCH):str(RAGMiddlewareNode.RESEARCH),
             str(RAGMiddlewareNode.EXIT):str(RAGMiddlewareNode.EXIT),
+        })
+
+        rag_middleware_flow_graph.add_conditional_edges(
+            str(RAGMiddlewareNode.RESEARCH),
+            self.work_flow.router, {
+            str(RAGMiddlewareNode.RESPONSE_REFINEMENT):str(RAGMiddlewareNode.RESPONSE_REFINEMENT),
         })
 
         rag_middleware_flow_graph.set_entry_point(str(RAGMiddlewareNode.ENTRY))

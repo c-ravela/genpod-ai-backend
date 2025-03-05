@@ -20,6 +20,7 @@ class RAGQueryStage(str, Enum):
     SELECT_AGENT = "select_agent"
     FORWARD_TO_RAG = "forward_to_rag"
     REFINE_RESPONSE = "refine_response"
+    FALLBACK_RESEARCH = "fallback_research"
     FINISHED = "finished"
 
     def __str__(self):
