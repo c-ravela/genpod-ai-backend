@@ -9,8 +9,7 @@ default:
     model: 'gpt-4o-2024-08-06'
     config:
       temperature: 0.3
-      model_kwargs:
-        top_p: 0.4
+      top_p: 0.4
       max_retries: 3
       streaming: True
   max_retries: 3 # Maximum retries for internal handling, not specific to any provider
@@ -80,6 +79,8 @@ agents:
     description: 'Designs the high-level system and architecture, responsible for creating requirements for project.'
   coder:
     description: 'Writes and optimizes code based on the architecture, focusing on implementing functionality with clean coding practices.'
+  research:
+    description: 'Conducts in-depth research by aggregating and synthesizing information from various online sources to generate actionable insights and refined queries.'
   rag_middleware:
     description: 'Acts as a mediator for the Retrieval-Augmented Generation (RAG) process by maintaining a group of specialized RAG agents. Upon receiving a question, it determines the most suitable agent to address it, forwards the question, and returns the accurate answer provided.'
   planner:
