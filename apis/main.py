@@ -4,6 +4,7 @@ from typing import List, Optional
 
 from agents.rag import RAGAgent
 from agents.rag_middleware import RAGMiddleware, register_rag_agent
+from agents.research import ResearchAgent
 from agents.supervisor import SupervisorAgent, SupervisorInput
 from apis.microservice.controller import MicroserviceController
 from apis.microservice_session.controller import MicroserviceSessionController
@@ -218,6 +219,17 @@ class ActionManager:
                 register_rag_agent(mismo_3_6_rag, mismo_3_6_rag_details.description)
                 rag_related_agents.append(mismo_3_6_rag)
 
+                research_details = self.agent_registry.research
+                research_agent = ResearchAgent(
+                    id=research_details.agent_id,
+                    name=research_details.agent_name,
+                    description=research_details.description,
+                    llm=research_details.llm,
+                    recursion_limit=research_details.recursion_limit,
+                    persistence_db_path=self.database_path
+                )
+                rag_related_agents.append(research_agent)
+
                 # Initialize the RAG middleware agent.
                 rag_middleware_details = self.agent_registry.rag_middleware
                 rag_middleware = RAGMiddleware(
@@ -225,8 +237,10 @@ class ActionManager:
                     name=rag_middleware_details.agent_name,
                     description=rag_middleware_details.description,
                     llm=rag_middleware_details.llm,
+                    research_agent=research_agent,
                     recursion_limit=rag_middleware_details.recursion_limit,
                     persistence_db_path=self.database_path,
+                    use_research_agent=True
                 )
                 rag_related_agents.append(rag_middleware)
 
@@ -243,7 +257,7 @@ class ActionManager:
                     agent.set_thread_id(session.id)
                     rag_agents_session[agent.id] = session.id
                     logger.info(f"Session created for RAG agent '{agent.id}': {session}")
-                
+
                 # Update the GenpodContext with RAG sessions.
                 if not self._genpod_context.agents_session:
                     self._genpod_context.update(agents_session=rag_agents_session)
