@@ -15,10 +15,13 @@ class.
 from .constants import ChatRoles, PStatus, RagResponseType, Status
 from .models import (Issue, IssuesQueue, PlannedIssue, PlannedIssuesQueue,
                      PlannedTask, PlannedTaskQueue, RequirementsDocument, Task,
-                     TaskQueue)
+                     TaskQueue, WebSearchResult, WebSearchResults)
 from .rag_middleware_models import (AdditionalInfoRequest, ErrorRegistry,
                                     RagAgentDetail, RagSelectionResponse)
 from .rag_models import BinaryScore, PromptResponse
+from .research_models import (EvaluationDetail, GeneratedResponse,
+                              RelevanceEvaluationResponse,
+                              SourceSelectionResponse)
 from .reviewer_models import IssuesReport
 
 __all__ = [
@@ -26,6 +29,8 @@ __all__ = [
     'BinaryScore',
     'ChatRoles',
     'ErrorRegistry',
+    'EvaluationDetail',
+    'GeneratedResponse',
     'Issue',
     'IssuesQueue',
     'IssuesReport',
@@ -39,7 +44,11 @@ __all__ = [
     'RagResponseType',
     'RagSelectionResponse',
     'RequirementsDocument',
+    'RelevanceEvaluationResponse',
     'Status',
+    'SourceSelectionResponse',
     'Task',
-    'TaskQueue'
+    'TaskQueue',
+    'WebSearchResult',
+    'WebSearchResults'
 ]
