@@ -25,7 +25,6 @@ class TestCoderWorkFlow(BaseWorkFlow[TestsGeneratorPrompts]):
 
     def __init__(self, agent_id: str, agent_name: str, llm: LLM, use_rag = False):
         super().__init__(agent_id, agent_name, TestsGeneratorPrompts(use_rag), llm, use_rag)
-        self.requirements_document = ""
 
     @route_on_errors
     def router(self, state: TestCoderState) -> str:
@@ -110,12 +109,7 @@ class TestCoderWorkFlow(BaseWorkFlow[TestsGeneratorPrompts]):
             state.operational_mode = TestsGeneratorMode.FINISHED
 
         state.current_test_generation = {}
-        self.requirements_document = (
-            f"{state.requirements_document.file_structure}\n"
-            f"{state.requirements_document.code_standards}\n"
-            f"{state.requirements_document.license_terms}"
-        )
-        logger.debug("Updated requirements_document: %s", self.requirements_document)
+
         logger.debug("Exiting entry_node with updated state: %s", state)
         return state
 
@@ -144,7 +138,7 @@ class TestCoderWorkFlow(BaseWorkFlow[TestsGeneratorPrompts]):
             {
                 'project_name': state.project_name,
                 'project_path': os.path.join(state.project_directory, state.project_name),
-                'requirements_document': self.requirements_document,
+                'requirements_document': state.requirements_document.to_markdown(),
                 'task': task.description,
                 'error_message': state.error_message
             },
@@ -235,7 +229,7 @@ class TestCoderWorkFlow(BaseWorkFlow[TestsGeneratorPrompts]):
             {
                 'project_name': state.project_name,
                 'project_path': project_path,
-                'requirements_document': self.requirements_document,
+                'requirements_document': state.requirements_document.to_markdown(),
                 'task': task.description,
                 'error_message': state.error_message,
                 'functions_skeleton': state.current_test_generation['functions_signature']
@@ -330,7 +324,7 @@ class TestCoderWorkFlow(BaseWorkFlow[TestsGeneratorPrompts]):
             'issue_details': planned_issue.issue_details(),
             'project_name': state.project_name,
             'project_path': os.path.join(state.project_directory, state.project_name),
-            'requirements_document': self.requirements_document,
+            'requirements_document': state.requirements_document.to_markdown(),
             'error_message': state.error_message,
         }
         logger.debug("Invoking skeleton generation for issue with parameters: %s", params)
@@ -381,7 +375,7 @@ class TestCoderWorkFlow(BaseWorkFlow[TestsGeneratorPrompts]):
             'issue_details': planned_issue.issue_details(),
             'project_name': state.project_name,
             'project_path': os.path.join(state.project_directory, state.project_name),
-            'requirements_document': self.requirements_document,
+            'requirements_document': state.requirements_document.to_markdown(),
             'error_message': state.error_message,
             'functions_skeleton': planned_issue.function_signatures
         }

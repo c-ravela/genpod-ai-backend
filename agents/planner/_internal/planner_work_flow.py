@@ -176,7 +176,7 @@ class PlannerWorkFlow(BaseWorkFlow[PlannerPrompts]):
             self.prompts.task_breakdown_prompt,
             {
                 "deliverable": state.current_task.description,
-                "context": f"{state.requirements_document.to_markdown()}\n\n{state.additional_information}",
+                "context": f"{state.user_prompt}\n\n{state.requirements_document.to_markdown()}\n\n{state.additional_information}",
                 "feedback": state.error_message
             }, 'string'
         )
@@ -230,7 +230,7 @@ class PlannerWorkFlow(BaseWorkFlow[PlannerPrompts]):
                 {
                     'backlog': backlog,
                     'deliverable': state.current_task.description,
-                    'context': f"{state.requirements_document.to_markdown()}\n\n{state.additional_information}",
+                    'context': f"{state.user_prompt}\n\n{state.requirements_document.to_markdown()}\n\n{state.additional_information}",
                     'feedback': state.error_message
                 },
                 'string'
