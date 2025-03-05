@@ -341,6 +341,19 @@ class AgentRegistry(Enum):
         use_rag=False
     )
 
+    research: AgentInfo = AgentInfo(
+        agent_name="Research Assistant",
+        agent_id="RES_08",
+        alias="research",
+        description=(
+            "Conducts in-depth research by aggregating and synthesizing information from various online sources. "
+            "Supports the project by refining queries, gathering relevant data, and generating insights that complement "
+            "the work of other agents."
+        ),
+        recursion_limit=25,
+        use_rag=False
+    )
+
     @property
     def agent_name(self) -> str:
         return self.value.agent_name
