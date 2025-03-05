@@ -30,7 +30,6 @@ class InformationGatheringStage(str, Enum):
     """
     Represents different stages of the information gathering process.
     """
-    IN_PROGRESS = "in_progress"
     REQUEST_ADDITIONAL_INFO = "request_additional_info"
     RECEIVE_ADDITIONAL_INFO = "receive_additional_info"
     FINISHED = "finished"
