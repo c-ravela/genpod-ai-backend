@@ -9,15 +9,12 @@ default:
     model: 'gpt-4o-2024-08-06'
     config:
       temperature: 0.3
-      model_kwargs:
-        top_p: 0.4
-      max_retries: 4
+      top_p: 0.4
+      max_retries: 3
       streaming: True
   max_retries: 3 # Maximum retries for internal handling, not specific to any provider
   retry_backoff: 3 # Time (in seconds) to wait before retrying a request
   max_graph_recursion_limit: 1000
-  user_input_path: /path/to/user_input/textfile.txt
-  project_output_directory: /directory/path/to/project/output
 
 # Configuration for supported LLM providers and their respective models
 providers:
@@ -82,16 +79,21 @@ agents:
     description: 'Designs the high-level system and architecture, responsible for creating requirements for project.'
   coder:
     description: 'Writes and optimizes code based on the architecture, focusing on implementing functionality with clean coding practices.'
-  rag:
-    description: 'Responsible for retrieval-augmented generation tasks, combining data retrieval with language generation for enhanced accuracy.'
+  research:
+    description: 'Conducts in-depth research by aggregating and synthesizing information from various online sources to generate actionable insights and refined queries.'
+  rag_middleware:
+    description: 'Acts as a mediator for the Retrieval-Augmented Generation (RAG) process by maintaining a group of specialized RAG agents. Upon receiving a question, it determines the most suitable agent to address it, forwards the question, and returns the accurate answer provided.'
   planner:
     description: 'Manages project planning, timelines, and task prioritization, ensuring smooth progress and resource allocation.'
   tests_generator:
     description: 'Generates and validates test cases to ensure that code meets the required standards and passes all quality checks.'
-  human:
-    description: 'Represents human interactions and decisions in the loop, handling tasks that require human oversight or creative judgment.'
   reviewer:
     description: 'Performs code reviews, suggests improvements, and ensures that all outputs meet quality and performance standards.'
 
-vector_collections_name: "MISMO-version-3.6-docs"
+rag_agents:
+  mismo_3_6_rag:
+    description: "Specialized RAG agent that addresses queries related to MISMO 3.6 standards, providing accurate and comprehensive responses."
+    collection_name: "MISMO-version-3.6-docs"
+    vector_database_path: "/opt/genpod/vector_collections"
+
 max_graph_recursion_limit: 1500

@@ -44,7 +44,7 @@ def setup_logger():
     # Set root logger to WARNING
     logging.basicConfig(level=logging.ERROR)
 
-    logger = logging.getLogger('Compage_AI_Backend')
+    logger = logging.getLogger('Genpod')
     logger.setLevel(log_level)
 
     handler = logging.StreamHandler()

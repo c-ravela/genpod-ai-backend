@@ -33,12 +33,12 @@ class EnvironmentVariables(BaseModel):
 
     OPENAI_API_KEY: str = Field(
         description="API key for OpenAI services.",
-        required=True,
+        required=False,
     )
 
     SEMGREP_APP_TOKEN: str = Field(
         description="App token for Semgrep service.",
-        required=True,
+        required=False,
     )
 
     @field_validator('GENPOD_CONFIG_PATH')

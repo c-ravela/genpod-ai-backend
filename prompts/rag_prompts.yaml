@@ -1,0 +1,60 @@
+retriever_grader_prompt_template:
+  template: |
+    You are a grader assessing relevance of a retrieved document to a user question. \n 
+    Here is the retrieved document: \n\n {document} \n\n
+    Here is the user question: {question} \n
+    If the document contains keywords related to the user question, grade it as relevant. \n
+    It does not need to be a stringent test. The goal is to filter out erroneous retrievals. \n
+    Give a binary score 'True' or 'False' score to indicate whether the document is relevant to the question. \n
+    
+    Output format instructions:
+    `{format_instructions}`
+
+hallucination_grader_prompt_template:
+  template: |
+    You are a grader assessing whether an answer is grounded in / supported by a set of facts.
+    Here are the facts:
+    {documents}
+
+    Here is the answer:
+    {generation}
+
+    Give a binary score 'True' or 'False' score to indicate whether the answer is grounded in/supported by a set of facts.
+
+    Output format instructions:
+    `{format_instructions}`
+
+re_write_prompt_template:
+  template: |
+    You a question re-writer that converts an input question to a better version that is optimized 
+    for vectorstore retrieval. Look at the initial and formulate an improved question.
+
+    Initial question:
+    {question}
+
+answer_grader_prompt_template:
+  template: |
+    You are a grader assessing whether an answer is useful to resolve a question. \n 
+    Here is the question:
+    {question}
+
+    Here is the answer:
+    {generation} 
+
+    Give a binary score 'True' or 'False' to indicate whether the answer is useful to resolve a question. \n
+
+    Output format instructions:
+    `{format_instructions}`
+
+rag_generation_template:
+  template: |
+    Use the following context to answer the user's query.
+
+    User's Query:
+    {question}
+
+    Context:
+    {context}
+
+    Output format instructions:
+    `{format_instructions}`

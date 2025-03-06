@@ -1,4 +1,6 @@
-from abc import ABC, abstractmethod
+import json
+from abc import ABC, ABCMeta, abstractmethod
+from dataclasses import dataclass
 from time import sleep
 from typing import Any, Dict, Generic, Literal, Type, TypeVar, Union
 
@@ -7,81 +9,136 @@ from langchain_core.prompts import PromptTemplate
 from langchain_core.runnables.base import RunnableSequence
 from pydantic import BaseModel, ValidationError
 
+from core.prompt import BasePrompt
+from llms.llm_metrics_callback import *
+from models import AdditionalInfoRequest
+from utils.decorators import auto_repr
+from utils.logs.logging_utils import logger
+
 TLLMInstance = TypeVar('TLLMInstance')
 TResponse = TypeVar('TResponse', bound=BaseModel)
 
 
-class LLMMetrics:
-    """Class to represent metrics related to LLM invocations."""
-
-    def __init__(self, it: int, ot: int, tt: int) -> None:
-        """
-        Initializes the metrics with input, output, and total token counts.
-
-        Args:
-            it (int): The number of input tokens.
-            ot (int): The number of output tokens.
-            tt (int): The total number of tokens (input + output).
-        """
-        self.input_tokens = it
-        self.output_tokens = ot
-        self.total_tokens = tt
-   
-    def __str__(self) -> str:
-        return (
-            f"total_tokens: {self.total_tokens}, input_tokens: {self.input_tokens}, "
-            f"output_tokens: {self.output_tokens}"
-        )
-
-
+@dataclass
 class LLMOutput(Generic[TResponse]):
     """Represents the output of a language model invocation, including response and metrics."""
-    
-    def __init__(self, response: TResponse, metrics: LLMMetrics) -> None:
-        """
-        Initializes the LLMOutput with the response and its associated metrics.
-
-        Args:
-            response (TResponse): The response from the LLM.
-            metrics (LLMMetrics): The metrics associated with the response.
-        """
-        self.response: TResponse = response
-        self.metrics = metrics
-
-    def __str__(self) -> str:
-        return (
-            f'response: {self.response}'
-            f'\nmetrics: {self.metrics}'
-        )
+    response: TResponse
+    token_usage: TokenUsage
 
 
-class LLM(ABC, Generic[TLLMInstance]):
+class LLMMeta(ABCMeta):
+    """Metaclass for registering LLM providers."""
+
+    _registry = {}
+
+    def __new__(cls, name, bases, attrs):
+        logger.debug("Creating a new class with LLMMeta: %s", name)
+        new_class = super().__new__(cls, name, bases, attrs)
+        provider = attrs.get('provider_name')
+        if provider:
+            cls._registry[provider] = new_class
+            logger.info("Registered LLM provider: %s", provider)
+        return new_class
+
+    @classmethod
+    def get_provider(cls, provider_name: str):
+        """Gets a registered LLM provider by name"""
+        logger.debug("Looking up provider: %s", provider_name)
+        provider_class = cls._registry.get(provider_name)
+        if provider_class:
+            logger.info("Found provider: %s", provider_name)
+        else:
+            logger.warning("Provider not found: %s", provider_name)
+        return provider_class
+
+
+@auto_repr
+class LLM(ABC, Generic[TLLMInstance], metaclass=LLMMeta):
     """Abstract base class for different LLM (Large Language Model) providers."""
 
-    def __init__(self, provider: str, model: str, model_config: Dict[str, Any], llm_class: Type[TLLMInstance], max_retries: int, retry_backoff: float) -> None:
+    def __init__(
+        self,
+        model: str,
+        model_config: Dict[str, Any],
+        max_retries: int,
+        retry_backoff: float
+    ) -> None:
         """
         Initializes the LLM with the given provider, model, and configuration, along with retry mechanism defaults.
         """
-        self.provider = provider
+        logger.debug(
+            "Initializing LLM with model: %s, model_config: %s, max_retries: %d, retry_backoff: %f",
+            model, model_config, max_retries, retry_backoff
+        )
         self.model = model
         self.model_config = model_config
-        self._llm_instance = llm_class(model=self.model, **self.model_config)
-        self.__max_retries = max_retries
+        self._callbacks = []
+        self._llm_instance = self._initialize_llm_instance()
+        self._max_retries = max_retries
         self._retry_backoff = retry_backoff
-        self.__current_retry_backoff = self._retry_backoff
-        self._last_metrics = LLMMetrics(0, 0, 0)
-        
-    def invoke_with_pydantic_model(self, prompt: PromptTemplate, prompt_inputs: Dict[str, Any], response_model: Type[TResponse]) -> LLMOutput[TResponse]:
-        """
-        Invoke the LLM chain and return the response, with an optional retry mechanism, and parse into a structured model.
-        """
-        default_response_type = 'json'
-        return self.__invoke_with_retry(prompt, prompt_inputs, default_response_type, response_model)
+        self._current_retry_backoff = self._retry_backoff
+        self._last_metrics = TokenUsage()
+        logger.info("LLM initialized successfully.")
 
-    def invoke(self, prompt: PromptTemplate, prompt_inputs: Dict[str, Any], response_type: Literal['string', 'json', 'raw'] = 'raw') -> LLMOutput[Union[str, dict, AIMessage]]:
+    @property
+    @abstractmethod
+    def provider(self) -> str:
+        """Return the provider name."""
+        pass
+
+    @abstractmethod
+    def _initialize_llm_instance(self) -> TLLMInstance:
+        """Initialize the LLM instance. Must be implemented by subclasses."""
+        pass
+
+    @abstractmethod
+    def _create_chain(
+        self,
+        prompt: PromptTemplate,
+        response_type: Literal['string', 'json', 'raw']
+    ) -> RunnableSequence:
+        """Create a runnable chain for invoking the LLM. Must be implemented by provider classes."""
+        pass
+
+    def invoke_with_pydantic_model(
+        self,
+        prompt: BasePrompt,
+        prompt_inputs: Dict[str, Any],
+        response_model: Type[TResponse]
+    ) -> LLMOutput[Union[TResponse, AdditionalInfoRequest]]:
+        """
+        Invoke the LLM chain and return the response, parsing it into a structured model.
+
+        If a response_model is provided, this method first attempts to parse the LLM's response using that model.
+        If that fails, it then attempts to parse the response as an AdditionalInfoRequest.
+        
+        This method uses a retry mechanism as implemented in __invoke_with_retry.
+        
+        Returns:
+            LLMOutput containing either a response of type TResponse or an AdditionalInfoRequest.
+        """
+        logger.debug("Invoking LLM with structured model response.")
+        return self.__invoke_with_retry(prompt, prompt_inputs, 'json', response_model)
+
+    def invoke(
+        self,
+        prompt: BasePrompt,
+        prompt_inputs: Dict[str, Any],
+        response_type: Literal['string', 'json', 'raw'] = 'raw'
+    ) -> LLMOutput[Union[str, dict, AIMessage, AdditionalInfoRequest]]:
         """
         Invoke the LLM chain and return the response in the specified format.
+        
+        If the LLM output does not match the expected type, it will attempt to parse it as an AdditionalInfoRequest.
+        
+        Expected method signature:
+            def invoke(self, prompt: BasePrompt, prompt_inputs: Dict[str, Any],
+                    response_type: Literal['string', 'json', 'raw'] = 'raw') -> LLMOutput[Union[str, dict, AIMessage, AdditionalInfoRequest]]:
+        
+        Returns:
+            LLMOutput containing either the raw response (string, dict, or AIMessage) or an AdditionalInfoRequest.
         """
+        logger.debug("Invoking LLM with response type: %s", response_type)
         return self.__invoke_with_retry(prompt, prompt_inputs, response_type)
 
     def _extract_usage_metadata(self, llm_response: AIMessage):
@@ -91,95 +148,141 @@ class LLM(ABC, Generic[TLLMInstance]):
 
         usage_metadata = llm_response.usage_metadata
         if usage_metadata:
-            self._last_metrics = LLMMetrics(
-                it=usage_metadata.get('input_tokens', 0),
-                ot=usage_metadata.get('output_tokens', 0),
-                tt=usage_metadata.get('total_tokens', 0)
+            self._last_metrics = TokenUsage(
+                input_tokens=usage_metadata.get('input_tokens', 0),
+                output_tokens=usage_metadata.get('output_tokens', 0),
+                total_tokens=usage_metadata.get('total_tokens', 0)
             )
+            logger.debug("Extracted usage metadata: %s", self._last_metrics)
         else:
-            self._last_metrics = LLMMetrics(0, 0, 0)
+            self._last_metrics = TokenUsage()
 
         return llm_response
 
-    @abstractmethod
-    def _create_chain(self, prompt: PromptTemplate, response_type: Literal['string', 'json', 'raw']) -> RunnableSequence:
-        """Create a runnable chain for invoking the LLM. Must be implemented by provider classes."""
-        pass
+    def _parse_llm_response(
+        self,
+        runnable_response: Any,
+        response_type: Literal['string', 'json', 'raw'],
+        response_model: Type[TResponse] = None
+    ) -> Union[str, dict, AIMessage, TResponse, AdditionalInfoRequest]:
+        """
+        Parses the output from the LLM invocation.
 
-    def __invoke_with_retry(self, prompt: PromptTemplate, prompt_inputs: Dict[str, Any], response_type: Literal['string', 'json', 'raw'] = 'raw', response_model: Type[TResponse] = None) -> LLMOutput[Union[str, dict, AIMessage, TResponse]]:
+        For response_type 'raw', if the runnable_response has a 'content' attribute, that is used.
+        For 'string' and 'json', the method attempts to parse the output as JSON if possible.
+        If a response_model is provided, it first attempts to parse the output using that model;
+        if that fails due to a validation error, it then attempts to parse the output as an AdditionalInfoRequest.
+        If no response_model is provided, it checks if the parsed output is a dict with a "question" key
+        and, if so, attempts to parse it as an AdditionalInfoRequest.
+
+        Returns:
+            The final parsed response.
+        """
+        # For raw responses, try to retrieve content
+        if response_type == 'raw' and hasattr(runnable_response, "content"):
+            raw_output = runnable_response.content
+        else:
+            raw_output = runnable_response
+
+        # Try to parse raw_output as JSON if it's a string
+        if isinstance(raw_output, str):
+            try:
+                parsed = json.loads(raw_output)
+            except (ValueError, TypeError):
+                parsed = raw_output  # Fallback: use the raw string
+        elif isinstance(raw_output, dict):
+            parsed = raw_output
+        else:
+            # If not a string or dict, convert to string and try to parse JSON
+            try:
+                parsed = json.loads(str(raw_output))
+            except Exception:
+                parsed = str(raw_output)
+
+        # If a response model is provided, attempt to parse with it.
+        if response_model:
+            try:
+                # If parsed is a dict, unpack; else, try parsing from raw string.
+                final_response = response_model(**parsed)
+            except ValidationError as e:
+                logger.debug("Parsing with response_model (%s) failed: %s", response_model.__name__, e)
+                try:
+                    final_response = AdditionalInfoRequest(**parsed)
+                except ValidationError as e2:
+                    raise ValueError(
+                        f"Response does not match expected model ({response_model.__name__}) "
+                        f"nor AdditionalInfoRequest: {e}; {e2}"
+                    )
+            return final_response
+        else:
+            # No response model provided.
+            if isinstance(parsed, dict) and "question" in parsed:
+                try:
+                    final_response = AdditionalInfoRequest(**parsed)
+                except ValidationError as ve:
+                    logger.debug("Parsing as AdditionalInfoRequest failed: %s", ve)
+                    final_response = parsed
+            else:
+                final_response = parsed
+            return final_response
+
+    def __invoke_with_retry(
+        self, 
+        prompt: BasePrompt,
+        prompt_inputs: Dict[str, Any],
+        response_type: Literal['string', 'json', 'raw'] = 'raw',
+        response_model: Type[TResponse] = None
+    ) -> LLMOutput[Union[str, dict, AIMessage, TResponse, AdditionalInfoRequest]]:
         """
         Invokes the LLM with a retry mechanism.
+
+        If a response_model is provided, this method first attempts to parse the LLM's output using that model.
+        If parsing fails due to validation errors, it then attempts to parse the output as an AdditionalInfoRequest.
+        If no response_model is provided, it still checks if the output can be interpreted as an AdditionalInfoRequest
+        (for example, if the output is a JSON dict with a "question" key).
+
+        Returns:
+            LLMOutput containing either the final response (of type TResponse) or an AdditionalInfoRequest.
         """
         attempt = 0
-        wrapped_prompt = self.__wrap_prompt_with_instructions(prompt, prompt_inputs)
+        rendered_prompt = prompt.render(**prompt_inputs)
+        final_prompt = PromptTemplate.from_template(rendered_prompt)
         feedback = ""
         
-        while attempt < self.__max_retries:
+        current_metrics = MetricsContext(self.provider, self.model)
+        self._callbacks = [LLMMetricsCallback(current_metrics)]
+
+        while attempt < self._max_retries:
             try:
-                runnable = self._create_chain(wrapped_prompt, response_type)
-                runnable_response = runnable.invoke({'feedback': feedback})
+                logger.debug("Attempting to invoke LLM (attempt %d).", attempt + 1)
+                runnable = self._create_chain(final_prompt, response_type)
+                runnable_response = runnable.invoke(
+                    {'feedback': feedback},
+                    config={"callbacks": self._callbacks}
+                )
 
-                if response_model:
-                    try:
-                        final_response = response_model(**runnable_response)
-                    except ValidationError as e:
-                        raise ValueError(f"Response does not match the expected model: {e}")
-                else:
-                    final_response = runnable_response
-
-                # Reset retry backoff to default after successful invocation
-                self.__current_retry_backoff = self._retry_backoff
-                return LLMOutput(final_response, self._last_metrics)
+                final_response = self._parse_llm_response(runnable_response, response_type, response_model)
             
+                # Reset retry backoff to default after successful invocation
+                self._current_retry_backoff = self._retry_backoff
+                logger.info("LLM invocation successful on attempt %d.", attempt + 1)
+                current_metrics.save_to_db()
+                return LLMOutput(final_response, self._last_metrics)
+            except KeyError as ke:
+                logger.error("Unrecoverable KeyError in prompt formatting: %s", ke, exc_info=True)
+                raise RuntimeError(f"Unrecoverable error in prompt template: {ke}") from ke 
             except Exception as e:
                 attempt += 1
+                logger.warning(
+                    "Invocation failed (attempt %d/%d): %s", attempt, self._max_retries, str(e)
+                )
                 feedback = str(e)
-                if attempt >= self.__max_retries:
-                    self.__current_retry_backoff = self._retry_backoff
-                    raise RuntimeError(f"LLM invocation failed after {self.__max_retries} attempts: {e}")
-                else:
-                    # print(f"Invocation failed (attempt {attempt}/{self.__max_retries}). Retrying in {self.__current_retry_backoff} seconds...")
-                    sleep(self.__current_retry_backoff)
-                    self.__current_retry_backoff *= 2
-
-    def __wrap_prompt_with_instructions(self, prompt: PromptTemplate, prompt_inputs: Dict[str, Any]) -> PromptTemplate:
-        """
-        Wraps the user prompt with additional instructions and feedback handling.
-        """
-        user_prompt = prompt.format(**prompt_inputs)
-        user_prompt = user_prompt.replace("{", "{{").replace("}", "}}")
-
-        wrapped_prompt = PromptTemplate(
-            template="""
-            Please adhere to the following instructions:
-
-            1. If the prompt specifies a particular format, follow it exactly.
-            2. Avoid including any unnecessary introductory phrases (e.g., "Here is my response") 
-            or tail phrases (e.g., "Thank you for your question.").
-
-            Note: If any format instructions are given and there was a previous error in your response,
-            you will receive feedback to improve future outputs.
-
-            `{feedback}`
-
-            {formatted_user_prompt}
-            """,
-            input_variables=['feedback'],
-            partial_variables={
-                "formatted_user_prompt": user_prompt
-            }
-        )
-
-        return wrapped_prompt
-    
-    def __str__(self):
-        return (
-            f"LLM Provider: {self.provider}\n"
-            f"Model: {self.model}\n"
-            f"Model Config: {self.model_config}\n"
-            f"Max Retries: {self.__max_retries}\n"
-            f"Retry Backoff: {self._retry_backoff}\n"
-            f"Last Metrics: Input Tokens: {self._last_metrics.input_tokens}, "
-            f"Output Tokens: {self._last_metrics.output_tokens}, "
-            f"Total Tokens: {self._last_metrics.total_tokens}"
-        )
+                if attempt >= self._max_retries:
+                    logger.error(
+                        "LLM invocation failed after %d attempts. Error: %s", self._max_retries, str(e)
+                    )
+                    self._current_retry_backoff = self._retry_backoff
+                    raise RuntimeError(f"LLM invocation failed: {e}")
+                sleep(self._current_retry_backoff)
+                logger.debug("Retrying after backoff: %.2f seconds.", self._current_retry_backoff)
+                self._current_retry_backoff *= 2

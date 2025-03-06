@@ -1,0 +1,17 @@
+# List of research sources, each containing:
+# - `url`: The web link to the source.
+# - `name`: A brief title or identifier for the source.
+# - `description`: A short summary of the source's content or purpose.
+#
+# Example format:
+# sources:
+#   - url: https://example.com/article1
+#     name: Example Source 1
+#     description: A research paper on AI advancements.
+#   - url: https://example.com/article2
+#     name: Example Source 2
+#     description: A blog post covering recent tech trends.
+#
+# Add actual sources below:
+
+sources:
