@@ -3,6 +3,9 @@
 import os
 import sys
 
+from openinference.instrumentation.openai import OpenAIInstrumentor
+from phoenix.otel import register
+
 from apis.main import Action
 from configs.project_config import ProjectConfig
 from configs.project_path import set_project_path
@@ -10,27 +13,10 @@ from context.context import GenpodContext
 from database.sqlite import SQLite
 from utils.logs.logging_utils import logger
 from utils.time import get_timestamp
-from utils.fs import read_file, write_supervisor_state_to_file
-from phoenix.otel import register
-from openinference.instrumentation.openai import OpenAIInstrumentor
-
-tracer_provider = register(project_name="genpod", endpoint='http://0.0.0.0:6006/v1/traces')
-OpenAIInstrumentor().instrument(tracer_provider=tracer_provider)
-
-print(
-    "\n\nWe greatly appreciate your interest! Please note that we are in the "
-    "midst of active development and are striving to make improvements every day!\n\n"
-)
-
-if __name__ == "__main__":
-    load_dotenv()  # dotenv is just dev environment will be removed for production
-
-    try:
-        pe = ProjectEnvironment()
-
-    except Exception:
-        logger.error("Error loading environment variables.")
 from utils.yaml_utils import read_yaml
+
+tracer_provider = register(project_name="Genpod", endpoint='http://localhost:6006/v1/traces')
+OpenAIInstrumentor().instrument(tracer_provider=tracer_provider)
 
 
 def main():
@@ -184,7 +170,6 @@ def main():
             logger.error(
                 f"Unrecognized action: {requested_action}. Valid actions are 'generate', 'resume', 'microservice_status', or 'add_project'."
             )
-            write_supervisor_state_to_file(super_state)
             sys.exit(1)
     except Exception as e:
         logger.critical(f"An unexpected error occurred while executing action '{requested_action}': {e}", exc_info=True)
@@ -212,4 +197,4 @@ if __name__ == "__main__":
         logger.info("Genpod script executed successfully.")
     except Exception as e:
         logger.critical(f"Unhandled exception in script execution: {e}", exc_info=True)
-        raise 
+        raise
