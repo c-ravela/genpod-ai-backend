@@ -1,3 +1,4 @@
+import os
 import sys
 import time
 from typing import List, Optional
@@ -560,12 +561,25 @@ class Action:
     @staticmethod
     def _prompt_user_for_project_idea() -> str:
         """
-        Prompt the user for a project idea and validate the input.
+        Prompt the user to enter a project idea via standard input or from a file.
 
         Returns:
-            str: The validated project idea provided by the user.
+            str: The validated project idea.
         """
-        return Action._prompt_for_input("Enter your project idea (at least 10 characters)", min_length=10)
+        while True:
+            try:
+                input_type = input("Enter 1 to provide project idea via file, or 2 to enter manually: ").strip()
+                
+                if input_type == "1":
+                    return Action._prompt_for_file_input()
+                elif input_type == "2":
+                    return Action._prompt_for_input("Enter your project idea (at least 10 characters)", min_length=10)
+                else:
+                    print("Invalid choice. Please enter 1 or 2.")
+            
+            except Exception as e:
+                logger.exception("Error during user input type selection.")
+                raise
 
     @staticmethod
     def _get_project_details(user_id: int) -> Optional[int]:
@@ -764,7 +778,55 @@ class Action:
             except Exception as e:
                 logger.exception("Error during user input.")
                 raise
-    
+
+    @staticmethod
+    def _prompt_for_file_input() -> str:
+        """
+        Prompt the user for a file path, validate the file type and content length.
+
+        Returns:
+            str: The validated file content.
+
+        Raises:
+            Exception: If the file is not valid or content is insufficient.
+        """
+        while True:
+            try:
+                file_path = input("Enter the path to your Markdown file (.md): ").strip()
+
+                # Validate file extension
+                if not file_path.lower().endswith(".md"):
+                    print("Invalid file type. Please provide a Markdown (.md) file.")
+                    continue
+
+                # Validate file existence
+                if not os.path.exists(file_path):
+                    print("File does not exist. Please enter a valid file path.")
+                    continue
+
+                try:
+                    # Attempt to open the file
+                    with open(file_path, "r", encoding="utf-8") as file:
+                        content = file.read().strip()
+                except UnicodeDecodeError:
+                    print("The file contains unsupported characters or is not in a readable text format.")
+                    print("Please provide a valid UTF-8 encoded Markdown (.md) file.")
+                    logger.error(f"Unsupported characters detected in file: {file_path}")
+                    continue
+
+                # Validate content length
+                if len(content) < 20:
+                    print("File content is too short. Please provide a file with at least 20 characters.")
+                    continue
+
+                logger.debug(f"User provided valid file input from {file_path}")
+                return content
+
+            except Exception as e:
+                logger.exception("Error during file input processing.")
+                print("An unexpected error occurred while processing the file. Please try again.")
+                raise
+
     @staticmethod
     def _get_project(project_id: int, user_id: int) -> Optional[Project]:
         """
