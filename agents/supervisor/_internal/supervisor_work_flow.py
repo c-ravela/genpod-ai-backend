@@ -13,12 +13,14 @@ from llms.llm import LLM
 from models.constants import ChatRoles, PStatus, Status
 from models.models import IssuesQueue, Task
 from utils.logs.logging_utils import logger
+from utils.otel import trace_span
 
 
 class SupervisorWorkFlow(BaseWorkFlow[SupervisorPrompts]):
 
     team: Team
 
+    @trace_span
     def __init__(self, agent_id: str, agent_name: str, llm: LLM, use_rag: bool) -> None:
         """
         Initializes a SupervisorAgent instance.
@@ -37,6 +39,7 @@ class SupervisorWorkFlow(BaseWorkFlow[SupervisorPrompts]):
         self.called_agent: str = ""
         logger.info("SupervisorAgent instance created successfully.")
 
+    @trace_span
     def setup_team(self, team: Team) -> None:
         """
         Sets up the supervisor's team for the project.
@@ -58,6 +61,7 @@ class SupervisorWorkFlow(BaseWorkFlow[SupervisorPrompts]):
         self.team = team
         logger.info("Supervisor team configuration completed successfully.")
 
+    @trace_span
     def router(self, state: SupervisorState) -> str:
         """
         Delegates tasks across agents based on the current project status.
@@ -227,6 +231,7 @@ class SupervisorWorkFlow(BaseWorkFlow[SupervisorPrompts]):
         logger.info("Delegator: No specific action matched. Invoking update_state.")
         return 'exit'
 
+    @trace_span
     @record_node('entry')
     def entry_node(self, state: SupervisorState) -> SupervisorState:
         """
@@ -266,6 +271,7 @@ class SupervisorWorkFlow(BaseWorkFlow[SupervisorPrompts]):
         self._genpod_context.update(microservice_id=state.microservice_id)
         return state
 
+    @trace_span
     @record_node()
     def call_supervisor(self, state: SupervisorState) -> SupervisorState:
         """
@@ -504,7 +510,8 @@ class SupervisorWorkFlow(BaseWorkFlow[SupervisorPrompts]):
                 f"Supervisor: Unhandled project status encountered. Current project status: {state.project_status}."
             )
             return state
-    
+
+    @trace_span
     @record_node()
     def call_architect(self, state: SupervisorState) -> SupervisorState:
         """
@@ -558,6 +565,7 @@ class SupervisorWorkFlow(BaseWorkFlow[SupervisorPrompts]):
         logger.warning("Architect agent received unhandled project status. No changes made to the state.")
         return state
 
+    @trace_span
     @record_node()
     def call_human(self, state: SupervisorState) -> SupervisorState:
         """
@@ -619,6 +627,7 @@ class SupervisorWorkFlow(BaseWorkFlow[SupervisorPrompts]):
 
         return state
 
+    @trace_span
     @record_node()
     def call_planner(self, state: SupervisorState) -> SupervisorState:
         """
@@ -703,6 +712,7 @@ class SupervisorWorkFlow(BaseWorkFlow[SupervisorPrompts]):
             logger.error("Error during Planner agent invocation: %s", str(e))
             raise e
 
+    @trace_span
     @record_node()
     def call_coder(self, state: SupervisorState) -> SupervisorState:
         """
@@ -799,6 +809,7 @@ class SupervisorWorkFlow(BaseWorkFlow[SupervisorPrompts]):
             logger.error("Error during Coder agent invocation: %s", str(e))
             raise e
 
+    @trace_span
     @record_node()
     def call_test_code_generator(self, state: SupervisorState) -> SupervisorState:
         """
@@ -893,6 +904,7 @@ class SupervisorWorkFlow(BaseWorkFlow[SupervisorPrompts]):
             logger.error("Error during Test Code Generator agent invocation: %s", str(e))
             raise e
 
+    @trace_span
     @record_node()
     def call_reviewer(self, state: SupervisorState) -> SupervisorState:
         """
@@ -938,6 +950,7 @@ class SupervisorWorkFlow(BaseWorkFlow[SupervisorPrompts]):
             logger.error("Error during Reviewer agent invocation: %s", str(e))
             raise e
 
+    @trace_span
     @record_node('exit')
     def exit_node(self, state: SupervisorState) -> SupervisorOuptut:
         return state

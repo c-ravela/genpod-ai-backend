@@ -4,6 +4,7 @@ from core.agent import BaseAgent
 from genpod import Team
 from llms import LLM
 from utils.logs.logging_utils import logger
+from utils.otel import trace_span
 
 
 class SupervisorAgent(BaseAgent[SupervisorGraph]):
@@ -59,5 +60,6 @@ class SupervisorAgent(BaseAgent[SupervisorGraph]):
         
         logger.info("SupervisorAgent successfully initialized | ID: %s | Name: %s", id, name)
     
+    @trace_span
     def setup_team(self, team: Team) -> None:
         self.work_flow.setup_team(team)
