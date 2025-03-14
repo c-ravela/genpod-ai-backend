@@ -1,10 +1,24 @@
-"""Driving code file for this project."""
+"""Main driver for the Genpod project.
+
+This script initializes the tracing session, loads configuration and context,
+establishes a database connection, and executes one of several actions based on
+command-line input. It supports actions such as project generation, resuming a
+project, checking microservice status, and adding a new project.
+
+Usage:
+    python main.py <action> [<additional arguments>]
+
+Actions:
+    generate: Generate a new project (requires <project_id> and <user_id>)
+    resume: Resume an existing project (requires <user_id>)
+    microservice_status: Check microservice status (requires <project_id>, <service_id>, <user_id>)
+    add_project: Add a new project (requires <user_id>)
+
+Note:
+    The tracing session is started and stopped within the main execution block.f"""
 
 import os
 import sys
-
-from openinference.instrumentation.openai import OpenAIInstrumentor
-from phoenix.otel import register
 
 from apis.main import Action
 from configs.project_config import ProjectConfig
@@ -12,20 +26,19 @@ from configs.project_path import set_project_path
 from context.context import GenpodContext
 from database.sqlite import SQLite
 from utils.logs.logging_utils import logger
+from utils.otel import start_trace_session, stop_trace_session, trace_span
 from utils.time import get_timestamp
 from utils.yaml_utils import read_yaml
 
-tracer_provider = register(project_name="Genpod", endpoint='http://localhost:6006/v1/traces')
-OpenAIInstrumentor().instrument(tracer_provider=tracer_provider)
 
-
+@trace_span
 def main():
-    logger.info("Initializing Genpod main execution.")
+    logger.info("Starting Genpod main execution.")
 
     if len(sys.argv) < 2:
         logger.error(
-            "No action specified. Please provide an action such as 'generate', "
-            "'resume', 'microservice_status', or 'add_project'."
+            "No action specified. Provide one of: 'generate', 'resume', "
+            "'microservice_status', or 'add_project'."
         )
         sys.exit(1)
 
@@ -40,44 +53,42 @@ def main():
 
     try:
         setup_config = read_yaml(setup_config_path)
-        logger.info("Successfully loaded setup configuration.")
+        logger.info("Loaded setup configuration successfully.")
     except Exception as e:
-        logger.critical(f"Failed to load setup configuration. Error: {e}")
+        logger.critical(f"Failed to load setup configuration: {e}")
         raise
 
     db_path = setup_config.get('sqlite3_database_path')
     if not db_path:
-        logger.error("Database path not found in the configuration.")
+        logger.error("Database path missing in configuration.")
         sys.exit(1)
-    logger.debug(f"SQLite database path: {db_path}")
+    logger.debug(f"Using SQLite database path: {db_path}")
 
     try:
         genpod_config_path = setup_config.get('genpod_configuration_file_path')
         if not genpod_config_path:
-            logger.warning(
-                "The 'genpod_configuration_file_path' is missing in the setup configuration."
-            )
+            logger.warning("Missing 'genpod_configuration_file_path' in setup configuration.")
         config = ProjectConfig(genpod_config_path)
         config.load_config()
-        logger.info("Project configuration successfully loaded.")
+        logger.info("Project configuration loaded successfully.")
     except Exception as e:
-        logger.error(f"Error while loading project configuration: {e}")
+        logger.error(f"Error loading project configuration: {e}")
         raise
 
     try:
         genpod_context = GenpodContext()
-        logger.info("GenpodContext initialized successfully with default values.")
+        logger.info("Initialized Genpod context with default values.")
     except Exception as e:
-        logger.error(f"Failed to initialize GenpodContext. Error: {e}", exc_info=True)
+        logger.error(f"Error initializing Genpod context: {e}", exc_info=True)
         raise
 
     try:
         db = SQLite(db_path)
-        logger.info("Database connection established successfully.")
+        logger.info("Established database connection successfully.")
         db.create_tables()
         logger.info("Database tables created or verified successfully.")
     except Exception as e:
-        logger.error(f"Error during database initialization: {e}")
+        logger.error(f"Database initialization error: {e}")
         raise
 
     try:
@@ -87,7 +98,7 @@ def main():
             db_path,
             config.max_graph_recursion_limit
         )
-        logger.debug(f"Action object initialized with configuration: {action_obj}")
+        logger.debug(f"Initialized Action object: {action_obj}")
 
         if requested_action == "generate":
             if len(sys.argv) < 4:
@@ -105,12 +116,14 @@ def main():
             project_path = set_project_path(setup_config['code_output_directory'], get_timestamp())
             genpod_context.update(project_path=project_path)
             logger.info(f"Generated project path: {project_path}")
-            logger.info("Context successfully updated for the 'generate' action.")
+            logger.info("Context updated for 'generate' action.")
 
-            license_header = "SPDX-License-Identifier: Apache-2.0\nCopyright 2024 Authors of CRBE & the Organization created CRBE"
+            # license_header = "SPDX-License-Identifier: Apache-2.0\nCopyright 2024 Authors of CRBE & the Organization created CRBE"
+            license_header = ""
             license_url = "https://raw.githubusercontent.com/intelops/tarian-detector/8a4ff75fe31c4ffcef2db077e67a36a067f1437b/LICENSE"
             action_obj.generate(project_id, user_id, project_path, license_header, license_url)
             logger.info("'Generate' action executed successfully.")
+
         elif requested_action == "resume":
             if len(sys.argv) < 3:
                 logger.error(
@@ -127,6 +140,7 @@ def main():
 
             action_obj.resume(user_id)
             logger.info("The 'resume' action completed successfully.")
+
         elif requested_action == "microservice_status":
             if len(sys.argv) < 5:
                 logger.error(
@@ -150,6 +164,7 @@ def main():
 
             action_obj.microservice_status(user_id, project_id, service_id)
             logger.info("The 'microservice_status' action completed successfully.")
+
         elif requested_action == "add_project":
             if len(sys.argv) < 3:
                 logger.error(
@@ -171,6 +186,7 @@ def main():
                 f"Unrecognized action: {requested_action}. Valid actions are 'generate', 'resume', 'microservice_status', or 'add_project'."
             )
             sys.exit(1)
+
     except Exception as e:
         logger.critical(f"An unexpected error occurred while executing action '{requested_action}': {e}", exc_info=True)
         raise
@@ -193,7 +209,9 @@ def main():
 if __name__ == "__main__":
     logger.info("Genpod script execution started.")
     try:
+        start_trace_session()
         main()
+        stop_trace_session()
         logger.info("Genpod script executed successfully.")
     except Exception as e:
         logger.critical(f"Unhandled exception in script execution: {e}", exc_info=True)
