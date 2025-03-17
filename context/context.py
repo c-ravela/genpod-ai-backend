@@ -1,7 +1,8 @@
-from typing import Optional, Dict
-from utils.logs.logging_utils import logger
+from typing import Dict, Optional
+
 from context.agent_context import AgentContext
 from context.task_context import TaskContext
+from utils.logs.logging_utils import logger
 
 
 class GenpodContext:
@@ -9,6 +10,7 @@ class GenpodContext:
     A singleton context class with fields that are easy to access, update, and retrieve.
     """
     __slots__ = (
+       "user_prompt",
        "project_id",
        "microservice_id",
        "agents_session",
@@ -35,6 +37,7 @@ class GenpodContext:
         if not hasattr(self, "_initialized"):
 
             # Initialize fields
+            self.user_prompt: Optional[str] = None
             self.project_id: Optional[int] = None
             self.microservice_id: Optional[int] = None
             self.agents_session: Optional[Dict[str, int]] = None

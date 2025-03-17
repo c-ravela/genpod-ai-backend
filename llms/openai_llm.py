@@ -106,10 +106,3 @@ class OpenAI(LLM[ChatOpenAI]):
         except Exception as e:
             logger.exception("Failed to create chain.")
             raise
-
-    def __repr__(self):
-        representation = (
-            f"<OpenAI(provider_name={self.provider_name}, model={self.model})>"
-        )
-        logger.debug("Generated representation: %s", representation)
-        return representation

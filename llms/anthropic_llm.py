@@ -101,11 +101,3 @@ class Anthropic(LLM[ChatAnthropic]):
         except Exception as e:
             logger.exception("Failed to create chain: %s", e)
             raise
-
-    def __repr__(self):
-        representation = (
-            f"<Anthropic(provider_name={self.provider_name}, "
-            f"model={self.model})>"
-        )
-        logger.debug("Generated representation: %s", representation)
-        return representation

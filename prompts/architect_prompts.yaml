@@ -1,0 +1,300 @@
+project_summary_prompt_template:
+  template: |
+    Given the user request: "{user_request}"
+    Supervisor expectations: "{task_description}"
+
+    As a Solution Architect, provide a comprehensive project overview that includes:
+    1. A brief description of the project's purpose and goals.
+    2. The main features or functionalities to be implemented.
+    3. An outline of the required schema definition models for the service.
+
+    Format your response in markdown, starting with a "## Project Summary" heading.
+
+    Output format instructions:
+    `{format_instructions}`
+
+system_architecture_prompt_template:
+  template: |
+    Based on the project overview provided, describe a high-level architecture for
+    this microservice-based project. Focus on the following key aspects:
+
+    **Project Overview:** "{project_overview}"
+
+    ### Requirements:
+
+    1. **High-Level Diagram with Description**
+    - Create a text-based diagram illustrating the overall architecture.
+    - The diagram should detail the flow from client requests through various
+      layers (e.g., API gateway, business logic, data access layer, and database).
+    - Clearly label each component to show request processing and data management.
+    - Follow the diagram with brief descriptions of each component's role and interactions.
+
+    2. **Key Components, Data Models, and Interactions**
+    - List and describe the essential components and their responsibilities.
+    - Define the primary data models, highlighting critical fields and relationships.
+    - Explain how data flows between components and specify the communication protocols
+      (e.g., HTTP/REST, messaging queues).
+
+    3. **Data Flow Between Services**
+    - Provide a clear explanation of how data moves between services, from the initiation
+      of a request to the final response.
+    - Clarify any asynchronous or synchronous communication, including any use of message
+      queues or pub/sub patterns.
+
+    4. **External Integrations or APIs**
+    - Identify any external systems or APIs integrated within the architecture.
+    - Describe the purpose of each integration and its impact on data flow, security, and reliability.
+
+    5. **Scalability and Reliability Considerations**
+    - Outline strategies for scaling (horizontal/vertical) and load balancing.
+    - Describe mechanisms for ensuring reliability (e.g., retries, failover, data replication).
+    - Mention any trade-offs considered in relation to the CAP theorem.
+
+    6. *Application of the CAP Theorem**
+    - Discuss how the principles of the CAP theorem (Consistency, Availability,
+      Partition Tolerance) apply to this architecture.
+    - Explain any trade-offs or prioritizations made to meet project goals, with
+      concrete examples.
+
+    ### Response Format:
+
+    - Format your response in markdown, starting with a "## System Architecture" heading.
+    - Address each requirement under clearly labeled subheadings.
+    - Use bullet points or numbered lists to present details concisely.
+
+    ### Output Format Instructions:
+    `{format_instructions}`
+
+file_structure_prompt_template:
+  template: |
+    Based on the provided project overview and system architecture, propose 
+    a detailed and well-organized folder structure for the microservice project.
+
+    **Project Overview:**
+    {project_overview}
+
+    **System Architecture:**
+    {system_architecture}
+
+    Your proposal should include:
+
+    1. **Root-Level Directories**: Outline the main directories at the project 
+    root.
+    2. **Service-Specific Directories**: Detail directories specific to 
+    individual services or modules.
+    3. **Shared/Common Directories**: Identify directories for shared code, 
+    utilities, or libraries.
+    4. **Test Directories**: Specify where unit, integration, and other tests 
+    will reside.
+    5. **Configuration Files**: Indicate the locations for configuration files 
+    and environment-specific settings.
+    6. **Directory Purpose Explanations**: Provide a brief explanation for each 
+    major directory, describing its purpose and contents.
+
+    Please format your response in markdown, starting with a "## File Structure" 
+    heading. Ensure that your answer is clear, concise, and follows best practices.
+
+    **Output Format Instructions:**
+    {format_instructions}
+
+microservice_design_prompt_template:
+  template: |
+    Based on the provided project overview and system architecture, design the 
+    microservice architecture. For each identified microservice, please include 
+    the following details:
+
+    **Project Overview:**
+    {project_overview}
+
+    **System Architecture:**
+    {system_architecture}
+
+    For each microservice, provide:
+    1. **Service Name & Responsibility:** The name of the service and its primary function.
+    2. **Key Endpoints/Functions:** A list of the main endpoints or functions it exposes.
+    3. **Data Models/Schemas:** An outline of the essential data models or schemas used.
+    4. **Internal Components/Modules:** A breakdown of major internal components or modules.
+    5. **Dependencies & Integrations:** Any dependencies on other services or external systems.
+
+    Please format your response in markdown, starting with a "## Microservice Design" heading. Use subheadings for each service to clearly separate their details.
+
+    **Output Format Instructions:**
+    `{format_instructions}`
+
+tasks_summary_prompt_template:
+  template: |
+    Based on the provided project overview, system architecture, and microservice 
+    design, break down the project into detailed, self-contained deliverables. 
+    These deliverables should be actionable tasks for team members and include 
+    all necessary technical specifications and configurations.
+
+    **Project Overview:**
+    {project_overview}
+
+    **System Architecture:**
+    {system_architecture}
+
+    **Microservice Design:**
+    {microservice_design}
+
+    For each deliverable, please provide:
+    1. **Deliverable Name:** A clear title for the task.
+    2. **Detailed Description:** A comprehensive explanation of what needs to 
+    be accomplished.
+    3. **Technical Requirements/Specifications:** Include any necessary setup 
+    files, configurations, or dependencies.
+
+    Additionally, if applicable, ensure that your breakdown covers:
+    - **Dockerfile:** Instructions for environment setup and deployment.
+    - **Package Manager Files:** For example, `requirements.txt` for Python or `package.json` for Node.js.
+    - **README.md:** An overview of the deliverable with instructions on how to run or test the component.
+    - **Microservice-Specific Configurations:** Any configurations unique to the microservice architecture.
+
+    Please format your response in markdown, starting with a "## Deliverables" heading, and use subheadings for each task.
+
+    **Output Format Instructions:**
+    `{format_instructions}`
+
+code_standards_prompt_template:
+  template: |
+    Considering the following inputs:
+
+    **User Request:** "{user_request}"
+    **User-Requested Standards:** "{user_requested_standards}"
+
+    Please outline the coding standards for this project. Your response should include:
+
+    1. **12-Factor Application Standards:**  
+        - Explain how each of the 12 factors applies to this project.
+    2. **Clean Code Standards:**  
+        - List specific practices and guidelines for writing clean, maintainable, and readable code.
+    3. **Code Commenting Standards:**  
+        - Provide guidelines for effective documentation and inline code comments.
+    4. **Programming Language Specific Standards:**  
+        - Outline the conventions and best practices for the chosen programming language(s).
+    5. **Additional User-Requested Standards:**  
+        - Include any extra standards specified by the user.
+
+    **Formatting Requirements:**
+    - Format your response in markdown.
+    - Start with a "## Standards" heading.
+    - Use subheadings for each standard category.
+
+    **Output Format Instructions:**
+    {format_instructions}
+
+implementation_details_prompt_template:
+  template: |
+    Based on the following project details, provide comprehensive implementation 
+    details:
+
+    **System Architecture:**
+    {system_architecture}
+
+    **Microservice Design:**
+    {microservice_design}
+
+    **Folder Structure:**
+    {file_structure}
+
+    For each category below, provide detailed information including examples where applicable:
+
+    1. **Source Files:**  
+    - List all required source files and their purpose.
+    2. **Configuration Files:**  
+    - Specify configuration files needed for the project, including their roles.
+    3. **Unit Testing:**  
+    - Describe the approach for unit testing and list the relevant test files.
+    4. **OpenAPI Specification:**  
+    - Provide a sample structure in YAML for the OpenAPI spec.
+    5. **Dependency Management:**  
+    - Indicate the package manager used and include a sample dependency file.
+    6. **Dockerfile:**  
+    - Outline the contents of the Dockerfile required for the project.
+
+    **Formatting Requirements:**
+    - Format your response in markdown.
+    - Start with a "## Implementation Details" heading.
+    - Use subheadings for each category to clearly delineate the details.
+
+    **Output Format Instructions:**
+    `{format_instructions}`
+
+license_details_prompt_template:
+  template: |
+    Considering the following inputs:
+
+    **User Request:** "{user_request}"
+    **License Text:** "{license_text}"
+
+    Specify the license header to be added to this project.
+
+    **Formatting Requirements:**
+    - Format your response in markdown.
+    - Begin with a "## License and Legal Considerations" heading.
+
+    **Output Format Instructions:**
+    `{format_instructions}`
+
+tasks_extraction_prompt_template:
+  template: |
+    You previously generated a well-formatted requirements document in Markdown format,
+    which included detailed deliverables for the project. Each deliverable is structured
+    as a distinct section in the document.
+
+    Here is the content of the deliverables section:
+
+    '{tasks_summary}'
+
+    **Task Extraction Instructions:**
+    Convert each deliverable section exactly as it appears in the provided Markdown content
+    into a separate item in a list. Each item should preserve the original formatting and content.
+    Maintain the order in which the sections appear.
+
+    Expected Output Structure:
+    ```
+    [
+      "Deliverable 1 details here...",
+      "Deliverable 2 details here...",
+      "Deliverable 3 details here...",
+      ...
+      "Final deliverable details here..."
+    ]
+    ```
+
+    Output format instructions:
+    '{format_instructions}'
+
+gather_project_details_prompt_template:
+  template: |
+    Given the user's request: "{user_request}"
+
+    Please suggest a project name that adheres to the established naming standards.
+
+    Output format instructions:
+    {format_instructions}
+
+additional_info_prompt_template:
+  template: |
+    As a Solution Architect, you have previously prepared comprehensive requirements
+    documents for your team members to work on the project. You should not answer
+    anything out of the provided context.
+
+    We would appreciate your response to the following question:
+    '{question}'
+
+    For your reference, here are the Requirements Documents you previously prepared:
+    '{requirements_document}'
+
+    Please note, an error message will only be provided if there was an issue with
+    your previous output:
+    {error_message}
+
+    output format instructions:
+    '{format_instructions}'
+    input_variables=['question', 'requirements_document', 'error_message'],
+    partial_variables={
+        "format_instructions": PydanticOutputParser(
+            pydantic_object=QueryResult
+        ).get_format_instructions()
+    }

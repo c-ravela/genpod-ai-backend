@@ -1,12 +1,12 @@
-import os
 from dataclasses import dataclass
 from enum import Enum
-from typing import Any, Dict, Optional, Tuple, Union
+from pathlib import Path
+from typing import Any, Dict, Iterator, Optional, Tuple
 
 from pydantic import BaseModel, Field, field_validator
 
-from llms.factory import llm_factory
-from llms.llm import LLM
+from llms import LLM, llm_factory
+from utils.decorators import auto_repr
 from utils.yaml_utils import read_yaml
 
 # Supported LLMs categorized by provider
@@ -57,7 +57,7 @@ def check_model(provider: str, model: str) -> None:
         raise ValueError(f"Unsupported model: {model} for provider {provider}. Supported models for {provider} are: {SUPPORTED_LLMS[provider]}")
 
 
-class LLMConfig(BaseModel):
+class LLMSettings(BaseModel):
     """Configuration for a specific LLM."""
     provider: str
     model: str
@@ -102,7 +102,7 @@ class LLMConfig(BaseModel):
         return value
 
 
-class ProviderModelConfig(BaseModel):
+class ProviderModelSettings(BaseModel):
     """Configuration for a specific provider's model."""
     
     name: str
@@ -110,7 +110,7 @@ class ProviderModelConfig(BaseModel):
     api_key: str = Field(required=False, default=None)
 
 
-class ProviderSetting(BaseModel):
+class ProviderConnectionSettings(BaseModel):
     """Settings for a provider."""
     
     api_key: str = Field(required=False, default=None)
@@ -118,12 +118,12 @@ class ProviderSetting(BaseModel):
     retry_backoff: int  = Field(ge=0, required=False, default=None)
 
 
-class ProviderConfig(BaseModel):
+class ProviderSettings(BaseModel):
     """Configuration for a specific provider."""
 
     name: str
-    setting: ProviderSetting = Field(default=None)
-    models: dict[str, ProviderModelConfig] = Field(default=None)
+    setting: ProviderConnectionSettings = Field(default=None)
+    models: dict[str, ProviderModelSettings] = Field(default=None)
 
     @field_validator("name")
     def validate_name(cls, value):
@@ -144,28 +144,55 @@ class ProviderConfig(BaseModel):
         return value
 
 
-class AgentConfig(BaseModel):
+class AgentSettings(BaseModel):
     """Configuration for an agent."""
 
     description: str
-    llm_config: LLMConfig = Field(required=False, default=None)
+    llm_config: LLMSettings = Field(required=False, default=None)
 
 
-class DefaultConfig(BaseModel):
+class RAGAgentSettings(BaseModel):
+    """Configuration for an agent."""
+
+    description: str
+    vector_database_path: str
+    collection_name: str
+    llm_config: LLMSettings = Field(required=False, default=None)
+
+    @field_validator('vector_database_path', mode='before')
+    def valid_vector_database_path(cls, v: str) -> str:
+        if not v or not v.strip():
+            raise ValueError("vector_database_path must not be empty.")
+        path = Path(v)
+        if not path.exists():
+            raise ValueError(f"vector_database_path '{v}' does not exist.")
+        if not path.is_dir():
+            raise ValueError(f"vector_database_path '{v}' is not a directory.")
+        return v
+
+    @field_validator('collection_name',  mode='before')
+    def non_empty_collection_name(cls, v: str) -> str:
+        if not v or not v.strip():
+            raise ValueError("collection_name must not be empty.")
+        return v
+
+
+class DefaultSettings(BaseModel):
     """Default configuration settings for the project."""
     
-    llm_config: LLMConfig
+    llm_config: LLMSettings
     max_retries: int = Field(ge=1, required=True)
     retry_backoff: int = Field(ge=0, required=True)
     max_graph_recursion_limit: Optional[int] = Field(ge=1, required=True)
 
 
-class GenpodConfig(BaseModel):
+class GenpodSettings(BaseModel):
     """Configuration for the Genpod project."""
     
-    default: DefaultConfig
-    providers: Dict[str, ProviderConfig]
-    agents: Dict[str, AgentConfig]
+    default: DefaultSettings
+    providers: Dict[str, ProviderSettings]
+    agents: Dict[str, AgentSettings]
+    rag_agents: Dict[str, RAGAgentSettings]
     max_graph_recursion_limit: Optional[int] = Field(
         ge=1, 
         required=False, 
@@ -174,258 +201,187 @@ class GenpodConfig(BaseModel):
 
 
 @dataclass
-class GraphInfo:
-    """
-    Class that holds information about a graph.
-
-    Attributes:
-        graph_name (str): The name of the graph.
-        graph_id (str): The unique identifier of the graph.
-    """
-    graph_name: str
-    graph_id: str
-
-
-@dataclass
 class AgentInfo:
     """
-    Class that holds information about an agent.
+    Encapsulates configuration information for an agent.
 
     Attributes:
-        agent_name (str): The name of the agent.
-        agent_id (str): The unique identifier of the agent.
-        alias (Optional[str]): An optional alias for the agent.
-        description (Optional[str]): An optional description of the agent.
-        thread_id (Union[int, None]): The ID of the thread associated with the agent, if any.
-        llm (LLM): The LLM instance associated with the agent.
+        agent_name (str): The human-readable name of the agent.
+        agent_id (str): A unique identifier for the agent.
+        alias (str): An optional alias for referencing the agent (default is an empty string).
+        description (str): An optional description outlining the agent's role or functionality.
+        llm (Optional[LLM]): The language model (LLM) instance associated with the agent, if applicable.
+        recursion_limit (int): The maximum recursion depth allowed for tasks handled by the agent.
+        use_rag (bool): A flag indicating whether retrieval-augmented generation (RAG) is enabled.
     """
     agent_name: str
     agent_id: str
     alias: str = ""
     description: str = ""
-    thread_id: Union[int, None] = None
-    llm: LLM = None
-  
-    def set_llm(self, l: LLM) -> None:
-        """
-        Sets the thread ID for this agent.
-
-        Args:
-            thread_id (int): The thread ID to be set.
-        """
-        self.llm = l
-
-    def set_thread_id(self, thread_id: int) -> None:
-        """
-        Sets the thread ID for this agent.
-
-        Args:
-            thread_id (int): The thread ID to be set.
-        """
-        self.thread_id = thread_id
-    
-    def __str__(self) -> str:
-        """
-        Returns a string representation of the AgentInfo instance.
-        
-        Returns:
-            str: A formatted string describing the agent's information.
-        """
-        # Build a string representation of the agent's core information.
-        return (
-            f"Agent Name: {self.agent_name}\n"
-            f"Agent ID: {self.agent_id}\n"
-            f"Alias: {self.alias}\n"
-            f"Description: {self.description}\n"
-            f"Thread ID: {self.thread_id}\n"
-            f"LLM Associated: {self.llm}"
-        )
+    llm: Optional[LLM] = None
+    recursion_limit: int = 0
+    use_rag: bool = False
 
 
-class ProjectGraphs(Enum):
+@dataclass
+class RAGAgentInfo:
     """
-    Enum that holds all the graphs used by the project.
+    Configuration information for a Retrieval-Augmented Generation (RAG) agent.
 
     Attributes:
-        supervisor (GraphInfo): Information about the Supervisor Graph.
-        architect (GraphInfo): Information about the Solution Architect Graph.
-        coder (GraphInfo): Information about the Software Engineer Graph.
-        rag (GraphInfo): Information about the Standards Extractor Graph.
-        planner (GraphInfo): Information about the Project Planner Graph.
-        tests_generator (GraphInfo): Information about the Unit Tester Graph.
-        modernizer (GraphInfo): Information about the Knowledge Graph Generator Graph.
-        reviewer (GraphInfo): Information about the Code Reviewer Graph.
+        agent_name (str): The human-readable name of the RAG agent.
+        agent_id (str): A unique identifier for the agent.
+        alias (str): An optional alias for referencing the agent.
+        description (str): A description outlining the agent's role and functionality.
+        vector_database_path (str): The connection string or file system path for the vector database.
+        collection_name (str): The name of the collection within the vector database.
+        llm (Optional[LLM]): The associated language model (LLM) instance, if applicable.
+        recursion_limit (int): The maximum recursion depth allowed for tasks handled by the agent.
     """
-
-    supervisor: GraphInfo = GraphInfo("Project Supervisor Graph", "GRPH_01_SUP")
-    architect: GraphInfo = GraphInfo("Solution Architect Graph", "GRPH_02_ARC")
-    coder: GraphInfo = GraphInfo("Software Engineer Graph", "GRPH_03_ENG")
-    rag: GraphInfo = GraphInfo("Document Repository Manager Graph", "GRPH_04_RAG")
-    planner: GraphInfo = GraphInfo("Project Planner Graph", "GRPH_05_PLN")
-    tests_generator: GraphInfo = GraphInfo("Unit Tester Graph", "GRPH_06_TST")
-    modernizer: GraphInfo = GraphInfo("Knowledge Graph Generator Graph", "GRPH_07_MOD")
-    reviewer: GraphInfo = GraphInfo("Code Reviewer Graph", "GRPH_08_REV")
-
-    @property
-    def graph_name(self) -> str:
-        """
-        Returns the name of the graph.
-
-        Returns:
-            str: The name of the graph.
-        """
-        return self.value.graph_name
-
-    @property
-    def graph_id(self) -> str:
-        """
-        Returns the unique identifier of the graph.
-
-        Returns:
-            str: The unique identifier of the graph.
-        """
-        return self.value.graph_id
+    agent_name: str
+    agent_id: str
+    alias: str = ""
+    description: str = ""
+    vector_database_path: str = ""
+    collection_name: str = ""
+    llm: Optional[LLM] = None
+    recursion_limit: int = 0
 
 
-class ProjectAgents(Enum):
+class AgentRegistry(Enum):
     """
-    Enum that holds all the agents used by the project.
-
-    Attributes:
-        supervisor (AgentInfo): Information about the Project Supervisor agent.
-        architect (AgentInfo): Information about the Solution Architect agent.
-        coder (AgentInfo): Information about the Software Engineer agent.
-        rag (AgentInfo): Information about the Standards Extractor agent.
-        planner (AgentInfo): Information about the Project Planner agent.
-        tests_generator (AgentInfo): Information about the Unit Tester agent.
-        modernizer (AgentInfo): Information about the Knowledge graph Generator agent.
-        human (AgentInfo): Information about the Human In The Loop agent.
-        reviwer (AgentInfo): Information about the code reviewing agent
+    Enum representing configuration for all project agents.
+    Each member is an AgentInfo instance detailing an agent's role, settings, and behavior.
     """
 
     supervisor: AgentInfo = AgentInfo(
-        agent_name="Project Supervisor", 
+        agent_name="Project Supervisor",
         agent_id="SUP_01",
         alias="supervisor",
-        description="Coordinates with the team, assigns tasks, and guides the team toward successful project completion."
+        description=(
+            "Oversees the entire project workflow by coordinating the GenPod team. "
+            "Delegates tasks such as transforming user prompts into requirements documents, "
+            "generating deliverables/tasks, developing code/projects, and ensuring thorough reviews. "
+            "Guides iterative cycles until the reviewer yields zero issues."
+        ),
+        recursion_limit=25,
+        use_rag=False
     )
 
     architect: AgentInfo = AgentInfo(
         agent_name="Solution Architect", 
         agent_id="ARC_02",
         alias="architect",
-        description="Defines the project requirements and outlines the architectural framework."
+        description=(
+            "Generates a detailed, comprehensive requirements document and outlines deliverable/tasks based on the user prompt, "
+            "laying the foundation for the project's architectural framework."
+        ),
+        recursion_limit=25,
+        use_rag=True
     )
 
     coder: AgentInfo = AgentInfo(
         agent_name="Software Engineer", 
         agent_id="ENG_03",
         alias="coder",
-        description="Develops and writes code to the tasks assigned."
-    )
-
-    rag: AgentInfo = AgentInfo(
-        agent_name="Document Repository Manager", 
-        agent_id="RAG_04",
-        alias="rag",
-        description="Oversees the vector database, manages document and file storage, and provides relevant information in response to queries."
+        description=(
+            "Executes assigned tasks by generating code with proper license headers, "
+            "ensuring adherence to coding standards and project requirements."
+        ),
+        recursion_limit=25,
+        use_rag=False
     )
 
     planner: AgentInfo = AgentInfo(
         agent_name="Project Planner", 
         agent_id="PLN_05",
         alias="planner",
-        description="Creates detailed plans for task execution, based on requirements provided."
+        description=(
+            "Transforms raw tasks or deliverables from the architect into detailed, actionable subtasks, "
+            "and similarly refines issues identified by the reviewer into manageable tasks for execution."
+        ),
+        recursion_limit=25,
+        use_rag=True
     )
 
     tests_generator: AgentInfo = AgentInfo(
         agent_name="Unit Tester", 
         agent_id="TST_06",
         alias="tests_generator",
-        description="Develops and executes unit test cases to ensure code quality and functionality."
-    )
-
-    modernizer: AgentInfo = AgentInfo(
-        agent_name="Knowledge Graph Generator", 
-        agent_id="MOD_07",
-        alias="modernizer",
-        description="Generates and maintains the knowledge graph for the project, facilitating data relationships and insights."
-    )
-
-    human = AgentInfo(
-        agent_name="Human Intervention Specialist", 
-        agent_id="HUM_08",
-        alias="human",
-        description="Provides assistance and oversight when automated systems encounter issues or produce unreliable results."
+        description=(
+            "Prior to coding, generates detailed unit test cases and function signatures from the assigned tasks. "
+            "These artifacts guide the Software Engineer in implementing functionality that meets quality and specification standards."
+        ),
+        recursion_limit=25,
+        use_rag=False
     )
 
     reviewer: AgentInfo = AgentInfo(
         agent_name="Code Reviewer",
         agent_id="REV_09",
         alias="reviewer",
-        description="Responsible for evaluating code quality and ensuring adherence to coding standards. This includes reviewing code for clean code principles, naming conventions, and compliance with both internal and external standards."
+        description=(
+            "Evaluates the generated project by reviewing code quality, clean code principles, naming conventions, "
+            "and compliance with both internal and external standards. After reviewing, compiles and reports issues "
+            "that need resolution before final project approval."
+        ),
+        recursion_limit=25,
+        use_rag=False
+    )
+
+    rag_middleware: AgentInfo = AgentInfo(
+        agent_name="RAG Middleware", 
+        agent_id="RAG_MW_07",
+        alias="rag_middleware",
+        description=(
+            "Acts as a mediator for the Retrieval-Augmented Generation (RAG) process by maintaining a group of specialized RAG agents. "
+            "Upon receiving a question, it determines the most suitable agent to address it, forwards the question, and returns the accurate answer provided."
+        ),
+        recursion_limit=25,
+        use_rag=False
+    )
+
+    research: AgentInfo = AgentInfo(
+        agent_name="Research Assistant",
+        agent_id="RES_08",
+        alias="research",
+        description=(
+            "Conducts in-depth research by aggregating and synthesizing information from various online sources. "
+            "Supports the project by refining queries, gathering relevant data, and generating insights that complement "
+            "the work of other agents."
+        ),
+        recursion_limit=25,
+        use_rag=False
     )
 
     @property
     def agent_name(self) -> str:
-        """
-        Returns the name of the agent.
-
-        Returns:
-            str: The name of the agent.
-        """
         return self.value.agent_name
 
     @property
     def agent_id(self) -> str:
-        """
-        Returns the unique identifier of the agent.
-
-        Returns:
-            str: The unique identifier of the agent.
-        """
         return self.value.agent_id
-    
+
     @property
     def alias(self) -> str:
-        """
-        Returns the alias of the agent, if it exists.
-
-        Returns:
-            Optional[str]: The alias of the agent, or None if not set.
-        """
         return self.value.alias
 
     @property
     def description(self) -> str:
-        """
-        Returns the description of the agent, if it exists.
-
-        Returns:
-            Optional[str]: The description of the agent, or None if not set.
-        """
         return self.value.description
-    
-    @property
-    def thread_id(self) -> int:
-        """
-        Returns the thread_id associated with the agent.
 
-        Returns:
-            LLM: The thread_id instance associated with the agent.
-        """
-        return self.value.thread_id
-    
     @property
-    def llm(self) -> LLM:
-        """
-        Returns the LLM associated with the agent.
-
-        Returns:
-            LLM: The LLM instance associated with the agent.
-        """
+    def llm(self) -> Optional["LLM"]:
         return self.value.llm
-    
+
+    @property
+    def recursion_limit(self) -> int:
+        return self.value.recursion_limit
+
+    @property
+    def use_rag(self) -> bool:
+        return self.value.use_rag
+ 
     @classmethod
     def get_agent(cls, alias: str) -> AgentInfo:
         """
@@ -438,7 +394,7 @@ class ProjectAgents(Enum):
             AgentInfo: The corresponding AgentInfo object.
         """
 
-        return cls[alias]
+        return cls[alias].value
     
     @classmethod
     def get_agent_by_id(cls, agent_id: str) -> Optional[AgentInfo]:
@@ -469,50 +425,128 @@ class ProjectAgents(Enum):
         """
         return any(agent.alias == alias for agent in cls)
     
-    def set_llm(self, llm: LLM) -> None:
-        """
-        Set the LLM instance for the agent.
-
-        Args:
-            llm (LLM): The LLM instance to be associated with the agent.
-
-        Returns:
-            None
-        """
-        self.value.set_llm(llm)
-
-    def set_thread_id(self, thread_id: int) -> None:
-        """
-        Set the thread ID for the agent.
-
-        Args:
-            thread_id (int): The thread ID to be associated with the agent.
-
-        Returns:
-            None
-        """
-        self.value.set_thread_id(thread_id)
-    
-    def __iter__(self):
+    def __iter__(self) -> Iterator[AgentInfo]:
         """
         Custom iterator to return each enum member's agent info.
 
         Yields:
             AgentInfo: Yields each AgentInfo object from the enum.
         """
-        for agent in ProjectAgents:
+        for agent in AgentRegistry:
             yield agent.value
 
+
+class RAGAgentRegistry(Enum):
+    """
+    Enum representing the configuration for specialized RAG agents.
+    Each member is an instance of RAGAgentInfo tailored to handle specific Retrieval-Augmented Generation queries.
+    """
+    mismo_3_6_rag: RAGAgentInfo = RAGAgentInfo(
+        agent_name="MISMO 3.6 RAG Agent", 
+        agent_id="M3R_01",
+        alias="mismo_3_6_rag",
+        description=(
+            "Specialized RAG agent that addresses queries related to MISMO 3.6 standards, providing accurate and comprehensive responses."
+        ),
+        recursion_limit=25
+    )
+
+    @property
+    def agent_name(self) -> str:
+        return self.value.agent_name
+
+    @property
+    def agent_id(self) -> str:
+        return self.value.agent_id
+
+    @property
+    def alias(self) -> str:
+        return self.value.alias
+
+    @property
+    def description(self) -> str:
+        return self.value.description
+
+    @property
+    def llm(self) -> Optional["LLM"]:
+        return self.value.llm
+
+    @property
+    def recursion_limit(self) -> int:
+        return self.value.recursion_limit
+
+    @property
+    def vector_database_path(self) -> str:
+        return self.value.vector_database_path
+
+    @property
+    def collection_name(self) -> str:
+        return self.value.collection_name
+
+    @classmethod
+    def get_agent(cls, alias: str) -> RAGAgentInfo:
+        """
+        Retrieve a RAG agent's configuration by its alias.
+
+        Args:
+            alias (str): The alias of the agent.
+
+        Returns:
+            RAGAgentInfo: The corresponding RAGAgentInfo object.
+        """
+        return cls[alias].value
+
+    @classmethod
+    def get_agent_by_id(cls, agent_id: str) -> Optional[RAGAgentInfo]:
+        """
+        Retrieve a RAG agent's configuration by its unique identifier.
+
+        Args:
+            agent_id (str): The unique identifier of the agent.
+
+        Returns:
+            Optional[RAGAgentInfo]: The corresponding RAGAgentInfo object if found; otherwise, None.
+        """
+        for agent in cls:
+            if agent.value.agent_id == agent_id:
+                return agent.value
+        return None
+
+    @classmethod
+    def has_agent(cls, alias: str) -> bool:
+        """
+        Check if a RAG agent with the specified alias exists.
+
+        Args:
+            alias (str): The alias of the agent.
+
+        Returns:
+            bool: True if the agent exists, False otherwise.
+        """
+        return any(agent.alias == alias for agent in cls)
+
+    def __iter__(self) -> Iterator[RAGAgentInfo]:
+        """
+        Custom iterator to yield each RAG agent's configuration.
+
+        Yields:
+            RAGAgentInfo: Each RAGAgentInfo object stored in the enum.
+        """
+        for agent in RAGAgentRegistry:
+            yield agent.value
+
+
+@auto_repr
 class ProjectConfig:
     """
     Configuration for the entire project, including agent configurations and vector database settings.
     """
 
-    graphs: ProjectGraphs
-    agents: ProjectAgents
+    agents: AgentRegistry
+    rag_agents: RAGAgentRegistry
     max_graph_recursion_limit: int
     __config_path: str
-    __genpod_config: GenpodConfig
+    __genpod_config: GenpodSettings
 
     def __init__(self, config_path: str) -> None:
         """
@@ -520,8 +554,9 @@ class ProjectConfig:
         and vector database collection paths.
         """
 
-        self.graphs = ProjectGraphs
-        self.agents = ProjectAgents
+        self.agents = AgentRegistry
+        self.rag_agents = RAGAgentRegistry
+        self.max_graph_recursion_limit = -1
         self.__config_path = config_path
 
     def load_config(self) -> None:
@@ -529,7 +564,7 @@ class ProjectConfig:
         Loads the configuration data from a YAML file and updates the project settings accordingly.
         
         This method reads the YAML configuration from the file path specified during initialization, 
-        parses the configuration into the internal `GenpodConfig` structure, and applies the configurations 
+        parses the configuration into the internal `GenpodSettings` structure, and applies the configurations 
         by calling the appropriate update methods.
         """
         try:
@@ -539,7 +574,7 @@ class ProjectConfig:
         except Exception as e:
             raise ValueError(f"Error parsing YAML config: {e}")
     
-        self.__genpod_config = GenpodConfig(**__yaml_data)
+        self.__genpod_config = GenpodSettings(**__yaml_data)
         self.__update_config()
 
     def __update_config(self) -> None:
@@ -549,6 +584,7 @@ class ProjectConfig:
 
         self.__set__max_graph_recursion_limit()
         self.__update__agents()
+        self.__update__rag_agents()
         
     def __set__max_graph_recursion_limit(self):
         """
@@ -567,7 +603,7 @@ class ProjectConfig:
 
         for agent, config in self.__genpod_config.agents.items():
             if not self.agents.has_agent(agent):
-                raise ValueError(f"Agent {agent} not found in ProjectAgents.")
+                raise ValueError(f"Agent {agent} not found in {self.agents.__class__}.")
 
             llm_config = config.llm_config or self.__genpod_config.default.llm_config
             provider_config = self.__genpod_config.providers[llm_config.provider]
@@ -578,9 +614,36 @@ class ProjectConfig:
             model_config = llm_config.config
 
             llm_instance = llm_factory(provider, model, model_config, max_retries, retry_backoff)
-            self.agents.get_agent(agent).set_llm(llm_instance)
+            self.agents.get_agent(agent).llm = llm_instance
 
-    def __get_retry_settings(self, provider_config: ProviderConfig, default_config: DefaultConfig) -> Tuple[int, float]:
+    def __update__rag_agents(self) -> None:
+        """
+        Sets LLM instances and updates collection name and vector database path for RAG agents
+        based on the loaded configuration.
+        """
+        for agent_alias, config in self.__genpod_config.rag_agents.items():
+            if not self.rag_agents.has_agent(agent_alias):
+                raise ValueError(f"RAG Agent '{agent_alias}' not found in {self.rag_agents.__class__.__name__}.")
+
+            rag_agent = self.rag_agents.get_agent(agent_alias)
+
+            llm_config = config.llm_config or self.__genpod_config.default.llm_config
+
+            provider_config = self.__genpod_config.providers[llm_config.provider]
+
+            max_retries, retry_backoff = self.__get_retry_settings(provider_config, self.__genpod_config.default)
+
+            provider = llm_config.provider
+            model = llm_config.model
+            model_config = llm_config.config
+
+            llm_instance = llm_factory(provider, model, model_config, max_retries, retry_backoff)
+
+            rag_agent.llm = llm_instance
+            rag_agent.collection_name = config.collection_name
+            rag_agent.vector_database_path = config.vector_database_path
+
+    def __get_retry_settings(self, provider_config: ProviderSettings, default_config: DefaultSettings) -> Tuple[int, float]:
         """
         Helper method to extract retry settings for LLM configuration.
 
