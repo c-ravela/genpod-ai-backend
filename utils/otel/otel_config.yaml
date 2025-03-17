@@ -1,0 +1,6 @@
+tracing:
+  project_name: "Genpod"
+  tracing_endpoint: "http://localhost:6006/v1/traces"
+  launch_options:
+    use_temp_dir: false
+    delete_data: false

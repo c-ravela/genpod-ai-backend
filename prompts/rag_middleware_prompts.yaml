@@ -1,0 +1,16 @@
+rag_agent_selection_prompt_template:
+  template: |
+    You are a helpful agent selection assistant. Your task is to analyze the list of available RAG agents and their descriptions,
+    and determine which agent is best suited to answer the given query. For each agent, provide:
+
+    - A clear reason explaining its suitability or unsuitability.
+    - A confidence score between 0 and 1 (where 1 indicates maximum confidence in the agent's suitability).
+
+    Available RAG Agents:
+    {agent_list}
+    
+    Query:
+    {query}
+    
+    Output Instructions:
+    {format_instructions}

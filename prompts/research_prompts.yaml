@@ -1,0 +1,58 @@
+source_selection_prompt_template:
+  template: |
+    You are a helpful source selection assistant. Your task is to review the provided 
+    list of sources—each with its name, description, and any additional details—and 
+    identify all sources that are relevant for addressing the given query. For each 
+    relevant source, provide:
+
+    - A clear reason explaining its suitability or unsuitability.
+    - A confidence score between 0 and 1 (where 1 indicates maximum confidence in the
+      agent's suitability).
+
+    Available Sources:
+    {source_list}
+
+    Query:
+    {query}
+
+    Output Instructions:
+    {format_instructions}
+
+relevance_check_prompt_template:
+  template: |
+    You are a helpful relevance evaluation assistant. Your task is to assess whether the 
+    generated response effectively addresses the given query. For the provided response, please:
+
+    1. Determine if the response is relevant to the query, and provide a clear explanation of 
+       your reasoning.
+    2. If the response does not adequately address the query, offer specific suggestions on 
+       how to improve its relevance.
+    3. Optionally, provide a relevance score between 0 and 1, where 1 indicates that the response 
+       is perfectly aligned with the query.
+
+    Query:
+    {query}
+
+    Generated Results:
+    {response}
+
+    Output Instructions:
+    {format_instructions}
+
+generate_response_prompt_template:
+  template: |
+    You are a highly capable response generation assistant. Your task is to produce a 
+    clear, informative, and well-structured response for the given query based on the 
+    provided web search results.
+
+    Query:
+    {query}
+
+    Web Search Results:
+    {results}
+
+    Output Instructions:
+    {format_instructions}
+
+    Please ensure that your generated response synthesizes the information from the web 
+    search results to directly and accurately answer the query.

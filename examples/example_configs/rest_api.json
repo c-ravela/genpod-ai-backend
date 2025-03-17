@@ -1,0 +1,35 @@
+{
+  "prompt": "Create a REST api service by taking the inputs provided to you using python language using fastapi. Instrument the code you generate with latest version of opentelemetry sdk so that this REST API service can send data to opentelemetry collector agent for observability purposes.",
+  "name": "user-service",
+  "language": "python",
+  "restConfig": {
+    "server": {
+      "sqlDB": "MySQL",
+      "port": "3000",
+      "resources": [
+        { 
+          "name": "User",
+          "allowedMethods": [
+            "POST",
+            "LIST",
+            "GET",
+            "PUT",
+            "DELETE"
+          ],
+          "fields": {
+            "Name": {
+              "datatype": "string"
+            },
+            "City": {
+              "datatype": "string"
+            }
+          }
+        }
+      ]
+    },
+    "framework": "fastapi"
+  },
+  "LICENSE_URL": "https://raw.githubusercontent.com/intelops/tarian-detector/8a4ff75fe31c4ffcef2db077e67a36a067f1437b/LICENSE",
+  "LICENSE_TEXT": "This code base copyrights belong to XYZ"
+}
+  
