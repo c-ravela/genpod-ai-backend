@@ -1,6 +1,6 @@
 from agents.architect.architect_graph import ArchitectGraph
 from agents.architect.architect_state import ArchitectState
-from configs.project_config import ProjectAgents, ProjectConfig
+from configs.project_config import ProjectAgents, ProjectGraphs
 from genpod.member import AgentMember
 
 
@@ -8,12 +8,20 @@ class ArchitectMember(AgentMember[ArchitectState, ArchitectGraph]):
     """
     """
 
-    def __init__(self, persistance_db_path: str):
+    def __init__(self, agents: ProjectAgents, graphs: ProjectGraphs, persistance_db_path: str):
         """"""
 
-        self.architect_config = ProjectConfig().agents_config[ProjectAgents.architect.agent_id]
+        architect_config = agents.architect
+        architect_graph = graphs.architect
         super().__init__(
-            self.architect_config, 
+            architect_config, 
             ArchitectState, 
-            ArchitectGraph(self.architect_config.llm, persistance_db_path)
+            ArchitectGraph(
+                architect_graph.graph_id, 
+                architect_graph.graph_name,
+                architect_config.agent_id,
+                architect_config.agent_name,
+                architect_config.llm,
+                persistance_db_path
+            )
         )

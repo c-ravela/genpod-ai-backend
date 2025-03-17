@@ -51,8 +51,17 @@ class SupervisorPrompts():
     )
 
     init_rag_questionaire_prompt = PromptTemplate(
-        template="""Given the user prompt: "{user_prompt}", generate a comprehensive list of questions to query the knowledge base which is a vector DB.
-        These questions should cover various aspects of the project requirements, technical specifications, and industry standards. Focus on the following areas:
+        template="""
+        Given the user prompt:
+        ```user_prompt
+        {user_prompt}
+        ```
+
+        Generate a comprehensive list of questions to query the knowledge base which is
+        a vector DB.
+
+        These questions should cover various aspects of the project requirements,
+        technical specifications, and industry standards. Focus on the following areas:
             1. Industry standards and regulations:
             - What specific standards or regulations are relevant to this project?
             - How do these standards impact the design and implementation?
@@ -65,50 +74,57 @@ class SupervisorPrompts():
             - What type of data storage is most suitable for this project?
             - How should the data be structured for efficient retrieval and management?
 
-            Create a list response which containes one well-defined question for each category that will help extract detailed information from our knowledge base to assist in creating a comprehensive requirements document.
-            example output format: "['question1','question2','question3']"
-            Use this additional context if an error exists in output: {context}
-            """,
-            input_variables=["user_prompt", "context"]
+        Create a list response which containes one well-defined question for each
+        category that will help extract detailed information from our knowledge base
+        to assist in creating a comprehensive requirements document.
+
+        example output format: "['question1','question2','question3']"
+        Use this additional context if an error exists in output: {context}
+        """,
+        input_variables=["user_prompt", "context"]
     )
 
     follow_up_questions = PromptTemplate(
-        template="""Given the original user query and the initial RAG response:
+        template="""
+        Given the original user query and the initial RAG response:
 
-                    User query: "{user_query}"
+        User query: "{user_query}"
 
-                    Initial RAG response:
-                    {initial_rag_response}
+        Initial RAG response:
+        {initial_rag_response}
 
-                    Evaluate the response based on the following criteria:
-                    1. Relevance to the original query
-                    2. Completeness of information
-                    3. Technical accuracy
-                    4. Clarity and coherence
+        Evaluate the response based on the following criteria:
+        1. Relevance to the original query
+        2. Completeness of information
+        3. Technical accuracy
+        4. Clarity and coherence
 
-                    Determine if the response is complete or if a follow-up query is needed.
+        Determine if the response is complete or if a follow-up query is needed.
 
-                    If the response is complete, output:
-                    COMPLETE
-                    [Provide a brief summary of why the response is considered complete]
+        If the response is complete, output:
+        COMPLETE
+        [Provide a brief summary of why the response is considered complete]
 
-                    If the response is incomplete or inadequate, output:
-                    INCOMPLETE
-                    [Briefly explain why the response is incomplete]
-                    Follow-up Query: [Provide a single, focused query to retrieve all the missing information]
+        If the response is incomplete or inadequate, output:
+        INCOMPLETE
+        [Briefly explain why the response is incomplete]
+        Follow-up Query: [Provide a single, focused query to retrieve all the missing information]
 
-                    Example outputs:
+        Example outputs:
 
-                    COMPLETE
-                    The response fully addresses the user's query about the Title Requests Micro-service, covering MISMO v3.6 standards, GET REST API implementation, and .NET specifics.
+        COMPLETE
+        The response fully addresses the user's query about the Title Requests Microservice,
+        covering MISMO v3.6 standards, GET REST API implementation, and .NET specifics.
 
-                    INCOMPLETE
-                    The response lacks details on specific MISMO v3.6 data structures for title requests.
-                    Follow-up Query: What are the key MISMO v3.6 XML elements and data structures required for implementing a Title Requests GET service in .NET?
+        INCOMPLETE
+        The response lacks details on specific MISMO v3.6 data structures for title requests.
+        Follow-up Query: What are the key MISMO v3.6 XML elements and data structures
+        required for implementing a Title Requests GET service in .NET?
 
-                    Your evaluation and output:""",
-                    input_variables=["user_query", "initial_rag_response"]
-        )
+        Your evaluation and output.
+        """,
+        input_variables=["user_query", "initial_rag_response"]
+    )
 
     ideal_init_rag_questionaire_prompt = PromptTemplate(
         template="""Given the user prompt: "{user_prompt}", generate a comprehensive list of questions to query the knowledge base which is a vector DB. 
@@ -153,9 +169,9 @@ class SupervisorPrompts():
                 - What should be included in the project documentation?
                 - Are there any standard tools or formats recommended for documentation in this domain?
 
-            Create a list response which containes one well-defined question for each category that will help extract detailed information from our knowledge base to assist in creating a comprehensive requirements document.
-            example output format: "['question1','question2','question3']"
-            Use this additional context if an error exists in output: {context}
-            """,
-            input_variables=["user_prompt", "context"]
+        Create a list response which containes one well-defined question for each category that will help extract detailed information from our knowledge base to assist in creating a comprehensive requirements document.
+        example output format: "['question1','question2','question3']"
+        Use this additional context if an error exists in output: {context}
+        """,
+        input_variables=["user_prompt", "context"]
     )

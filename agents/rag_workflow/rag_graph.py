@@ -1,21 +1,26 @@
 import os
 
-from langchain_openai import ChatOpenAI
 from langgraph.graph import END, StateGraph
 
-from agents.agent.graph import Graph
+from agents.base.base_graph import BaseGraph
 from agents.rag_workflow.rag_agent import RAGAgent
 from agents.rag_workflow.rag_state import RAGState
-from configs.project_config import ProjectGraphs
+from llms.llm import LLM
 
 
-class RAGWorkFlow(Graph[RAGAgent]):
+class RAGWorkFlow(BaseGraph[RAGAgent]):
 
-    def __init__(self, llm: ChatOpenAI, persistance_db_path: str, collection_name: str, persist_directory: str=None):
+    def __init__(self, graph_id: str, graph_name: str, agent_id: str, agent_name: str, llm: LLM, persistance_db_path: str, collection_name: str, persist_directory: str=None):
         super().__init__(
-            ProjectGraphs.rag.graph_id,
-            ProjectGraphs.rag.graph_name, 
-            RAGAgent(llm, collection_name = collection_name, persist_directory=persist_directory),
+            graph_id,
+            graph_name, 
+            RAGAgent(
+                agent_id,
+                agent_name,
+                llm,
+                collection_name=collection_name,
+                persist_directory=persist_directory
+            ),
             persistance_db_path
         )
 
@@ -30,6 +35,7 @@ class RAGWorkFlow(Graph[RAGAgent]):
         rag_workflow.add_node("grade_documents", self.agent.grade_documents)  # grade documents
         rag_workflow.add_node("generate", self.agent.generate)  # generate
         rag_workflow.add_node("transform_query", self.agent.transform_query)  # transform_query
+        rag_workflow.add_node("save_analytics", self.agent.save_analytics_record)
         rag_workflow.add_node("update_state", self.agent.update_state)
 
         # Build graph
@@ -49,7 +55,7 @@ class RAGWorkFlow(Graph[RAGAgent]):
             lambda x: x["next"],
             {
                 "retrieve": "retrieve",
-                "update_state": "update_state",
+                "update_state": "save_analytics",
             },
         )
         rag_workflow.add_conditional_edges(
@@ -57,10 +63,12 @@ class RAGWorkFlow(Graph[RAGAgent]):
             self.agent.grade_generation_v_documents_and_question,
             {
                 "not supported": "generate",
-                "useful": "update_state",
+                "useful": "save_analytics",
                 "not useful": "transform_query",
             },
         )
+
+        rag_workflow.add_edge("save_analytics", "update_state")
         rag_workflow.add_edge("update_state", END)
 
         return rag_workflow

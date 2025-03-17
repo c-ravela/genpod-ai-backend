@@ -1,13 +1,24 @@
 # Base Image
-FROM python:3.12.3
+FROM python:3.12.7
 
-# Working directory in the container
+# Set the working directory in the container
 WORKDIR /opt/genpod
 
-# copy files to the container workspace
+# Copy requirements file first to leverage Docker cache
+COPY requirements.txt .
+
+# Install system dependencies and Python packages
+RUN apt-get update && \
+    apt-get install -y --no-install-recommends \
+    make \
+    less \
+    sqlite3 && \
+    rm -rf /var/lib/apt/lists/* && \
+    pip install --no-cache-dir -r requirements.txt && \
+    pip install --no-cache-dir semgrep==1.93.0
+
+# Copy the rest of the application files
 COPY . .
 
-# update and install necessary packages
-RUN apt-get update && apt-get install -y make less sqlite3 && pip install -r requirements.txt
-
+# Default command to keep the container running
 CMD ["sleep", "infinity"]

@@ -5,12 +5,12 @@ The Coder agent is responsible for completing tasks in a project. The output of
 the Coder agent includes information about the steps to complete a task, 
 the files to be created, the location of the code, the actual code.
 """
-import re
-
 from typing import Any, Dict
 
 from pydantic import BaseModel, Field, model_validator
+
 from configs.shell_config import CODER_COMMANDS
+
 
 class FileContent(BaseModel):
     """
@@ -27,7 +27,7 @@ class FileContent(BaseModel):
         """,
         default='',
         title="File Code Content",
-        example='print("Hello, World!")'
+        examples=['print("Hello, World!")']
     )
 
     license_comments: Dict[str, str] = Field(
@@ -44,10 +44,10 @@ class FileContent(BaseModel):
         """,
         default={},
         title="License Comments by File Extension",
-        example={
-            ".py": "''' \nSPDX-License-Identifier: Apache-2.0\nCopyright 2024 Authors of [Your Organization] & [Your Project]\n'''",
-            ".md": "<!-- SPDX-License-Identifier: Apache-2.0\nCopyright 2024 Authors of [Your Organization] & [Your Project] -->"
-        }
+        examples=[
+            {".py": "''' \nSPDX-License-Identifier: Apache-2.0\nCopyright 2024 Authors of [Your Organization] & [Your Project]\n'''",
+            ".md": "<!-- SPDX-License-Identifier: Apache-2.0\nCopyright 2024 Authors of [Your Organization] & [Your Project] -->"}
+        ]
     )
 
     @model_validator(mode="before")
@@ -67,7 +67,7 @@ class FileContent(BaseModel):
         license_comments = values.get('license_comments')
 
         if not isinstance(license_comments, dict):
-            raise ValueError('license_comments must be a dictionary.')
+            raise ValueError(f'Expected a dictionary for license_comments, but received `{license_comments}` of type {type(license_comments).__name__}.')
         
         for key, value in license_comments.items():
             if not isinstance(key, str) or not key.startswith('.'):
@@ -192,39 +192,40 @@ class CodeGenerationPlan(BaseModel):
             if not isinstance(content, dict):
                 raise ValueError(f'Content for "{path}" must be a valid FileContent instance.')
         
-            try:
-                FileContent(**content)
-            except ValueError as e:
-                raise ValueError(f'Invalid content for file "{path}": {e}')
+            if not isinstance(content, FileContent):
+                try:
+                    FileContent(**content)
+                except ValueError as e:
+                    raise ValueError(f'Invalid content for file "{path}": {e}')
             
         return values
     
-    @model_validator(mode='before')
-    def check_field__terminal_commands(cls, values: Dict[str, Any]) -> Dict[str, Any]:
-        allowed_commands = CODER_COMMANDS
-        restricted_symbols = re.compile(r'[&|;]')
+    # @model_validator(mode='before')
+    # def check_field__terminal_commands(cls, values: Dict[str, Any]) -> Dict[str, Any]:
+    #     allowed_commands = CODER_COMMANDS
+    #     restricted_symbols = re.compile(r'[&|;]')
         
-        terminal_commands = values.get('terminal_commands')
-        # if not terminal_commands:
-        #     raise ValueError('terminal_commands cannot be an empty.')
+    #     terminal_commands = values.get('terminal_commands')
+    #     # if not terminal_commands:
+    #     #     raise ValueError('terminal_commands cannot be an empty.')
         
-        if not isinstance(terminal_commands, dict):
-            raise ValueError('The "terminal_commands" field must be a dictionary.')
+    #     if not isinstance(terminal_commands, dict):
+    #         raise ValueError('The "terminal_commands" field must be a dictionary.')
         
-        for path, actions in terminal_commands.items():
-            if not isinstance(path, str) or not path:
-                raise ValueError(f'Terminal command path "{path}" must be a non-empty string.')
-            if not isinstance(actions, dict) or 'before' not in actions or 'after' not in actions:
-                raise ValueError(f'Terminal command actions for "{path}" must be a dictionary with "before" and "after" keys.')
+    #     for path, actions in terminal_commands.items():
+    #         if not isinstance(path, str) or not path:
+    #             raise ValueError(f'Terminal command path "{path}" must be a non-empty string.')
+    #         if not isinstance(actions, dict) or 'before' not in actions or 'after' not in actions:
+    #             raise ValueError(f'Terminal command actions for "{path}" must be a dictionary with "before" and "after" keys.')
             
-            for phase in ['before', 'after']:
-                for dir_path, command in actions[phase].items():
-                    if not isinstance(dir_path, str) or not dir_path:
-                        raise ValueError(f'Directory path "{dir_path}" for command in phase "{phase}" must be a non-empty string.')
-                    # if not isinstance(command, str) or restricted_symbols.search(command):
-                    #     raise ValueError(f'Command "{command}" in phase "{phase}" contains restricted symbols.')
-                    # TODO: Disabling this logic just for now. Need to figure out how to handle in case of raising this exception.
-                    # if not any(cmd in command for cmd in allowed_commands):
-                    #     raise ValueError(f'Command "{command}" in phase "{phase}" is not an approved command.')
+    #         for phase in ['before', 'after']:
+    #             for dir_path, command in actions[phase].items():
+    #                 if not isinstance(dir_path, str) or not dir_path:
+    #                     raise ValueError(f'Directory path "{dir_path}" for command in phase "{phase}" must be a non-empty string.')
+    #                 # if not isinstance(command, str) or restricted_symbols.search(command):
+    #                 #     raise ValueError(f'Command "{command}" in phase "{phase}" contains restricted symbols.')
+    #                 # TODO: Disabling this logic just for now. Need to figure out how to handle in case of raising this exception.
+    #                 # if not any(cmd in command for cmd in allowed_commands):
+    #                 #     raise ValueError(f'Command "{command}" in phase "{phase}" is not an approved command.')
         
-        return values
+    #     return values

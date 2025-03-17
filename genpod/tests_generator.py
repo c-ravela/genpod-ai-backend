@@ -1,6 +1,6 @@
 from agents.tests_generator.tests_generator_graph import TestCoderGraph
 from agents.tests_generator.tests_generator_state import TestCoderState
-from configs.project_config import ProjectAgents, ProjectConfig
+from configs.project_config import ProjectAgents, ProjectGraphs
 from genpod.member import AgentMember
 
 
@@ -8,12 +8,20 @@ class TestsGeneratorMember(AgentMember[TestCoderState, TestCoderGraph]):
     """
     """
 
-    def __init__(self, persistance_db_path: str):
+    def __init__(self, agents: ProjectAgents, graphs: ProjectGraphs, persistance_db_path: str):
         """"""
 
-        self.tests_generator_config = ProjectConfig().agents_config[ProjectAgents.tests_generator.agent_id]
+        tests_generator_config = agents.tests_generator
+        tstg_grph = graphs.tests_generator
         super().__init__(
-            self.tests_generator_config, 
+            tests_generator_config, 
             TestCoderState, 
-            TestCoderGraph(self.tests_generator_config.llm, persistance_db_path)
+            TestCoderGraph(
+                tstg_grph.graph_id,
+                tstg_grph.graph_name,
+                tests_generator_config.agent_id,
+                tests_generator_config.agent_name,
+                tests_generator_config.llm, 
+                persistance_db_path
+            )
         )
