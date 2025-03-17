@@ -27,8 +27,6 @@ class SupervisorAgent(BaseAgent[SupervisorGraph]):
         use_rag: bool = False
     ):
         """
-        Initializes a new instance of SupervisorAgent.
-
         This constructor creates a SupervisorWorkFlow instance to drive the agent's operations, then initializes
         a SupervisorGraph with the specified recursion limit and persistence database path. The agent is then
         constructed using these components.

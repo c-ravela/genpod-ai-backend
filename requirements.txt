@@ -266,6 +266,9 @@ typer==0.15.1
 typing-inspect==0.9.0
 typing_extensions==4.12.2
 tzdata==2025.1
+unstructured[pdf]
+unstructured[xlsx]
+unstructured[docx]
 unstructured==0.14.3
 unstructured-client==0.25.9
 unstructured-inference==0.7.33
