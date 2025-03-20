@@ -18,7 +18,8 @@ SUPPORTED_LLMS = {
         'gpt-4o-2024-05-13',
         'o1-preview-2024-09-12',
         'o1-mini-2024-09-12',
-        'gpt-3.5-turbo'
+        'gpt-3.5-turbo',
+        'o3-mini'
     ],
     'ollama': [
         'llama3'
