@@ -1,4 +1,4 @@
-from typing import Annotated, List, Literal, TypedDict
+from typing import Dict, List
 
 from pydantic import Field
 
@@ -101,4 +101,9 @@ class PlannerState(BaseState):
     planned_backlogs: List[str] = Field(
         default_factory=list,
         description="List of planned backlogs."
+    )
+
+    task_to_file_map: Dict[str, List[str]] = Field(
+        default_factory=dict,
+        description="Mapping from task IDs to the list of work package file names that have been written."
     )

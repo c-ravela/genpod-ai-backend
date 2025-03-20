@@ -17,6 +17,10 @@ class ArchitectInput(BaseInputState):
     Represents the input expected by the Architect agent (or node).
     Typically sourced from user input or external contexts.
     """
+    additional_information: str = Field(
+        default='',
+        description="Supplementary contextual data or insights that support and enrich the requirements document."
+    )
     requested_standards: str = Field(
         default="",
         description="Standards that the user wants to be incorporated into the generated code."
@@ -48,6 +52,10 @@ class ArchitectState(BaseState):
     Represents the state of the Architect agent, encompassing both internal configurations
     and dynamic state information required for project generation and management.
     """
+    additional_information: str = Field(
+        default='',
+        description="Supplementary contextual data or insights that support and enrich the requirements document."
+    )
     requested_standards: str = Field(
         default="",
         description="Standards that the user wants to be incorporated into the generated code."

@@ -6,7 +6,7 @@ capturing a specific set of information required for the project. These models
 are used to structure the data in a consistent and organized manner, enhancing
 the readability and maintainability of the code.
 """
-from typing import Any, Generic, Iterator, List, Optional, TypeVar
+from typing import Any, Callable, Generic, Iterator, List, Optional, TypeVar
 
 from pydantic import BaseModel, Field
 
@@ -98,6 +98,24 @@ class Queue(BaseModel, Generic[QueueType]):
             bool: True if there are unprocessed items, False otherwise.
         """
         return self.next < len(self.items)
+
+    def remove_items(self, predicate: Callable[[QueueType], bool]) -> int:
+        """
+        Removes items from the queue that satisfy the given predicate.
+
+        Args:
+            predicate (Callable[[QueueType], bool]): A function that returns True for items to be removed.
+
+        Returns:
+            int: The number of items removed.
+        """
+        original_length = len(self.items)
+        self.items = [item for item in self.items if not predicate(item)]
+
+        # Adjust the next pointer safely: if next is now out of range, set it to the end.
+        if self.next > len(self.items):
+            self.next = len(self.items)
+        return original_length - len(self.items)
 
     def clear(self) -> None:
         """

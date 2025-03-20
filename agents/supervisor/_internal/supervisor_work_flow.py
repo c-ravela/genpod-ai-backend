@@ -1,4 +1,5 @@
 import os
+from typing import Optional
 
 from agents.supervisor._internal.supervisor_prompts import SupervisorPrompts
 from agents.supervisor._internal.supervisor_state import (SupervisorOuptut,
@@ -302,6 +303,7 @@ class SupervisorWorkFlow(BaseWorkFlow[SupervisorPrompts]):
             # Architect has prepared all the required information.
             if state.current_task.task_status == Status.DONE:
                 if not state.is_human_reviewed:
+                    state.previous_project_status = state.project_status
                     state.project_status = PStatus.HALTED
 
                     logger.info(
@@ -309,6 +311,7 @@ class SupervisorWorkFlow(BaseWorkFlow[SupervisorPrompts]):
                         "Waiting for human review."
                     )
                 else:
+                    state.is_human_reviewed = False
                     state.project_status = PStatus.EXECUTING
                     state.chat_history += [
                         (
@@ -378,11 +381,23 @@ class SupervisorWorkFlow(BaseWorkFlow[SupervisorPrompts]):
                     state.project_status = PStatus.REVIEWING
                 else:
                     state.current_task = next_task
+                    state.is_human_reviewed = False
                     self._genpod_context.update(
                         current_task=TaskContext(task_id=state.current_task.task_id)
                     )
             elif state.current_task.task_status == Status.INPROGRESS:
                 # update the planned_task status in the list
+                if not state.is_human_reviewed:
+                    state.previous_project_status = state.project_status
+                    state.project_status = PStatus.HALTED
+                    state.current_task.task_status = Status.AWAITING
+
+                    logger.info(
+                        "Supervisor: Planner completed the planned tasks preparation. "
+                        "Waiting for human review."
+                    )
+                    return state
+            
                 try:
                     state.planned_tasks.update_item(state.current_planned_task)
                 except Exception as e:
@@ -480,23 +495,40 @@ class SupervisorWorkFlow(BaseWorkFlow[SupervisorPrompts]):
             #  complete the task.
 
             if state.is_human_reviewed:
-                if state.current_task.task_status == Status.INPROGRESS:
-                    state.project_status = PStatus.INITIAL
-                    state.current_task.task_status = Status.NEW
-                    state.is_human_reviewed = False
-                    logger.info("Supervisor: Human review completed. Project status updated to INITIAL.")
-                else:
+                if state.previous_project_status == PStatus.INITIAL:
+                    # For INITIAL phase, human review is complete.
+                    # If changes were needed, call_human should have already updated task_status to INPROGRESS.
+                    # Revert to INITIAL irrespective of whether modifications were applied.
+                    if state.current_task.task_status == Status.INPROGRESS:
+                        state.current_task.task_status = Status.NEW
+                        state.is_human_reviewed = False
+                        state.project_status = PStatus.INITIAL
+                        log_msg = "Modifications applied; task status updated to NEW and project status reverted to INITIAL."
+                    else:
+                        state.project_status = PStatus.EXECUTING
+                        log_msg = "No modifications applied; project status advanced to EXECUTING."
+                    state.previous_project_status = PStatus.NONE
+                    logger.info(f"Supervisor: Human review completed. {log_msg}")
+                elif state.previous_project_status == PStatus.EXECUTING:
+                    # If modifications were needed, task_status would be INPROGRESS.
+                    # Remove outdated planned tasks only if modifications were applied.
+                    if state.current_task.task_status == Status.INPROGRESS:
+                        self._remove_planned_tasks_for_current_task(state)
+                        state.current_task.task_status = Status.NEW
+                        state.is_human_reviewed = False
+                        log_msg = "Modifications applied; outdated planned tasks removed and task status updated to NEW."
+                    else:
+                        state.current_task.task_status = Status.INPROGRESS
+                        log_msg = "No modifications applied."
+                    state.previous_project_status = PStatus.NONE
                     state.project_status = PStatus.EXECUTING
-                    logger.warning(
-                        f"Supervisor: Human review marked as completed, but task status is not INPROGRESS. "
-                        f"Current task status: {state.current_task.task_status}."
-                    )
+                    logger.info(f"Supervisor: Human review completed. {log_msg} Project status reverted to EXECUTING.")
+
             else:
-                logger.warning(
-                    "Supervisor: Project is in HALTED status, but 'is_human_reviewed' is False. "
-                    "Human intervention may still be required."
-                )
+                logger.warning("Supervisor: Project is in HALTED status and awaiting human review.")
+
             return state
+
         elif state.project_status == PStatus.DONE:
             # When the project status is 'DONE':
             # - All tasks have been completed.
@@ -505,6 +537,7 @@ class SupervisorWorkFlow(BaseWorkFlow[SupervisorPrompts]):
             # TODO: Figure out when this stage occurs and handle the logic
             logger.info("Supervisor: Project has been marked as DONE. All tasks and issues resolved.")
             return state
+
         else:
             logger.warning(
                 f"Supervisor: Unhandled project status encountered. Current project status: {state.project_status}."
@@ -539,7 +572,7 @@ class SupervisorWorkFlow(BaseWorkFlow[SupervisorPrompts]):
             state.tasks.clear()
 
             try:
-                architect_input_common['requested_standards'] = state.human_feedback_to_architect
+                architect_input_common['additional_information'] = self._extract_feedback_for_member(state, self.team.architect.id)
                 architect_result = self.team.architect.invoke(architect_input_common)
 
                 # if the task_status is done that mean architect has generated all the 
@@ -569,8 +602,7 @@ class SupervisorWorkFlow(BaseWorkFlow[SupervisorPrompts]):
     @record_node()
     def call_human(self, state: SupervisorState) -> SupervisorState:
         """
-        Engages with a human reviewer to validate or modify the project requirements document.
-
+        Engages with a human reviewer to validate or modify the project requirements document or work packages.
         Updates the state based on the human review and feedback.
 
         Args:
@@ -579,52 +611,57 @@ class SupervisorWorkFlow(BaseWorkFlow[SupervisorPrompts]):
         Returns:
             SupervisorState: The updated state after incorporating human feedback.
         """
-        print(
-            f"{self.team.architect.name} has completed the preparation of the project requirements document. "
-            "Please proceed with a thorough review to ensure all criteria are met and aligned with project objectives.\n"
-        )
-        
-        requirements_document_path = os.path.join(state.project_directory, 'docs/requirements.md')
-        print(f"Document Path: {requirements_document_path}\n")
-        
-        print(
-            "Does the requirements document meet the expected standards? "
-            "Would you like to make any modifications? (Y/N): "
-        )
+        if state.previous_project_status == PStatus.INITIAL:
+            header = (
+                f"{self.team.architect.name} has completed the preparation of the project requirements document. "
+                "Please proceed with a thorough review to ensure all criteria are met and aligned with project objectives.\n"
+            )
+            file_path = os.path.join(state.project_directory, 'docs/requirements_document.md')
+            doc_type = "requirements document"
+            path_label = "Document Path"
+            team_member_id = self.team.architect.id
+
+        elif state.previous_project_status == PStatus.EXECUTING:
+            header = (
+                f"{self.team.planner.name} has completed breaking down the deliverable into planned tasks. "
+                "Please review them to ensure all criteria are met and aligned with project objectives.\n"
+            )
+            file_path = os.path.join(state.project_directory, 'docs/work_packages')
+            start_index, end_index = self._get_work_packages_range_indices_for_current_task(state)
+            if start_index is not None and end_index is not None:
+                print(
+                    f"Work Packages for the current task (ID: {state.current_task.task_id}) range "
+                    f"from index {start_index} to {end_index}."
+                )
+            else:
+                print("No work packages associated with the current task were found.")
+
+            doc_type = "work packages"
+            path_label = "Work Packages Path"
+            team_member_id = self.team.planner.id
+
+        else:
+            return state
+
+        print(header)
+        print(f"{path_label}: {file_path}\n")
+        print(f"Does the {doc_type} meet the expected standards? Would you like to make any modifications? (Y/N): ")
         user_response = input().strip().lower()
 
-        # Set modification requirement flag based on user response
-        is_modification_required: bool = user_response == 'y'
-
-        human_feedback = ""
-        if is_modification_required:
-            print("\nYou have indicated that modifications are required. Please provide your feedback.")
-            while True:
-                print("\nPlease provide your feedback: ")
-                additional_feedback = input().strip()
-                human_feedback += f"\n{additional_feedback}"
-
-                print("\nWould you like to provide additional feedback? (Y/N): ")
-                has_more_feedback = input().strip().lower()
-                if has_more_feedback != 'y':
-                    break
-            
-            print(
-                "\nThank you for your feedback. It will be incorporated into the requirements document for regeneration."
-            )
+        if user_response == 'y':
             state.current_task.task_status = Status.INPROGRESS
-            state.human_feedback_to_architect += (
-                f"\nHuman feedback to incorporate:\n{human_feedback}"
-            )
+            feedback = self._collect_feedback(doc_type)
+            if team_member_id in state.human_feedback:
+                state.human_feedback[team_member_id].append(feedback)
+            else:
+                state.human_feedback[team_member_id] = [feedback]
         else:
             print(
-                "\nYou have selected 'No', indicating that no modifications are required. "
-                "The current version of the requirements document will be used."
+                f"\nYou have selected 'No', indicating that no modifications are required for the {doc_type}. "
+                "Proceeding with project generation based on the current requirements."
             )
-            print("Proceeding with project generation based on the current requirements.")
 
         state.is_human_reviewed = True
-
         return state
 
     @trace_span
@@ -653,6 +690,7 @@ class SupervisorWorkFlow(BaseWorkFlow[SupervisorPrompts]):
         }
 
         try:
+            planner_input_common['additional_information'] = self._extract_feedback_for_member(state, self.team.planner.id)
             planner_result = self.team.planner.invoke(planner_input_common)
 
             if state.project_status == PStatus.EXECUTING:
@@ -954,6 +992,91 @@ class SupervisorWorkFlow(BaseWorkFlow[SupervisorPrompts]):
     @record_node('exit')
     def exit_node(self, state: SupervisorState) -> SupervisorOuptut:
         return state
+
+    def _collect_feedback(self, doc_type: str) -> str:
+        """
+        Helper method to collect human feedback via a loop until the reviewer is done providing input.
+
+        Args:
+            doc_type (str): A descriptor for the type of document (e.g., 'requirements document' or 'work packages').
+
+        Returns:
+            str: The collected human feedback.
+        """
+        print(f"\nYou have indicated that modifications are required for the {doc_type}. Please provide your feedback.")
+        feedback = ""
+        while True:
+            print("\nPlease provide your feedback: ")
+            additional_feedback = input().strip()
+            feedback += f"\n{additional_feedback}"
+            print("\nWould you like to provide additional feedback? (Y/N): ")
+            if input().strip().lower() != 'y':
+                break
+        print(f"\nThank you for your feedback. It will be incorporated into the {doc_type} for regeneration.")
+        return feedback
+
+    def _extract_feedback_for_member(self, state: SupervisorState, team_member_id: str) -> str:
+        """
+        Extracts and concatenates feedback messages for a specific team member from the state's human_feedback dictionary.
+
+        Args:
+            state (SupervisorState): The current state containing human_feedback (a dict where keys are team member IDs and values are lists of feedback messages).
+            team_member_id (str): The team member's ID for which to extract feedback messages.
+
+        Returns:
+            str: A string that starts with "Human Feedback to Incorporate:" followed by the concatenated feedback messages.
+                If no feedback is found for the given ID, returns an empty string.
+        """
+        messages = state.human_feedback.get(team_member_id, [])
+        if not messages:
+            return ""
+        
+        combined_messages = "\n".join(messages)
+        return f"Human Feedback to Incorporate:\n{combined_messages}"
+
+    def _remove_planned_tasks_for_current_task(self, state: SupervisorState) -> None:
+        """
+        Private helper method to remove planned tasks from the planned_tasks queue that are associated
+        with the current task, if human feedback has been provided for the planner.
+
+        Args:
+            state (SupervisorState): The current state of the SupervisorAgent.
+
+        This method updates the state in place and does not return a new state.
+        """
+        current_task_id = state.current_task.task_id
+        removed_count = state.planned_tasks.remove_items(
+            lambda task: task.parent_task_id == current_task_id
+        )
+        logger.info(
+            f"Removed {removed_count} planned tasks associated with current task ID: {current_task_id}."
+        )
+
+    def _get_work_packages_range_indices_for_current_task(self, state: SupervisorState) -> tuple[Optional[int], Optional[int]]:
+        """
+        Private helper method to obtain the start and end indices in the planned_tasks queue
+        for the work packages associated with the current task.
+
+        Args:
+            state (SupervisorState): The current state of the SupervisorAgent.
+
+        Returns:
+            tuple[Optional[int], Optional[int]]: A tuple containing the start and end indices
+            of the planned tasks for the current task. If no planned tasks are found for the
+            current task, returns (None, None).
+        """
+        current_task_id = state.current_task.task_id
+        # Find indices of planned tasks that belong to the current task based on parent_task_id.
+        indices = [
+            index for index, task in enumerate(state.planned_tasks.items)
+            if task.parent_task_id == current_task_id
+        ]
+        if not indices:
+            return None, None
+
+        start_index = indices[0] + 1
+        end_index = indices[-1] + 1
+        return start_index, end_index
 
 """
 The code below demonstrates the interaction flow with the RAG (Retrieval-Augmented Generation) system.

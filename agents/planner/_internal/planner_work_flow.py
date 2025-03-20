@@ -121,6 +121,11 @@ class PlannerWorkFlow(BaseWorkFlow[PlannerPrompts]):
         if state.project_status == PStatus.EXECUTING:
             logger.debug("Project status is EXECUTING.")
             if state.current_task.task_status == Status.NEW:
+                if state.task_to_file_map.get(state.current_task.task_id):
+                    logger.debug("Existing work packages found for current task (ID: %s). Deleting outdated work packages.",
+                                state.current_task.task_id)
+                    self._delete_work_packages_for_task(state, state.project_directory, state.current_task.task_id)
+
                 logger.debug("Current task status is NEW. Preparing for task planning: Clearing planned tasks, setting operational mode to TASK_PLANNING, and stage to TASK_BREAKDOWN.")
                 state.planned_tasks.clear()
                 state.operational_mode = PlannerMode.TASK_PLANNING
@@ -176,7 +181,7 @@ class PlannerWorkFlow(BaseWorkFlow[PlannerPrompts]):
             self.prompts.task_breakdown_prompt,
             {
                 "deliverable": state.current_task.description,
-                "context": f"{state.user_prompt}\n\n{state.requirements_document.to_markdown()}\n\n{state.additional_information}",
+                "context": f"{state.requirements_document.to_markdown()}\n\n{state.additional_information}",
                 "feedback": state.error_message
             }, 'string'
         )
@@ -230,7 +235,7 @@ class PlannerWorkFlow(BaseWorkFlow[PlannerPrompts]):
                 {
                     'backlog': backlog,
                     'deliverable': state.current_task.description,
-                    'context': f"{state.user_prompt}\n\n{state.requirements_document.to_markdown()}\n\n{state.additional_information}",
+                    'context': f"{state.requirements_document.to_markdown()}\n\n{state.additional_information}",
                     'feedback': state.error_message
                 },
                 'string'
@@ -265,7 +270,7 @@ class PlannerWorkFlow(BaseWorkFlow[PlannerPrompts]):
             state.planned_tasks.add_item(planned_task)
             logger.info("Added PlannedTask for backlog '%s' with task ID: %s", backlog, planned_task.task_id)
 
-        files_written, total_files_written = self._write_workpackages_to_files(state.project_directory, state.planned_tasks)
+        files_written, total_files_written = self._write_workpackages_to_files(state, state.project_directory, state.planned_tasks)
         state.file_count = total_files_written
         logger.info("Work packages written to files. Files written: %d, Total files: %d", files_written, total_files_written)
 
@@ -438,6 +443,7 @@ class PlannerWorkFlow(BaseWorkFlow[PlannerPrompts]):
 
     def _write_workpackages_to_files(
         self,
+        state: PlannerState,
         output_dir: str,
         planned_tasks: PlannedTaskQueue
     ) -> tuple[int, int]:
@@ -472,13 +478,63 @@ class PlannerWorkFlow(BaseWorkFlow[PlannerPrompts]):
                     json.dump(work_package, file, indent=4)
 
                 logger.info(f"{self.agent_name}: Work package written to: {file_path}")
+                parent_id = planned_task.parent_task_id
+                if parent_id in state.task_to_file_map:
+                    state.task_to_file_map[parent_id].append(file_name)
+                else:
+                    state.task_to_file_map[parent_id] = [file_name]
             except UnicodeEncodeError:
                 try:
                     with codecs.open(file_path, 'w', encoding='utf-8-sig') as file:
                         json.dump(work_package, file, indent=4)
                     logger.info(f"{self.agent_name}: Work package written to: {file_path} (with BOM)")
+
+                    parent_id = planned_task.parent_task_id
+                    if parent_id in state.task_to_file_map:
+                        state.task_to_file_map[parent_id].append(file_name)
+                    else:
+                        state.task_to_file_map[parent_id] = [file_name]
                 except Exception as e:
                     logger.error(f"{self.agent_name}: Failed to write work package to {file_path}. Error: {e}")
+            except Exception as e:
+                logger.error(f"{self.agent_name}: Failed to write work package to {file_path}. Error: {e}")
+
             self.file_count += 1
             session_file_count += 1
         return session_file_count, self.file_count
+
+    def _delete_work_packages_for_task(self, state: PlannerState, output_dir: str, task_id: str) -> None:
+        """
+        Private helper method to delete the work package files associated with a specific task,
+        and update the file_count accordingly.
+
+        Args:
+            output_dir (str): The base directory where the 'docs/work_packages' folder is located.
+            task_id (str): The ID of the task whose work package files should be deleted.
+            state (PlannerState): The current state containing the mapping of task IDs to file names.
+        
+        This method deletes only the files listed in the state's task_to_file_map for the given task_id,
+        subtracts the number of deleted files from the file_count, and removes the entry from the map.
+        """
+        files_for_task = state.task_to_file_map.get(task_id, [])
+        if not files_for_task:
+            logger.info(f"No work package files found for task ID {task_id}. Nothing to delete.")
+            return
+
+        work_packages_dir = os.path.join(output_dir, "docs", "work_packages")
+        deleted_count = 0
+        for file_name in files_for_task:
+            file_path = os.path.join(work_packages_dir, file_name)
+            try:
+                os.remove(file_path)
+                deleted_count += 1
+                logger.info(f"Deleted work package file: {file_path}")
+            except Exception as e:
+                logger.error(f"Failed to delete file {file_path}. Error: {e}")
+        
+        # Update the global file count: subtract only the deleted count.
+        self.file_count -= deleted_count
+        logger.info(f"Deleted {deleted_count} files for task ID {task_id}. Updated file_count: {self.file_count}")
+
+        # Remove the entry for this task ID from the mapping.
+        del state.task_to_file_map[task_id]

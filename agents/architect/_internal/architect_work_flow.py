@@ -158,38 +158,47 @@ class ArchitectWorkFlow(BaseWorkFlow[ArchitectPrompts]):
                 input_params={
                     'user_request': state.user_prompt,
                     'task_description': state.current_task.description,
+                    'additional_information': state.additional_information
                 }
             ),
             'system_architecture': GenerationStepConfig(
                 prompt=self.prompts.system_architecture_prompt,
                 response_model=TaskResponse,
                 input_params={
+                    'user_request': state.user_prompt,
                     'project_overview': state.requirements_document.project_summary,
+                    'additional_information': state.additional_information
                 }
             ),
             'file_structure': GenerationStepConfig(
                 prompt=self.prompts.file_structure_prompt,
                 response_model=TaskResponse,
                 input_params={
+                    'user_request': state.user_prompt,
                     'project_overview': state.requirements_document.project_summary,
-                    'system_architecture': state.requirements_document.system_architecture
+                    'system_architecture': state.requirements_document.system_architecture,
+                    'additional_information': state.additional_information
                 }
             ),
             'microservice_design': GenerationStepConfig(
                 prompt=self.prompts.microservice_design_prompt,
                 response_model=TaskResponse,
                 input_params={
+                    'user_request': state.user_prompt,
                     'project_overview': state.requirements_document.project_summary,
-                    'system_architecture': state.requirements_document.system_architecture
+                    'system_architecture': state.requirements_document.system_architecture,
+                    'additional_information': state.additional_information
                 }
             ),
             'tasks_summary': GenerationStepConfig(
                 prompt=self.prompts.tasks_summary_prompt,
                 response_model=TaskResponse,
                 input_params={
+                    'user_request': state.user_prompt,
                     'project_overview': state.requirements_document.project_summary,
                     'system_architecture': state.requirements_document.system_architecture,
-                    'microservice_design': state.requirements_document.microservice_design
+                    'microservice_design': state.requirements_document.microservice_design,
+                    'additional_information': state.additional_information
                 }
             ),
             'code_standards': GenerationStepConfig(
@@ -197,16 +206,18 @@ class ArchitectWorkFlow(BaseWorkFlow[ArchitectPrompts]):
                 response_model=TaskResponse,
                 input_params={
                     'user_request': state.user_prompt,
-                    'user_requested_standards': state.requested_standards,
+                    'additional_information': state.additional_information
                 }
             ),
             'implementation_plan': GenerationStepConfig(
                 prompt=self.prompts.implementation_details_prompt,
                 response_model=TaskResponse,
                 input_params={
+                    'user_request': state.user_prompt,
                     'system_architecture': state.requirements_document.system_architecture,
                     'microservice_design': state.requirements_document.microservice_design,
                     'file_structure': state.requirements_document.file_structure,
+                    'additional_information': state.additional_information
                 }
             ),
             'license_terms': GenerationStepConfig(
@@ -215,6 +226,7 @@ class ArchitectWorkFlow(BaseWorkFlow[ArchitectPrompts]):
                 input_params={
                     'user_request': state.user_prompt,
                     'license_text': state.license_header,
+                    'additional_information': state.additional_information
                 }
             )
         }

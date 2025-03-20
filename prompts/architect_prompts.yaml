@@ -3,6 +3,8 @@ project_summary_prompt_template:
     Given the user request: "{user_request}"
     Supervisor expectations: "{task_description}"
 
+    {additional_information}
+
     As a Solution Architect, provide a comprehensive project overview that includes:
     1. A brief description of the project's purpose and goals.
     2. The main features or functionalities to be implemented.
@@ -18,7 +20,10 @@ system_architecture_prompt_template:
     Based on the project overview provided, describe a high-level architecture for
     this microservice-based project. Focus on the following key aspects:
 
+    Given the user request: "{user_request}"
     **Project Overview:** "{project_overview}"
+
+    {additional_information}
 
     ### Requirements:
 
@@ -70,11 +75,15 @@ file_structure_prompt_template:
     Based on the provided project overview and system architecture, propose 
     a detailed and well-organized folder structure for the microservice project.
 
+    Given the user request: "{user_request}"
+
     **Project Overview:**
     {project_overview}
 
     **System Architecture:**
     {system_architecture}
+
+    {additional_information}
 
     Your proposal should include:
 
@@ -103,11 +112,15 @@ microservice_design_prompt_template:
     microservice architecture. For each identified microservice, please include 
     the following details:
 
+    Given the user request: "{user_request}"
+
     **Project Overview:**
     {project_overview}
 
     **System Architecture:**
     {system_architecture}
+
+    {additional_information}
 
     For each microservice, provide:
     1. **Service Name & Responsibility:** The name of the service and its primary function.
@@ -128,6 +141,8 @@ tasks_summary_prompt_template:
     These deliverables should be actionable tasks for team members and include 
     all necessary technical specifications and configurations.
 
+    Given the user request: "{user_request}"
+
     **Project Overview:**
     {project_overview}
 
@@ -136,6 +151,8 @@ tasks_summary_prompt_template:
 
     **Microservice Design:**
     {microservice_design}
+
+    {additional_information}
 
     For each deliverable, please provide:
     1. **Deliverable Name:** A clear title for the task.
@@ -160,7 +177,8 @@ code_standards_prompt_template:
     Considering the following inputs:
 
     **User Request:** "{user_request}"
-    **User-Requested Standards:** "{user_requested_standards}"
+
+    {additional_information}
 
     Please outline the coding standards for this project. Your response should include:
 
@@ -188,6 +206,8 @@ implementation_details_prompt_template:
     Based on the following project details, provide comprehensive implementation 
     details:
 
+    Given the user request: "{user_request}"
+
     **System Architecture:**
     {system_architecture}
 
@@ -196,6 +216,8 @@ implementation_details_prompt_template:
 
     **Folder Structure:**
     {file_structure}
+
+    {additional_information}
 
     For each category below, provide detailed information including examples where applicable:
 
@@ -226,6 +248,8 @@ license_details_prompt_template:
 
     **User Request:** "{user_request}"
     **License Text:** "{license_text}"
+
+    {additional_information}
 
     Specify the license header to be added to this project.
 

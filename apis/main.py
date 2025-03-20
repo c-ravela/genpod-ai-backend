@@ -385,13 +385,28 @@ class Action:
                 self.graph_recursion_limit
             )
             
-            user_prompt = Action._prompt_user_for_project_idea()
-            manager.microservice.prompt = user_prompt
+            human_prompt = Action._prompt_user_for_project_generation(
+                manual_prompt="Enter your project idea (at least 10 characters)",
+                min_length=10,
+            )
+            # TODO: Need to add support for multiple files just for this input
+            # additional_input_prompt = Action._prompt_user_for_project_generation(
+            #     manual_prompt="Enter additional input (at least 10 characters)",
+            #     min_length=10,
+            # )
+
+            final_human_input = (
+                "Human Prompt: "
+                f"{human_prompt}"
+                # "Additional Details:"
+                # f"{additional_input_prompt}"
+            )
+            manager.microservice.prompt = final_human_input
             manager.microservice_controller.create(manager.microservice)
             logger.info(f"Microservice created with ID {manager.microservice.id} for project ID {manager.microservice.project_id}.")
 
-            self._genpod_context.update(user_prompt=user_prompt)
-            logger.debug("GenpodContext updated with user_prompt: %s", user_prompt)
+            self._genpod_context.update(user_prompt=final_human_input)
+            logger.debug("GenpodContext updated with user_prompt: %s", final_human_input)
 
             delay_seconds = 5
             print(
@@ -406,7 +421,7 @@ class Action:
             manager.setup_rag()
 
             supervisor_data = SupervisorInput(
-                user_prompt=user_prompt,
+                user_prompt=final_human_input,
                 project_directory=manager.microservice.project_location,
                 project_id=manager.microservice.project_id,
                 microservice_id=manager.microservice.id,
@@ -559,24 +574,39 @@ class Action:
             raise
 
     @staticmethod
-    def _prompt_user_for_project_idea() -> str:
+    def _prompt_user_for_project_generation(
+        manual_prompt: str,
+        min_length: int = 0,
+        file_option_label: str = "1",
+        manual_option_label: str = "2",
+    ) -> str:
         """
-        Prompt the user to enter a project idea via standard input or from a file.
+        Generic method to prompt the user for input, either via a file or manually.
+
+        Args:
+            manual_prompt (str): The prompt message for manual input.
+            min_length (int): Minimum length for manual input (if applicable).
+            file_input_prompt (Optional[str]): Optional prompt for file input.
+            file_option_label (str): Label for the file input option.
+            manual_option_label (str): Label for the manual input option.
+            choice_prompt (str): Format string for the choice prompt.
 
         Returns:
-            str: The validated project idea.
+            str: The validated user input.
         """
+        choice_prompt: str = "Enter {file_opt} to provide input via file, or {manual_opt} to enter manually: \n"
+
         while True:
             try:
-                input_type = input("Enter 1 to provide project idea via file, or 2 to enter manually: ").strip()
-                
-                if input_type == "1":
+                prompt_msg = choice_prompt.format(file_opt=file_option_label, manual_opt=manual_option_label)
+                input_type = input(prompt_msg).strip()
+
+                if input_type == file_option_label:
                     return Action._prompt_for_file_input()
-                elif input_type == "2":
-                    return Action._prompt_for_input("Enter your project idea (at least 10 characters)", min_length=10)
+                elif input_type == manual_option_label:
+                    return Action._prompt_for_input(manual_prompt, min_length=min_length)
                 else:
-                    print("Invalid choice. Please enter 1 or 2.")
-            
+                    print(f"Invalid choice. Please enter {file_option_label} or {manual_option_label}.")
             except Exception as e:
                 logger.exception("Error during user input type selection.")
                 raise
