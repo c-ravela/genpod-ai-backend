@@ -13,7 +13,7 @@ from agents.architect._internal.architect_node_enum import ArchitectNodeEnum
 from agents.architect._internal.architect_state import *
 from agents.architect._internal.architect_work_flow import ArchitectWorkFlow
 from core.graph import BaseGraph
-from utils.logs.logging_utils import logger
+from utils.logger import logger
 
 
 class ArchitectGraph(BaseGraph[ArchitectWorkFlow]):

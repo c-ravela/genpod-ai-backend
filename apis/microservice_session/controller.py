@@ -2,7 +2,7 @@ from typing import List
 
 from apis.microservice_session.service import MicroserviceSessionService
 from database.entities.microservice_sessions import MicroserviceSession
-from utils.logs.logging_utils import logger
+from utils.logger import logger
 
 
 class MicroserviceSessionController:

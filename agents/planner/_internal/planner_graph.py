@@ -6,7 +6,7 @@ from agents.planner._internal.planner_state import (PlannerInput,
                                                     PlannerState)
 from agents.planner._internal.planner_work_flow import PlannerWorkFlow
 from core.graph import BaseGraph
-from utils.logs.logging_utils import logger
+from utils.logger import logger
 
 
 class PlannerGraph(BaseGraph[PlannerWorkFlow]):

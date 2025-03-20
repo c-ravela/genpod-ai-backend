@@ -1,7 +1,7 @@
 from typing import Any, Dict
 
 from llms.llm import LLM, LLMMeta
-from utils.logs.logging_utils import logger
+from utils.logger import logger
 
 
 def llm_factory(

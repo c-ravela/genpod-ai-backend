@@ -2,7 +2,7 @@ from agents.architect._internal.architect_graph import ArchitectGraph
 from agents.architect._internal.architect_work_flow import ArchitectWorkFlow
 from core.agent import BaseAgent
 from llms import LLM
-from utils.logs.logging_utils import logger
+from utils.logger import logger
 
 
 class ArchitectAgent(BaseAgent[ArchitectGraph]):

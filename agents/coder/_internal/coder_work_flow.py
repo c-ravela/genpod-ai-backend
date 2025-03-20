@@ -18,7 +18,7 @@ from tools.code import CodeFileWriter
 from tools.file_system import FS
 from tools.license import License
 from tools.shell import Shell
-from utils.logs.logging_utils import logger
+from utils.logger import logger
 
 
 class CoderWorkFlow(BaseWorkFlow[CoderPrompts]):

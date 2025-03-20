@@ -1,6 +1,6 @@
 from tabulate import tabulate
 
-from utils.logs.logging_utils import logger
+from utils.logger import logger
 
 
 class ProjectStatus:

@@ -2,7 +2,7 @@ from agents.planner._internal.planner_graph import PlannerGraph
 from agents.planner._internal.planner_work_flow import PlannerWorkFlow
 from core.agent import BaseAgent
 from llms import LLM
-from utils.logs.logging_utils import logger
+from utils.logger import logger
 
 
 class PlannerAgent(BaseAgent[PlannerGraph]):

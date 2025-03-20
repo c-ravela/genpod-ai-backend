@@ -14,7 +14,7 @@ from models.architect_models import ProjectDetails, TaskList, TaskResponse
 from models.constants import PStatus, Status
 from models.models import Task, TaskQueue
 from tools.code import CodeFileWriter
-from utils.logs.logging_utils import logger
+from utils.logger import logger
 
 
 @dataclass

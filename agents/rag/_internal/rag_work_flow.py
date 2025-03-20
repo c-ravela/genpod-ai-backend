@@ -16,7 +16,7 @@ from core.workflow import BaseWorkFlow
 from database.entities.rag_analytics import RAGAnalytics
 from llms.llm import LLM
 from models import BinaryScore, PromptResponse, RagResponseType, Status
-from utils.logs.logging_utils import logger
+from utils.logger import logger
 
 RAG_RETRY_LIMIT = 1
 MAX_HALLUCINATION_LIMIT = 3

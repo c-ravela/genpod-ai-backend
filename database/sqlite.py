@@ -1,5 +1,5 @@
 from database.database import Database
-from utils.logs.logging_utils import logger
+from utils.logger import logger
 
 
 class SQLite(Database):

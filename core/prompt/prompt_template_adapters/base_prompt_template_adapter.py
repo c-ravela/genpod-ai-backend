@@ -2,7 +2,7 @@ from abc import ABC, abstractmethod
 from typing import Any
 
 from utils.decorators import auto_repr
-from utils.logs.logging_utils import logger
+from utils.logger import logger
 
 
 @auto_repr

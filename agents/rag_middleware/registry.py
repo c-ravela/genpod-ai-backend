@@ -2,7 +2,7 @@ from dataclasses import dataclass
 from typing import List, Optional
 
 from core.agent import BaseAgent
-from utils.logs.logging_utils import logger
+from utils.logger import logger
 
 
 @dataclass

@@ -7,7 +7,7 @@ from core.prompt.base_prompt import BasePrompt
 from core.prompt.prompt_template_adapters.base_prompt_template_adapter import \
     BasePromptTemplateAdapter
 from core.prompt.utils import load_instructions_from_yaml
-from utils.logs.logging_utils import logger
+from utils.logger import logger
 
 GLOBAL_RAG_INSTRUCTIONS_PATH = path.join(getcwd() , "prompts", "rag_retrieval_instructions.yaml")
 

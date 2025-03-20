@@ -5,7 +5,7 @@ from langchain_core.prompts import PromptTemplate
 
 from core.prompt import *
 from models import RagSelectionResponse
-from utils.logs.logging_utils import logger
+from utils.logger import logger
 from utils.yaml_utils import read_yaml
 
 RAG_MIDDLEWARE_PROMPTS_PATH = path.join(getcwd(), "prompts", "rag_middleware_prompts.yaml")

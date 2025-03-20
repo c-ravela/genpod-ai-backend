@@ -13,7 +13,7 @@ from core.prompt import BasePrompt
 from llms.llm_metrics_callback import *
 from models import AdditionalInfoRequest
 from utils.decorators import auto_repr
-from utils.logs.logging_utils import logger
+from utils.logger import logger
 
 TLLMInstance = TypeVar('TLLMInstance')
 TResponse = TypeVar('TResponse', bound=BaseModel)

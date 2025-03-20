@@ -3,7 +3,7 @@ from typing import Any, Dict, Generic, TypeVar
 from core.graph import BaseGraph
 from llms import LLM
 from utils.decorators import auto_repr
-from utils.logs.logging_utils import logger
+from utils.logger import logger
 
 GenericAgentGraph = TypeVar('GenericAgentGraph', bound=BaseGraph)
 

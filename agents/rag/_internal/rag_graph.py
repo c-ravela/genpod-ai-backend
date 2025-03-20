@@ -4,7 +4,7 @@ from agents.rag._internal.rag_node_enum import RAGNodeEnum
 from agents.rag._internal.rag_state import RAGInput, RAGOuput, RAGState
 from agents.rag._internal.rag_work_flow import RAGWorkFlow
 from core.graph import BaseGraph
-from utils.logs.logging_utils import logger
+from utils.logger import logger
 
 
 class RAGGraph(BaseGraph[RAGWorkFlow]):

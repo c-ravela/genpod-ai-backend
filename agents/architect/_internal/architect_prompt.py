@@ -5,7 +5,7 @@ from langchain_core.prompts import PromptTemplate
 
 from core.prompt import *
 from models.architect_models import ProjectDetails, TaskList, TaskResponse
-from utils.logs.logging_utils import logger
+from utils.logger import logger
 from utils.yaml_utils import read_yaml
 
 ARCHITECT_PROMPTS_PATH = path.join(getcwd(), "prompts", "architect_prompts.yaml")

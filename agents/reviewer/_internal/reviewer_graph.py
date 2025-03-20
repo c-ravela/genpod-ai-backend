@@ -6,7 +6,7 @@ from agents.reviewer._internal.reviewer_state import (ReviewerInput,
                                                       ReviewerState)
 from agents.reviewer._internal.reviewer_work_flow import ReviewerWorkFlow
 from core.graph import BaseGraph
-from utils.logs.logging_utils import logger
+from utils.logger import logger
 
 
 class ReviewerGraph(BaseGraph[ReviewerWorkFlow]):

@@ -1,7 +1,7 @@
 from typing import Any
 
 from core.prompt.base_prompt import BasePrompt
-from utils.logs.logging_utils import logger
+from utils.logger import logger
 
 
 class Prompt(BasePrompt):

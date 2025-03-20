@@ -26,7 +26,7 @@ Imported Models:
 - RAGAnalytics
 """
 
-from utils.logs.logging_utils import logger
+from utils.logger import logger
 
 try:
     from .microservice_llm_metrics import MicroserviceLLMMetrics

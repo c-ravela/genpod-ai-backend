@@ -2,7 +2,7 @@ from agents.rag._internal.rag_graph import RAGGraph
 from agents.rag._internal.rag_work_flow import RAGWorkFlow
 from core.agent import BaseAgent
 from llms import LLM
-from utils.logs.logging_utils import logger
+from utils.logger import logger
 
 
 class RAGAgent(BaseAgent[RAGGraph]):

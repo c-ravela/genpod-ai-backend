@@ -2,7 +2,7 @@ from agents.research._internal.research_graph import ResearchGraph
 from agents.research._internal.research_work_flow import ResearchWorkFlow
 from core.agent import BaseAgent
 from llms import LLM
-from utils.logs.logging_utils import logger
+from utils.logger import logger
 
 
 class ResearchAgent(BaseAgent[ResearchGraph]):
