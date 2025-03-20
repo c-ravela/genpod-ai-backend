@@ -76,8 +76,8 @@ class SupervisorOuptut(BaseOutputState):
         default_factory=TaskQueue,
         description="Queue of tasks generated during the project development process."
     )
-    human_feedback: List[tuple[str, str]] = Field(
-        default_factory=list,
+    human_feedback: Dict[str, List[str]] = Field(
+        default_factory=dict,
         description="List of tuples capturing human feedback during the human-in-the-loop process."
     )
     functions_skeleton: Dict[str, Any] = Field(
@@ -160,8 +160,8 @@ class SupervisorState(BaseState):
         default_factory=TaskQueue,
         description="Queue containing tasks generated throughout the project lifecycle."
     )
-    human_feedback: List[tuple[str, str]] = Field(
-        default_factory=list,
+    human_feedback: Dict[str, List[str]] = Field(
+        default_factory=dict,
         description="List of tuples representing human feedback entries for manual review and adjustments."
     )
     functions_skeleton: Dict[str, Any] = Field(
@@ -214,6 +214,8 @@ class SupervisorState(BaseState):
         default=False,
         description="Indicates whether the human review has been completed."
     )
-    human_feedback_to_architect: str = Field(
-        default=""
+    # Will be used during the call_human
+    previous_project_status: PStatus = Field(
+        default=PStatus.NONE,
+        description="Stores the previous project status, representing the state of the project prior to the current update. Defaults to PStatus.NONE if no previous status exists."
     )
