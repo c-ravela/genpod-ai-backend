@@ -6,7 +6,7 @@ from agents.research._internal.research_state import (ResearchInput,
                                                       ResearchState)
 from agents.research._internal.research_work_flow import ResearchWorkFlow
 from core.graph import BaseGraph
-from utils.logs.logging_utils import logger
+from utils.logger import logger
 
 
 class ResearchGraph(BaseGraph[ResearchWorkFlow]):

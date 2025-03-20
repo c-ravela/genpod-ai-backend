@@ -2,7 +2,7 @@ from typing import List, Optional
 
 from apis.project.service import ProjectService
 from database.entities.projects import Project
-from utils.logs.logging_utils import logger
+from utils.logger import logger
 
 
 class ProjectController:

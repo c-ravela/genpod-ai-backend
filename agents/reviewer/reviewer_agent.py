@@ -2,7 +2,7 @@ from agents.reviewer._internal.reviewer_graph import ReviewerGraph
 from agents.reviewer._internal.reviewer_work_flow import ReviewerWorkFlow
 from core.agent import BaseAgent
 from llms import LLM
-from utils.logs.logging_utils import logger
+from utils.logger import logger
 
 
 class ReviewerAgent(BaseAgent[ReviewerGraph]):

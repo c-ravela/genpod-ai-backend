@@ -13,7 +13,7 @@ from genpod.team import Team
 from llms.llm import LLM
 from models.constants import ChatRoles, PStatus, Status
 from models.models import IssuesQueue, Task
-from utils.logs.logging_utils import logger
+from utils.logger import logger
 from utils.otel import trace_span
 
 

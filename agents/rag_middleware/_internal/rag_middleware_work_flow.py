@@ -16,7 +16,7 @@ from core.state import RAGQueryInput, RAGQueryOutput
 from core.workflow import BaseWorkFlow
 from llms import LLM
 from models import PStatus, RagResponseType, RagSelectionResponse, Status, Task
-from utils.logs.logging_utils import logger
+from utils.logger import logger
 
 ERROR_THRESHOLD = 3
 

@@ -2,7 +2,7 @@ from typing import List, Optional
 
 from apis.rag_analytics.service import RAGAnalyticsService
 from database.entities.rag_analytics import RAGAnalytics
-from utils.logs.logging_utils import logger
+from utils.logger import logger
 
 
 class RAGAnalyticsController:

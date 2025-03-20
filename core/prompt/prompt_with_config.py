@@ -1,7 +1,7 @@
 from langchain.prompts import PromptTemplate
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 
-from utils.logs.logging_utils import logger
+from utils.logger import logger
 
 
 class PromptWithConfig(BaseModel):

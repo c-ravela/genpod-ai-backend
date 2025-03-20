@@ -2,7 +2,7 @@ from typing import List, Optional
 
 from apis.microservice_llm_metrics.service import MicroserviceLLMMetricsService
 from database.entities.microservice_llm_metrics import MicroserviceLLMMetrics
-from utils.logs.logging_utils import logger
+from utils.logger import logger
 
 
 class MicroserviceLLMMetricsController:

@@ -18,7 +18,7 @@ from models.tests_generator_models import (FileFunctionSignatures,
 from tools.code import CodeFileWriter
 from tools.file_system import FS
 from tools.shell import Shell
-from utils.logs.logging_utils import logger
+from utils.logger import logger
 
 
 class TestCoderWorkFlow(BaseWorkFlow[TestsGeneratorPrompts]):

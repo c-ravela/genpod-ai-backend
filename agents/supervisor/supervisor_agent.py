@@ -3,7 +3,7 @@ from agents.supervisor._internal.supervisor_work_flow import SupervisorWorkFlow
 from core.agent import BaseAgent
 from genpod import Team
 from llms import LLM
-from utils.logs.logging_utils import logger
+from utils.logger import logger
 from utils.otel import trace_span
 
 

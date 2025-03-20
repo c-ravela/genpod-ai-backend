@@ -17,7 +17,7 @@ from database.entities.microservices import Microservice
 from database.entities.projects import Project
 from genpod import Team
 from models.constants import PStatus
-from utils.logs.logging_utils import logger
+from utils.logger import logger
 from utils.project_status import ProjectStatus
 
 

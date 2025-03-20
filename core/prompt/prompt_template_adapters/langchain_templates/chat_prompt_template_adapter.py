@@ -1,7 +1,7 @@
 from langchain_core.prompts import ChatPromptTemplate
 
 from core.prompt.prompt_template_adapters.base_prompt_template_adapter import *
-from utils.logs.logging_utils import logger
+from utils.logger import logger
 
 
 class ChatPromptTemplateAdapter(BasePromptTemplateAdapter):

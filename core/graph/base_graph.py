@@ -10,7 +10,7 @@ from PIL import Image
 
 from core.workflow import BaseWorkFlow
 from utils.decorators import auto_repr
-from utils.logs.logging_utils import logger
+from utils.logger import logger
 
 GenericAgentWorkFlow = TypeVar("GenericAgentWorkFlow", bound=BaseWorkFlow)
 

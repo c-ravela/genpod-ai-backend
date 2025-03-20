@@ -16,7 +16,7 @@ from llms import LLM
 from models import (GeneratedResponse, RagResponseType,
                     RelevanceEvaluationResponse, SourceSelectionResponse,
                     Status)
-from utils.logs.logging_utils import logger
+from utils.logger import logger
 from utils.yaml_utils import read_yaml
 
 SOURCE_URL_FILE_PATH = path.join(getcwd(), "agents", "research", "_internal", "research_urls.yaml")

@@ -25,7 +25,7 @@ from configs.project_config import ProjectConfig
 from configs.project_path import set_project_path
 from context.context import GenpodContext
 from database.sqlite import SQLite
-from utils.logs.logging_utils import logger
+from utils.logger import logger
 from utils.otel import start_trace_session, stop_trace_session, trace_span
 from utils.time import get_timestamp
 from utils.yaml_utils import read_yaml

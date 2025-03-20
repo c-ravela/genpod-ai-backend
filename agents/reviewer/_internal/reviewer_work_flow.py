@@ -13,7 +13,7 @@ from core.workflow import BaseWorkFlow
 from llms.llm import LLM
 from models import Issue, IssuesQueue, IssuesReport, Status
 from tools.semgrep import Semgrep
-from utils.logs.logging_utils import logger
+from utils.logger import logger
 
 
 class ReviewerWorkFlow(BaseWorkFlow[ReviewerPrompts]):

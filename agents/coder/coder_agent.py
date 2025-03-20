@@ -2,7 +2,7 @@ from agents.coder._internal.coder_graph import CoderGraph
 from agents.coder._internal.coder_work_flow import CoderWorkFlow
 from core.agent import BaseAgent
 from llms import LLM
-from utils.logs.logging_utils import logger
+from utils.logger import logger
 
 
 class CoderAgent(BaseAgent[CoderGraph]):

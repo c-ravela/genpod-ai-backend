@@ -7,7 +7,7 @@ from pydantic import *
 from core.agent.base_agent import BaseAgent
 from models.constants import ChatRoles, PStatus
 from models.models import Task
-from utils.logs.logging_utils import logger
+from utils.logger import logger
 
 
 class ConfiguredBaseModel(BaseModel):

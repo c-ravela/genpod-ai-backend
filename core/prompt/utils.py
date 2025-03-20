@@ -1,6 +1,6 @@
 from typing import Any, Dict, List
 
-from utils.logs.logging_utils import logger
+from utils.logger import logger
 from utils.yaml_utils import read_yaml
 
 

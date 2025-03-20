@@ -3,7 +3,7 @@ from functools import wraps
 from pydantic import ValidationError
 
 from core.decorators.utils import validate_workflow_node_signature
-from utils.logs.logging_utils import logger
+from utils.logger import logger
 
 
 def _update_state_on_error(state: 'BaseState', error_detail: str, exc: Exception) -> None:

@@ -1,6 +1,6 @@
 from sqlalchemy.orm import DeclarativeBase
 
-from utils.logs.logging_utils import logger
+from utils.logger import logger
 
 logger.debug("Starting the setup of the declarative base for SQLAlchemy models.")
 

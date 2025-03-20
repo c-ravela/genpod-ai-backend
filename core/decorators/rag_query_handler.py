@@ -7,7 +7,7 @@ from context import GenpodContext
 from llms import LLMOutput
 from models import (AdditionalInfoRequest, PStatus, RagResponseType, Status,
                     Task)
-from utils.logs.logging_utils import logger
+from utils.logger import logger
 
 FAQ_KEY = 'faq'
 MAX_FALLBACK_ATTEMPTS = 10

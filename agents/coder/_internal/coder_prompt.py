@@ -5,7 +5,7 @@ from langchain_core.prompts import PromptTemplate
 
 from core.prompt import PromptTemplateAdapter, RagInstructionsPrompt
 from models.coder_models import CodeGenerationPlan
-from utils.logs.logging_utils import logger
+from utils.logger import logger
 from utils.yaml_utils import read_yaml
 
 CODER_PROMPTS_PATH = path.join(getcwd(), "prompts", "coder_prompts.yaml")

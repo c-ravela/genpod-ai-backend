@@ -5,7 +5,7 @@ from agents.rag_middleware._internal.rag_middleware_node_enum import \
 from agents.rag_middleware._internal.rag_middleware_state import *
 from agents.rag_middleware._internal.rag_middleware_work_flow import *
 from core.graph import BaseGraph
-from utils.logs.logging_utils import logger
+from utils.logger import logger
 
 
 class RAGMiddlewareGraph(BaseGraph[RAGMiddlewareWorkFlow]):

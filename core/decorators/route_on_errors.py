@@ -1,7 +1,7 @@
 from functools import wraps
 
 from core.decorators.utils import validate_workflow_node_signature
-from utils.logs.logging_utils import logger
+from utils.logger import logger
 
 
 def route_on_errors(func=None, *, max_error_threshold=3):

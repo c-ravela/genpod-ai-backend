@@ -17,7 +17,7 @@ from models.constants import PStatus, Status
 from models.models import PlannedIssue, PlannedTask, PlannedTaskQueue
 from models.planner_models import BacklogList, Segregation
 from tools.file_system import FS
-from utils.logs.logging_utils import logger
+from utils.logger import logger
 
 
 class PlannerWorkFlow(BaseWorkFlow[PlannerPrompts]):
