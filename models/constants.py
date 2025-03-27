@@ -77,15 +77,15 @@ class Status(Enum):
 class PStatus(Enum):
     """
     Enumeration representing the various states a project can be in.
-    
+
     Each member of this enum corresponds to a specific phase in a project's lifecycle.
-    
     The states track the project's progress through different phases:
 
     - 'NONE': No status has been assigned to the project yet.
     - 'RECEIVED': The project has been received but not yet processed.
     - 'NEW': The project is in the pre-initiation phase.
     - 'INITIAL': Setup is pending; initial preparations are underway.
+    - 'PLANNING': The project is in the planning phase.
     - 'EXECUTING': The assigned task is currently in progress.
     - 'MONITORING': The project is being monitored for any issues during execution.
     - 'REVIEWING': The project is under review, often for quality control or feedback.
@@ -98,6 +98,7 @@ class PStatus(Enum):
     RECEIVED: str = "RECEIVED"
     NEW: str = "NEW"
     INITIAL: str = "INITIAL"
+    PLANNING: str = "PLANNING"
     EXECUTING: str = "EXECUTING"
     MONITORING: str = "MONITORING"
     REVIEWING: str = "REVIEWING"
@@ -106,13 +107,13 @@ class PStatus(Enum):
     DONE: str = "DONE"
 
     def __str__(self):
-      """
-      Returns the string representation of the Enum member.
+        """
+        Returns the string representation of the Enum member.
 
-      Returns:
-          str: The value of the Enum member.
-      """
-      return self.value
+        Returns:
+            str: The value of the Enum member.
+        """
+        return self.value
 
 
 class RagResponseType(str, Enum):
