@@ -115,4 +115,27 @@ issues_segregation_prompt_template:
     Issue Details:
     {issue_details}
 
+    {context}
+
     {format_instruction}
+
+workpackage_update_extraction_prompt_template:
+  template: |
+    You are a helpful assistant that extracts update instructions from human feedback.
+    Given the following feedback:
+    {feedback}
+    Please extract and return a JSON list of update instructions. 
+    Each instruction must be a JSON object with the following keys:
+    - "target_id": The identifier provided in the feedback. If this corresponds to a deliverable, then all work packages under that deliverable need to be updated.
+    - "update_changes": The specific changes requested for that target.
+    Return the output in valid JSON format.
+
+workpackage_update_prompt_template:
+  template: |
+    You are a helpful assistant that updates work package details.
+    Given the current work package details:
+    {current_work_package}
+    and the following update changes requested by the user:
+    {update_changes}
+    Please produce a JSON object representing the updated work package details.
+    The output should merge the current details with the requested changes, preserving any unchanged fields.
