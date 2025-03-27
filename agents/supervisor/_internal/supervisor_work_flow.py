@@ -12,7 +12,7 @@ from core.workflow import BaseWorkFlow
 from genpod.team import Team
 from llms.llm import LLM
 from models.constants import ChatRoles, PStatus, Status
-from models.models import IssuesQueue, Task
+from models.models import IssuesQueue, Task, Issue
 from utils.logger import logger
 from utils.otel import trace_span
 
@@ -81,14 +81,41 @@ class SupervisorWorkFlow(BaseWorkFlow[SupervisorPrompts]):
             # receives the project details and prepares the the requirements out of it.
             # In this process if architect need aditional information thats when RAG 
             # comes into play at this phase of Project.
+            if state.current_task.task_status == Status.NEW:
+                self._genpod_context.update(
+                    current_agent=AgentContext(
+                        agent_id=self.team.architect.id,
+                        agent_name=self.team.architect.name,
+                    )
+                )
+                logger.info("Delegator: Project is in INITIAL status with additional information ready. Invoking call_architect.")
+                return 'call_architect'
+
             self._genpod_context.update(
                 current_agent=AgentContext(
-                    agent_id=self.team.architect.id,
-                    agent_name=self.team.architect.name,
+                    agent_id=self.agent_id,
+                    agent_name=self.agent_name,
                 )
             )
-            logger.info("Delegator: Project is in INITIAL status with additional information ready. Invoking call_architect.")
-            return 'call_architect'
+            return 'call_supervisor'
+        elif state.project_status == PStatus.PLANNING:
+            if state.current_task.task_status == Status.NEW:
+                self._genpod_context.update(
+                    current_agent=AgentContext(
+                        agent_id=self.team.planner.id,
+                        agent_name=self.team.planner.name,
+                    )
+                )
+                logger.info("Delegator: Project is in PLANNING status. Invoking call_planner.")
+                return 'call_planner'
+
+            self._genpod_context.update(
+                current_agent=AgentContext(
+                    agent_id=self.agent_id,
+                    agent_name=self.agent_name,
+                )
+            )
+            return 'call_supervisor'
         elif state.project_status == PStatus.EXECUTING:
             # During the execution phase, there are two key scenarios:
             # 1. The planner breaks down complex tasks into smaller, manageable planned tasks.
@@ -126,18 +153,6 @@ class SupervisorWorkFlow(BaseWorkFlow[SupervisorPrompts]):
                         "Delegator: Project is in EXECUTING status with a planned task requiring code generation. Invoking call_coder."
                     )
                     return 'call_coder'
-            else:
-                if state.current_task.task_status in (Status.NEW, Status.RESPONDED):
-                    self._genpod_context.update(
-                        current_agent=AgentContext(
-                            agent_id=self.team.planner.id,
-                            agent_name=self.team.planner.name,
-                        )
-                    )
-                    logger.info(
-                        "Delegator: Project is in EXECUTING status with tasks requiring planning. Invoking call_planner."
-                    )
-                    return 'call_planner'
 
             self._genpod_context.update(
                 current_agent=AgentContext(
@@ -312,7 +327,7 @@ class SupervisorWorkFlow(BaseWorkFlow[SupervisorPrompts]):
                     )
                 else:
                     state.is_human_reviewed = False
-                    state.project_status = PStatus.EXECUTING
+                    state.project_status = PStatus.PLANNING
                     state.chat_history += [
                         (
                             ChatRoles.AI,
@@ -323,7 +338,13 @@ class SupervisorWorkFlow(BaseWorkFlow[SupervisorPrompts]):
                             "Planner can take initiative and prepare the tasks for the team."
                         )
                     ]
-
+                    state.current_task = Task(
+                        description="Prepare Planned tasks.",
+                        task_status=Status.NEW
+                    )
+                    self._genpod_context.update(
+                        current_task=TaskContext(task_id=state.current_task.task_id)
+                    )
                     logger.info(
                         "Supervisor: Architect completed requirements. "
                         f"Project status updated to {state.project_status}."
@@ -338,66 +359,69 @@ class SupervisorWorkFlow(BaseWorkFlow[SupervisorPrompts]):
                 )
 
             return state
+        elif state.project_status == PStatus.PLANNING:
+            # When the project status is 'PLANNING'
+            # The Planner was supposed to prepare planned task for the 
+            # Deliverables prepared by architect.
+            if state.current_task.task_status == Status.DONE:
+                if not state.is_human_reviewed:
+                    state.previous_project_status = state.project_status
+                    state.project_status = PStatus.HALTED
+                    logger.info(
+                        "Supervisor: Planner completed the planned items. "
+                        "Waiting for human review."
+                    )
+                else:
+                    state.is_human_reviewed = False
+                    state.project_status = PStatus.EXECUTING
+                    state.current_task = Task(
+                        Status=Status.NEW,
+                        description="Coder and Tester please finish off the task."
+                    )
+                    state.chat_history += [
+                        (
+                            ChatRoles.AI,
+                            "Planner has finished preparing the planned tasks."
+                        )
+                    ]
+
+                    logger.info(f"{self.agent_name} Planner completed planned tasks")
+            else:
+                logger.warning("Unexcepted status")
+
+            return state
         elif state.project_status == PStatus.EXECUTING:
             # When the project status is 'EXECUTING':
-            # - The Planner, Coder, and Tester should work on the tasks that have been 
-            # prepared by the architect.
-            #
-            # If there are no planned tasks:
-            # - The Planner needs to prepare new tasks.
+            # - The Coder, and Tester should work on the tasks that have been 
+            # prepared by the planner.
             #
             # If there are planned tasks:
             # - The Coder and Tester should work on these tasks.
             #
-            # Once all the General Tasks were finised(All of the tasks statuses are DONE) 
+            # Once all the Planned Tasks were finised(All of the tasks statuses are DONE) 
             # then project state will be 
             # updated to REVIEWING
-
+            #
             # Three scenario for this block of code to get triggered
-            # Architect agent has finished generating the requirements documents and 
-            # tasks
+            # Planner agent has finished generating the planned items and 
             # or
             # Coder and Tester completed their task.
             # or
             # all planned tasks were done.
-            # Call Planner to prepare planned tasks.
 
-            try:
-                state.tasks.update_item(state.current_task)
-            except Exception as e:
-                logger.error(
-                    f"Supervisor: Task not found in 'tasks' list. Exception: {e}"
-                )
-            # If any task is abandoned just move on to new task for now. Already task 
-            # status is updated in the task list. Will decide on what to do with abandoned
-            # tasks later.
-            if state.current_task.task_status in (Status.DONE, Status.ABANDONED):
-                next_task = state.tasks.get_next_item()
+            if state.current_task.task_status == Status.NEW:
+                next_planned_task = state.planned_tasks.get_next_item()
 
-                # All task must have been finished.
-                if next_task is None:
-                    # TODO: Need to consider the Abandoned Tasks. Before considering 
-                    # the Project status as REVIEWING.
+                if not next_planned_task:
+                    state.are_planned_tasks_in_progress = False
+                    state.current_task.task_status = Status.DONE
                     state.project_status = PStatus.REVIEWING
                 else:
-                    state.current_task = next_task
-                    state.is_human_reviewed = False
-                    self._genpod_context.update(
-                        current_task=TaskContext(task_id=state.current_task.task_id)
-                    )
+                    state.current_task.task_status = Status.INPROGRESS
+                    state.current_planned_task = next_planned_task
+                    state.are_planned_tasks_in_progress = True
+                    self.calling_agent = self.agent_id
             elif state.current_task.task_status == Status.INPROGRESS:
-                # update the planned_task status in the list
-                if not state.is_human_reviewed:
-                    state.previous_project_status = state.project_status
-                    state.project_status = PStatus.HALTED
-                    state.current_task.task_status = Status.AWAITING
-
-                    logger.info(
-                        "Supervisor: Planner completed the planned tasks preparation. "
-                        "Waiting for human review."
-                    )
-                    return state
-            
                 try:
                     state.planned_tasks.update_item(state.current_planned_task)
                 except Exception as e:
@@ -405,12 +429,13 @@ class SupervisorWorkFlow(BaseWorkFlow[SupervisorPrompts]):
                         f"Supervisor: Planned task not found in 'planned_tasks' list. Exception: {e}"
                     )
 
-                if state.current_planned_task.task_status in (Status.NONE, Status.DONE, Status.ABANDONED):
+                if state.current_planned_task.task_status in (Status.DONE, Status.ABANDONED):
                     next_planned_task = state.planned_tasks.get_next_item()
 
-                    if next_planned_task is None:
+                    if not next_planned_task:
                         state.are_planned_tasks_in_progress = False
                         state.current_task.task_status = Status.DONE
+                        state.project_status = PStatus.REVIEWING
                     else:
                         state.current_planned_task = next_planned_task
                         state.are_planned_tasks_in_progress = True
@@ -420,6 +445,7 @@ class SupervisorWorkFlow(BaseWorkFlow[SupervisorPrompts]):
                     f"Supervisor: Unexpected task status during EXECUTING phase. "
                     f"Current task status: {state.current_task.task_status}."
                 )
+
             return state
         elif state.project_status == PStatus.REVIEWING:
             # When the project status is 'REVIEWING
@@ -437,37 +463,42 @@ class SupervisorWorkFlow(BaseWorkFlow[SupervisorPrompts]):
 
             if state.issues.has_pending_items():
                 state.project_status = PStatus.RESOLVING
+                state.current_issue = Issue(
+                    issue_status=Status.NEW,
+                    description='Prepare planned issues'
+                )
                 logger.info("Supervisor: Issues found during REVIEWING. Project status updated to RESOLVING.")
             else:
                 state.project_status = PStatus.DONE
                 logger.info("Supervisor: No issues found during REVIEWING. Project status updated to DONE.")
             return state
         elif state.project_status == PStatus.RESOLVING:
-
-            try:
-                state.issues.update_item(state.current_issue)
-            except Exception as e:
-                logger.error(
-                    f"Supervisor: Issue not found in 'issues' list. Exception: {e}"
+            
+            # Planner just finished of preparing planned issues
+            if state.current_issue.issue_status == Status.DONE:
+                state.current_task = Task(
+                    task_status=Status.NEW,
+                    description='work on planned issues'
                 )
-
-            if state.current_issue.issue_status in (Status.DONE, Status.NONE, Status.ABANDONED):
-                if state.issues.has_pending_items():
-                    state.current_issue = state.issues.get_next_item()
-                    logger.info("Supervisor: Moving to next issue for resolution.")
+            elif state.current_task.task_status == Status.NEW:
+                if state.planned_issues.has_pending_items():
+                    state.current_task.task_status = Status.INPROGRESS
+                    state.current_planned_issue = state.planned_issues.get_next_item()
+                    state.are_planned_issues_in_progress = True
                     self.calling_agent = self.agent_id
                 else:
+                    state.are_planned_issues_in_progress = False
+                    state.current_task.task_status = Status.DONE
                     state.project_status = PStatus.REVIEWING
-                    logger.info("Supervisor: All issues resolved. Project status updated to REVIEWING.")
-            elif state.current_issue.issue_status == Status.INPROGRESS:
+            elif state.current_task.task_status == Status.INPROGRESS:
                 try:
                     state.planned_issues.update_item(state.current_planned_issue)
                 except Exception as e:
-                    logger.error(
+                    logger.warning(
                         f"Supervisor: Planned issue not found in 'planned_issues' list. Exception: {e}"
                     )
 
-                if state.current_planned_issue.status in (Status.NONE, Status.DONE, Status.ABANDONED):
+                if state.current_planned_issue.status in (Status.DONE, Status.ABANDONED):
                     if state.planned_issues.has_pending_items():
                         state.current_planned_issue = state.planned_issues.get_next_item()
                         state.are_planned_issues_in_progress = True
@@ -475,7 +506,7 @@ class SupervisorWorkFlow(BaseWorkFlow[SupervisorPrompts]):
                         logger.info("Supervisor: Moving to next planned issue for resolution.")
                     else:
                         state.are_planned_issues_in_progress = False
-                        state.current_issue.issue_status = Status.DONE
+                        state.current_task.task_status = Status.DONE
                         logger.info("Supervisor: All planned issues resolved for the current issue.")
                 else:
                     logger.warning(
@@ -502,14 +533,12 @@ class SupervisorWorkFlow(BaseWorkFlow[SupervisorPrompts]):
                     if state.current_task.task_status == Status.INPROGRESS:
                         state.current_task.task_status = Status.NEW
                         state.is_human_reviewed = False
-                        state.project_status = PStatus.INITIAL
-                        log_msg = "Modifications applied; task status updated to NEW and project status reverted to INITIAL."
-                    else:
-                        state.project_status = PStatus.EXECUTING
-                        log_msg = "No modifications applied; project status advanced to EXECUTING."
+                    
+                    log_msg = "Modifications applied; task status updated to NEW and project status reverted to INITIAL."
+                    state.project_status = PStatus.INITIAL
                     state.previous_project_status = PStatus.NONE
                     logger.info(f"Supervisor: Human review completed. {log_msg}")
-                elif state.previous_project_status == PStatus.EXECUTING:
+                elif state.previous_project_status == PStatus.PLANNING:
                     # If modifications were needed, task_status would be INPROGRESS.
                     # Remove outdated planned tasks only if modifications were applied.
                     if state.current_task.task_status == Status.INPROGRESS:
@@ -521,14 +550,13 @@ class SupervisorWorkFlow(BaseWorkFlow[SupervisorPrompts]):
                         state.current_task.task_status = Status.INPROGRESS
                         log_msg = "No modifications applied."
                     state.previous_project_status = PStatus.NONE
-                    state.project_status = PStatus.EXECUTING
+                    state.project_status = PStatus.PLANNING
                     logger.info(f"Supervisor: Human review completed. {log_msg} Project status reverted to EXECUTING.")
 
             else:
                 logger.warning("Supervisor: Project is in HALTED status and awaiting human review.")
 
             return state
-
         elif state.project_status == PStatus.DONE:
             # When the project status is 'DONE':
             # - All tasks have been completed.
@@ -537,7 +565,6 @@ class SupervisorWorkFlow(BaseWorkFlow[SupervisorPrompts]):
             # TODO: Figure out when this stage occurs and handle the logic
             logger.info("Supervisor: Project has been marked as DONE. All tasks and issues resolved.")
             return state
-
         else:
             logger.warning(
                 f"Supervisor: Unhandled project status encountered. Current project status: {state.project_status}."
@@ -621,7 +648,7 @@ class SupervisorWorkFlow(BaseWorkFlow[SupervisorPrompts]):
             path_label = "Document Path"
             team_member_id = self.team.architect.id
 
-        elif state.previous_project_status == PStatus.EXECUTING:
+        elif state.previous_project_status == PStatus.PLANNING:
             header = (
                 f"{self.team.planner.name} has completed breaking down the deliverable into planned tasks. "
                 "Please review them to ensure all criteria are met and aligned with project objectives.\n"
@@ -668,83 +695,85 @@ class SupervisorWorkFlow(BaseWorkFlow[SupervisorPrompts]):
     @record_node()
     def call_planner(self, state: SupervisorState) -> SupervisorState:
         """
-        Invokes the Planner agent to handle planned tasks or issues based on the project status.
+        Invoke the Planner agent to process planned tasks or issues based on the project status,
+        and update the SupervisorState with the results.
 
-        Updates the state with results returned by the Planner agent.
+        This method builds a common input dictionary using key properties from the current state
+        (such as user_prompt, project_status, project_directory, current_task, requirements_document,
+        current_issue, and chat_history). It then extracts additional contextual information using
+        the _extract_feedback_for_member helper, and invokes the Planner agent.
+        
+        Depending on the project status:
+        - For EXECUTING:
+            • The current task is updated with the Planner's result.
+            • If the Planner marks the task as DONE, the planned tasks are extended into the state's planned_tasks queue,
+                and the agents_status is updated accordingly.
+            • If the task is ABANDONED, a warning is logged and agents_status is updated.
+        - For RESOLVING:
+            • The current issue is updated with the Planner's result.
+            • If the issue is marked as DONE, the planned issues are extended into the state's planned_issues queue,
+                and agents_status is updated.
+            • If the issue is ABANDONED, a warning is logged and agents_status is updated.
+
+        The method finally records the ID of the Planner agent as the called_agent, and returns the updated state.
 
         Args:
             state (SupervisorState): The current state of the SupervisorAgent.
 
         Returns:
-            SupervisorState: The updated state after interacting with the Planner agent.
+            SupervisorState: The updated state after the Planner agent has processed the input.
         """
-        logger.info(f"Planner agent '{self.team.planner.name}' has been invoked.")
+        logger.info(f"Invoking Planner agent '{self.team.planner.name}'.")   
         planner_input_common = {
             'user_prompt': state.user_prompt,
             'project_status': state.project_status,
             'project_directory': state.project_directory,
             'current_task': state.current_task,
+            'chat_history': [],
+            'deliverable_list': state.tasks,
+            'issue_list': state.issues,
             'requirements_document': state.requirements_document,
+            'human_feedback': self._extract_feedback_for_member(state, self.team.planner.id),
             'current_issue': state.current_issue,
-            'chat_history': []
         }
 
         try:
-            planner_input_common['additional_information'] = self._extract_feedback_for_member(state, self.team.planner.id)
             planner_result = self.team.planner.invoke(planner_input_common)
+            logger.info("Planner agent invoked successfully.")
 
-            if state.project_status == PStatus.EXECUTING:
-                logger.info("Processing results for project status: EXECUTING.")
+            if state.project_status == PStatus.PLANNING:
+                logger.info("Processing Planner results for project status: EXECUTING.")
                 state.current_task = planner_result['current_task']
 
-                # If the status is INPROGRESS, it indicates that the planner has 
+                # If the status is DONE, it indicates that the planner has 
                 # successfully prepared planned tasks.
-                # The task is marked as INPROGRESS rather than DONE because:
+                # The task is marked as DONE rather than DONE because:
                 # - The planner has set up the tasks, but they have not yet been executed.
                 # - The planned tasks are still pending execution.
                 # Once all the planned tasks have been addressed, regardless of their 
                 # individual states, the current task status will be updated to DONE 
                 # by the supervisor.
-                if state.current_task.task_status == Status.INPROGRESS:
-                    logger.info(
-                        f"{self.team.planner.name} successfully prepared planned tasks. "
-                        f"Task ID: {state.current_task.task_id}."
-                    )
+                if state.current_task.task_status == Status.DONE:
+                    logger.info(f"Planner agent '{self.team.planner.name}' successfully prepared planned tasks. Task ID: {state.current_task.task_id}.")
                     state.planned_tasks.extend(planner_result['planned_tasks'])
-                    state.agents_status = (
-                        f"Work packages prepared by {self.team.planner.name}."
-                    )
+                    state.agents_status = f"Work packages prepared by {self.team.planner.name}."
                 elif state.current_task.task_status == Status.ABANDONED:
-                    logger.warning(
-                        f"{self.team.planner.name} abandoned the task. "
-                        f"Task ID: {state.current_task.task_id}."
-                    )
-                    state.agents_status = (
-                        f"{self.team.planner.name} abandoned Task ID: {state.current_task.task_id}."
-                    )
+                    logger.warning(f"Planner agent '{self.team.planner.name}' abandoned the task. Task ID: {state.current_task.task_id}.")
+                    state.agents_status = f"{self.team.planner.name} abandoned Task ID: {state.current_task.task_id}."
             elif state.project_status == PStatus.RESOLVING:
-                logger.info("Processing results for project status: RESOLVING.")
+                logger.info("Processing Planner results for project status: RESOLVING.")
                 state.current_issue = planner_result['current_issue']
-
-                if state.current_issue.issue_status == Status.INPROGRESS:
-                    logger.info(
-                        f"{self.team.planner.name} successfully prepared planned issues. "
-                        f"Issue ID: {state.current_issue.issue_id}."
-                    )
+    
+                if state.current_issue.issue_status == Status.DONE:
+                    logger.info(f"Planner agent '{self.team.planner.name}' successfully prepared planned issues. Issue ID: {state.current_issue.issue_id}.")
                     state.planned_issues.extend(planner_result['planned_issues'])
-                    state.agents_status = (
-                        f"Planned issues prepared by {self.team.planner.name}."
-                    )
+                    state.agents_status = f"Planned issues prepared by {self.team.planner.name}."
                 elif state.current_issue.issue_status == Status.ABANDONED:
-                    logger.warning(
-                        f"{self.team.planner.name} abandoned the issue. "
-                        f"Issue ID: {state.current_issue.issue_id}."
-                    )
-                    state.agents_status = (
-                        f"{self.team.planner.name} abandoned Issue ID: {state.current_issue.issue_id}."
-                    )
+                    logger.warning(f"Planner agent '{self.team.planner.name}' abandoned the issue. Issue ID: {state.current_issue.issue_id}.")
+                    state.agents_status = f"{self.team.planner.name} abandoned Issue ID: {state.current_issue.issue_id}."
 
             self.called_agent = self.team.planner.id
+            logger.debug("Planner agent invocation complete; state updated successfully.")
             return state
         except Exception as e:
             logger.error("Error during Planner agent invocation: %s", str(e))
