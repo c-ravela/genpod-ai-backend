@@ -1,4 +1,3 @@
-""" Graph State for PM Agent """
 from typing import Any, Dict, List
 
 from pydantic import BaseModel, ConfigDict, Field

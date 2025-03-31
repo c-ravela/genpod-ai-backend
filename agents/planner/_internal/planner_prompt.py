@@ -78,7 +78,7 @@ class PlannerPrompts:
 
         issues_segregation_prompt_template = PromptTemplate(
             template=self.get_template('issues_segregation_prompt_template'),
-            input_variables=['file_content', 'issue_details'],
+            input_variables=['file_content', 'issue_details', 'context'],
             partial_variables={
                 "format_instruction": PydanticOutputParser(pydantic_object=Segregation).get_format_instructions()
             }
@@ -86,6 +86,26 @@ class PlannerPrompts:
 
         self.issues_segregation_prompt = Prompt(
             adapter=PromptTemplateAdapter(issues_segregation_prompt_template)
+        )
+
+        # New prompt for extracting update instructions:
+        workpackage_update_extraction_template = self.get_template('workpackage_update_extraction_prompt_template')
+        workpackage_update_extraction_prompt_template = PromptTemplate(
+            template=workpackage_update_extraction_template,
+            input_variables=["feedback"]
+        )
+        self.workpackage_update_extraction_prompt = Prompt(
+            adapter=PromptTemplateAdapter(workpackage_update_extraction_prompt_template)
+        )
+
+        # New prompt for updating work package details:
+        workpackage_update_template = self.get_template('workpackage_update_prompt_template')
+        workpackage_update_prompt_template = PromptTemplate(
+            template=workpackage_update_template,
+            input_variables=["current_work_package", "update_changes"]
+        )
+        self.workpackage_update_prompt = Prompt(
+            adapter=PromptTemplateAdapter(workpackage_update_prompt_template)
         )
 
     def get_template(self, key: str) -> str:

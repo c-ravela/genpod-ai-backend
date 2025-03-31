@@ -115,4 +115,33 @@ issues_segregation_prompt_template:
     Issue Details:
     {issue_details}
 
+    {context}
+
     {format_instruction}
+
+workpackage_update_extraction_prompt_template:
+  template: |
+    You are a helpful assistant that extracts update instructions from human feedback.
+    Given the following feedback:
+    {feedback}
+    
+    Your task is to scan the feedback for explicit update identifiers. Look for lines that begin with:
+    - "Parent_package_id:" - indicating a parent package ID. Updates for this ID apply to all child work packages under this parent.
+    - "*_package_id:" - indicating a specific child package ID.
+    
+    For each occurrence, extract an update instruction as a JSON object with these keys:
+      - "target_id": The exact identifier found after the label.
+      - "update_changes": A concise description of the changes requested, based on the overall feedback.
+    
+    Return a valid JSON list containing one update instruction object per identifier found.
+
+
+workpackage_update_prompt_template:
+  template: |
+    You are a helpful assistant that updates work package details.
+    Given the current work package details:
+    {current_work_package}
+    and the following update changes requested by the user:
+    {update_changes}
+    Please produce a JSON object representing the updated work package details.
+    The output should merge the current details with the requested changes, preserving any unchanged fields.
