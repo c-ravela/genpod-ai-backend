@@ -61,6 +61,16 @@ code_generation_prompt_template:
     Please focus strictly on the assigned task and adhere to the provided instructions. Avoid adding unnecessary information 
     outside the scope of the task. Let's collaborate efficiently to deliver high-quality work.
 
+    ### Inverse Prompting:
+    If your output does not include:
+    - An implementation that matches the provided function skeletons,
+    - Code that passes the given unit tests (if applicable),
+    - Accurate configuration/documentation for non-code tasks (like Docker or setup files),
+    - Strict adherence to the formatting and command rules,
+    - No extra content beyond the task scope,
+
+    Then revise your response to fully meet the expectations above.
+
 issue_resolution_prompt_template:
   template: |
     As a skilled programmer, you are a key part of a team working to deliver a high-quality, end-to-end project. 
@@ -100,3 +110,12 @@ issue_resolution_prompt_template:
     <instructions>
         {format_instructions}
     </instructions>
+
+    ### Inverse Prompting:
+    If your output does not include:
+    - A fix that directly addresses the described issue and file context,
+    - Code that aligns with the provided function signatures and passes the given unit tests,
+    - No unrelated changes or refactors,
+    - Compliance with formatting and guideline expectations,
+
+    Then revise your response to fully meet the expectations above.

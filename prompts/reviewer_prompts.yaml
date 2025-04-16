@@ -29,3 +29,11 @@ static_code_analysis_prompt_template:
        each identified project-related issue.
 
     Please generate the issues accordingly.
+
+    ### Inverse Prompting:
+    If your output does not include:
+    - Only issues that are directly caused by the project's code,
+    - No irrelevant tool-generated warnings (such as tool configuration errors or version mismatches),
+    - A clear description and recommendation for each valid issue,
+
+    Then revise your response to fully meet the expectations above.

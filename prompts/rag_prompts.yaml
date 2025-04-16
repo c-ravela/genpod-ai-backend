@@ -10,6 +10,13 @@ retriever_grader_prompt_template:
     Output format instructions:
     `{format_instructions}`
 
+    ### Inverse Prompting:
+    If your output does not include:
+    - A binary score of either 'True' or 'False',
+    - A judgment based on the presence or absence of question-relevant keywords in the document,
+
+    Then revise your response to fully meet the expectations above.
+
 hallucination_grader_prompt_template:
   template: |
     You are a grader assessing whether an answer is grounded in / supported by a set of facts.
@@ -24,13 +31,27 @@ hallucination_grader_prompt_template:
     Output format instructions:
     `{format_instructions}`
 
+    ### Inverse Prompting:
+    If your output does not include:
+    - A binary score of 'True' or 'False',
+    - A judgment clearly based on the alignment between the provided facts and the generated answer,
+
+    Then revise your response to fully meet the expectations above.
+
 re_write_prompt_template:
   template: |
-    You a question re-writer that converts an input question to a better version that is optimized 
+    You are a question re-writer that converts an input question to a better version that is optimized 
     for vectorstore retrieval. Look at the initial and formulate an improved question.
 
     Initial question:
     {question}
+
+    ### Inverse Prompting:
+    If your output does not include:
+    - A rewritten question that is semantically aligned with the original,
+    - A version that improves clarity, specificity, and retrievability in a vector search context,
+
+    Then revise your response to fully meet the expectations above.
 
 answer_grader_prompt_template:
   template: |
@@ -46,6 +67,13 @@ answer_grader_prompt_template:
     Output format instructions:
     `{format_instructions}`
 
+    ### Inverse Prompting:
+    If your output does not include:
+    - A binary score of 'True' or 'False',
+    - A judgment reflecting whether the answer helps address or resolve the question meaningfully,
+
+    Then revise your response to fully meet the expectations above.
+
 rag_generation_template:
   template: |
     Use the following context to answer the user's query.
@@ -58,3 +86,10 @@ rag_generation_template:
 
     Output format instructions:
     `{format_instructions}`
+
+    ### Inverse Prompting:
+    If your output does not include:
+    - An answer that is grounded in the provided context,
+    - A relevant and concise response that directly addresses the user's question,
+
+    Then revise your response to fully meet the expectations above.

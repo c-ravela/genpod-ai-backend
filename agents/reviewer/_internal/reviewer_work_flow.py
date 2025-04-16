@@ -162,6 +162,13 @@ class ReviewerWorkFlow(BaseWorkFlow[ReviewerPrompts]):
             logger.warning(f"{self.agent_name}: Operational mode is not UNDER_REVIEW. Task status remains unchanged.")
 
         logger.info(f"{self.agent_name}: Workflow exit complete. Total issues reported: {len(state.issues)}.")
+
+        # New changes: Call the documentation tool only if no issues are reported.
+        if len(state.issues) == 0:
+            self._trigger_documentation_tool(state)
+        else:
+            logger.info(f"{self.agent_name}: Issues reported; skipping documentation tool call.")
+
         return state
 
     def _initialize_git(self) -> None:
@@ -252,3 +259,19 @@ class ReviewerWorkFlow(BaseWorkFlow[ReviewerPrompts]):
         logger.info(f"{self.agent_name}: Performing linting analysis")
         # Future implementation
         return state
+
+    def _trigger_documentation_tool(self, state: ReviewerState) -> None:
+        """
+        Private method that calls the GenerateProjectDocumentationTool.
+        The project path is constructed as the combination of state.project_directory and state.project_name.
+        The tool is called only when there are no reviewer issues.
+        """
+        project_path = os.path.join(state.project_directory, state.project_name)
+        logger.info(f"{self.agent_name}: Triggering project documentation tool for project path: {project_path}")
+        from tools.generate_project_documentation_tool import GenerateProjectDocumentationTool
+        doc_tool = GenerateProjectDocumentationTool()
+        try:
+            result = doc_tool.run(project_path)
+            logger.info(f"{self.agent_name}: Documentation tool result: {result}")
+        except Exception as e:
+            logger.error(f"{self.agent_name}: Error calling documentation tool: {e}", exc_info=True)

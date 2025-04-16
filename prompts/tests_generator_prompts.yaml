@@ -38,11 +38,19 @@ test_generation_prompt_template:
     These are the functions skeletons dictionary the key contains the path where the functions are supposed to be created and value contains the function skeleton with function name, input parameters, return type and function description for which you need to create unit test cases 
     "{functions_skeleton}"
 
+    ### Inverse Prompting:
+    If your output does not include:
+    - Unit test cases covering the functionality described in the function skeletons,
+    - Coverage of both standard scenarios and edge cases,
+    - Correct formatting as a list of file paths per the given structure,
+    - Adherence to the project guidelines,
+
+    Then revise your response to fully meet the expectations above.
+
 skeleton_generation_prompt_template:
   template: |
     You are a highly skilled software developer assistant. Your task is to generate a detailed function skeleton 
     based on the provided description.
-
 
     You are currently working on the following project:
     Project Name: '{project_name}'
@@ -69,6 +77,14 @@ skeleton_generation_prompt_template:
 
     Now, here is your task to complete.
     {task}.
+
+    ### Inverse Prompting:
+    If your output does not include:
+    - A well-structured function skeleton with name, parameters, return type, and detailed docstring,
+    - Proper formatting as instructed (e.g., list of file paths),
+    - Clear alignment with the provided task and adherence to the project's requirements document,
+
+    Then revise your response to fully meet the expectations above.
 
 skeleton_generation_for_issue_prompt_template:
   template: |
@@ -116,6 +132,14 @@ skeleton_generation_for_issue_prompt_template:
     - Use proper formatting and follow the guidelines outlined above to ensure clarity and correctness.
 
     Please complete the task by generating the function signature as per the above specifications.
+
+    ### Inverse Prompting:
+    If your output does not include:
+    - A clearly defined function signature with purpose, parameters, return type, and a descriptive docstring,
+    - Accurate alignment with the issue and current business logic,
+    - Proper formatting and compliance with the project requirements,
+
+    Then revise your response to fully meet the expectations above.
 
 unit_test_generation_for_issue_prompt_template:
   template: |
@@ -176,3 +200,12 @@ unit_test_generation_for_issue_prompt_template:
     - Use appropriate assertions to validate the expected behavior of each function.
 
     Please complete the task by generating the unit test cases according to the specifications outlined above.
+
+    ### Inverse Prompting:
+    If your output does not include:
+    - Unit tests for each function listed in `functions_skeleton`,
+    - Coverage of normal, edge, and failure scenarios using assertions,
+    - Proper formatting that follows the given instructions,
+    - Relevance to the described business logic and issue,
+
+    Then revise your response to fully meet the expectations above.
