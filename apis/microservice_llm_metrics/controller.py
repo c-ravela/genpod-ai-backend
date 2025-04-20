@@ -75,13 +75,13 @@ class MicroserviceLLMMetricsController:
             logger.error(f"Failed to retrieve microservice token metric with ID {token_metrics_id}: {e}")
             raise
     
-    def get_token_metrics_by_microservice(self, microservice_id: int) -> List[MicroserviceLLMMetrics]:
+    def get_token_metrics_by_microservice(self, microservice_id: int, project_id: int, user_id: int) -> List[MicroserviceLLMMetrics]:
         """
         Retrieves all microservice token metrics for a specific microservice.
         """
         logger.info(f"Retrieving all microservice token metrics for microservice ID: {microservice_id}")
         try:
-            token_metrics_list = self.token_metrics_service.get_token_metrics_by_microservice_id(microservice_id)
+            token_metrics_list = self.token_metrics_service.get_token_metrics_by_microservice_id(microservice_id, project_id, user_id)
             logger.info(f"Retrieved {len(token_metrics_list)} token metrics for microservice ID: {microservice_id}")
             return token_metrics_list
         except Exception as e:
