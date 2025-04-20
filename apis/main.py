@@ -1,13 +1,17 @@
 import os
-import sys
 import time
+from enum import Enum
 from typing import List, Optional
+
+from rich.live import Live
 
 from agents.rag import RAGAgent
 from agents.rag_middleware import RAGMiddleware, register_rag_agent
 from agents.research import ResearchAgent
 from agents.supervisor import SupervisorAgent, SupervisorInput
 from apis.microservice.controller import MicroserviceController
+from apis.microservice_llm_metrics.controller import \
+    MicroserviceLLMMetricsController
 from apis.microservice_session.controller import MicroserviceSessionController
 from apis.project.controller import ProjectController
 from configs.project_config import AgentRegistry, RAGAgentRegistry
@@ -18,7 +22,26 @@ from database.entities.projects import Project
 from genpod import Team
 from models.constants import PStatus
 from utils.logger import logger
-from utils.project_status import ProjectStatus
+from utils.microservice_insights import MicroserviceInsights
+
+
+class MethodNames(Enum):
+    ARCHITECT = "call_architect"
+    PLANNER = "call_planner"
+    CODER = "call_coder"
+    TESTS_GENERATOR = "call_test_code_generator"
+    REVIEWER = "call_reviewer"
+
+def create_method_to_agent_mapping(agent_registry: AgentRegistry) -> dict:
+    """
+    Dynamically create the mapping between method names and agents.
+    """
+    return {
+        method.value: getattr(agent_registry, method.name.lower())
+        for method in MethodNames
+    }
+
+METHOD_TO_AGENT = create_method_to_agent_mapping(AgentRegistry)
 
 
 class ActionManager:
@@ -276,6 +299,31 @@ class ActionManager:
         else:
             logger.info("RAG agents are already enabled; skipping setup.")
 
+    def _create_session_for_agent(self, agent, agents_session: dict[str, int]):
+        """
+        Helper method to create a session for a given agent and add it to the session dictionary.
+        
+        Args:
+            agent (Agent): The agent for which the session is being created.
+            agents_session (dict[str, int]): A dictionary mapping agent IDs to session IDs.
+        """
+        session = MicroserviceSession(
+            agent_id=agent.id,
+            project_id=self.microservice.project_id,
+            microservice_id=self.microservice.id,
+            created_by=self.microservice.created_by,
+            updated_by=self.microservice.created_by
+        )
+        # Create session in the database
+        self.session_controller.create(session)
+        
+        # Set the thread ID for the agent
+        agent.set_thread_id(session.id)
+        
+        # Update the agents session dictionary with the new session ID
+        agents_session[agent.id] = session.id
+        logger.info(f"Session created for agent '{agent.id}': {session}")
+
 
 class Action:
     """
@@ -506,44 +554,50 @@ class Action:
             logger.error(f"Failed to resume microservice: {e}")
             raise
 
-    def microservice_status(
+    def microservice_insights(
         self,
         user_id: int,
         project_id: int,
         microservice_id: int
     ) -> None:
         """
-        Continuously display the status of a microservice.
+        Continuously retrieve and display insights for a microservice.
 
-        Retrieves the microservice and its session details, then enters a loop to
-        periodically fetch and display the current project status via the supervisor.
-        The loop runs indefinitely with a 5-second interval between updates.
+        This method monitors the status of a microservice by fetching its current state from the supervisor agent and periodically 
+        updating insights based on token metrics and agent states. The loop runs indefinitely with a 5-second interval between updates. 
+        This allows real-time tracking of the microservice's progress and performance.
 
         Args:
-            user_id (int): The ID of the user checking the status.
+            user_id (int): The ID of the user checking the insights.
             project_id (int): The ID of the project containing the microservice.
             microservice_id (int): The ID of the microservice to monitor.
 
         Raises:
-            Exception: Propagates any errors encountered during status retrieval.
+            Exception: Propagates any errors encountered during the retrieval of insights or state updates.
         """
-        logger.info("Checking microservice status.")
+        logger.info("Starting to monitor microservice insights.")
         try:
-            microservice_controller = MicroserviceController()
-            picked_microservice = microservice_controller.get_microservice(microservice_id)
+            ms_ctrl = MicroserviceController()
+            metrics_ctrl = MicroserviceLLMMetricsController()
+
+            # Retrieve the selected microservice
+            picked_microservice = ms_ctrl.get_microservice(microservice_id)
             if not picked_microservice:
                 logger.warning(f"No active service found for microservice ID: {microservice_id}")
-                print("No active service found for the provided microservice ID.")
+                print(f"No active service found for microservice ID {microservice_id}.")
                 return
 
+            # Retrieve session details for the specified microservice
             session_details = Action._get_session_details(user_id, project_id, picked_microservice.id)
             if not session_details:
+                logger.warning(f"No sessions found for microservice ID {microservice_id}.")
                 print("No sessions found for this service.")
-                logger.warning("No sessions found during status check.")
                 return
 
+            # Map session details to agent IDs
             session_map = {session.agent_id: session.id for session in session_details}
 
+            # Initialize supervisor agent using details from the agents registry
             supervisor_details = self.agents.supervisor
             supervisor = SupervisorAgent(
                 id=supervisor_details.agent_id,
@@ -554,23 +608,64 @@ class Action:
                 persistence_db_path=self.database_path,
                 use_rag=supervisor_details.use_rag
             )
+            
+            # Check if the supervisor has an active session
             supervisor_thread_id = session_map.get(supervisor.id)
             if not supervisor_thread_id:
                 logger.warning("No session found for the supervisor agent.")
                 print("Supervisor session not found.")
                 return
-            supervisor.set_thread_id(session_map[supervisor.id])
+            supervisor.set_thread_id(supervisor_thread_id)
 
-            logger.info("Entering status update loop for microservice.")
-            while True:
-                last_saved_state = supervisor.graph.get_last_saved_state()
-                project_status = ProjectStatus(last_saved_state)
-                
-                sys.stdout.write(project_status.display_project_status())
-                sys.stdout.flush()
-                time.sleep(5)
+            # Initialize the team and microservice insights
+            _team = Team(self.agents, self.database_path)
+            insights = MicroserviceInsights({})
+
+            logger.info("Entering the microservice insights update loop.")
+            
+            # Display real-time updates using the Live display from the rich library
+            with Live(insights.build_renderable(), screen=True, refresh_per_second=2) as live:
+                while True:
+                    # Fetch the last saved state of the supervisor agent
+                    last_saved_state = supervisor.graph.get_last_saved_state()
+                    
+                    # Retrieve token metrics for the specified microservice
+                    token_metrics = metrics_ctrl.get_token_metrics_by_microservice(microservice_id, project_id, user_id)
+                    
+                    # Determine which agent's state should be tracked
+                    active_node = last_saved_state.get("active_node", "")
+                    agent_info = METHOD_TO_AGENT.get(active_node)
+                    agent_state = None
+
+                    # Retrieve the state of the active agent, if available
+                    if agent_info:
+                        agent_obj = next(
+                            (a for a in _team.get_team_members() if a.id == agent_info.agent_id),
+                            None
+                        )
+                        
+                        # Set thread ID for the agent and fetch its state
+                        thread_id = session_map.get(agent_info.agent_id)
+                        if agent_obj and thread_id:
+                            agent_obj.set_thread_id(thread_id)
+                            agent_state = agent_obj.graph.get_last_saved_state()
+                            agent_state["agent_name"] = agent_info.agent_name
+
+                    # Update insights with the latest information
+                    insights.data = last_saved_state
+                    insights.token_metrics = token_metrics
+                    insights.current_agent = agent_state
+
+                    # Update the live display with the latest insights
+                    live.update(insights.build_renderable())
+
+                    # Sleep for 5 seconds before the next update
+                    time.sleep(5)
+
+        except KeyboardInterrupt:
+            logger.info("Microservice insights monitoring stopped by user.")
         except Exception as e:
-            logger.error(f"Failed to get service status: {e}")
+            logger.error(f"Error retrieving microservice insights: {e}")
             raise
 
     @staticmethod
