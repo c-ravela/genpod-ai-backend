@@ -1,10 +1,9 @@
-from typing import Any, Dict, List, Optional, Union, Tuple
-from rich.console import Console
-from rich.table import Table
-from rich.columns import Columns
+from typing import Any, Dict, List, Optional, Tuple, Union
+
 from rich import box
-from rich.console import Console, Group
 from rich.columns import Columns
+from rich.console import Console, Group
+from rich.table import Table
 
 from utils.logger import logger
 
