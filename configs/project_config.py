@@ -1,7 +1,6 @@
 import os
 import warnings
-from dataclasses import dataclass
-from enum import Enum
+from dataclasses import dataclass, fields
 from pathlib import Path
 from typing import Any, Dict, Iterator, Optional, Tuple
 
@@ -208,11 +207,14 @@ class RAGAgentInfo:
     recursion_limit: int = 0
 
 
-class AgentRegistry(Enum):
+@dataclass(frozen=True)
+class AgentRegistry:
     """
-    Static registry of built-in AgentInfo definitions for standard agents.
+    Registry of builtin AgentInfo definitions for standard agents.
+    Instantiate once and access agents as attributes, e.g. registry.supervisor.
     """
-    supervisor = AgentInfo(
+
+    supervisor: AgentInfo = AgentInfo(
         agent_name="Project Supervisor",
         agent_id="SUP_01",
         alias="supervisor",
@@ -225,18 +227,18 @@ class AgentRegistry(Enum):
         recursion_limit=25,
         use_rag=False,
     )
-    architect = AgentInfo(
+    architect: AgentInfo = AgentInfo(
         agent_name="Solution Architect",
         agent_id="ARC_02",
         alias="architect",
         description=(
-            "Generates a detailed, comprehensive requirements document and outlines deliverable/tasks based on the user prompt, "
-            "laying the foundation for the project's architectural framework."
+            "Generates a detailed, comprehensive requirements document and outlines deliverable/tasks "
+            "based on the user prompt, laying the foundation for the project's architectural framework."
         ),
         recursion_limit=25,
         use_rag=True,
     )
-    coder = AgentInfo(
+    coder: AgentInfo = AgentInfo(
         agent_name="Software Engineer",
         agent_id="ENG_03",
         alias="coder",
@@ -247,7 +249,7 @@ class AgentRegistry(Enum):
         recursion_limit=25,
         use_rag=False,
     )
-    planner = AgentInfo(
+    planner: AgentInfo = AgentInfo(
         agent_name="Project Planner",
         agent_id="PLN_05",
         alias="planner",
@@ -258,7 +260,7 @@ class AgentRegistry(Enum):
         recursion_limit=25,
         use_rag=True,
     )
-    tests_generator = AgentInfo(
+    tests_generator: AgentInfo = AgentInfo(
         agent_name="Unit Tester",
         agent_id="TST_06",
         alias="tests_generator",
@@ -269,7 +271,7 @@ class AgentRegistry(Enum):
         recursion_limit=25,
         use_rag=False,
     )
-    reviewer = AgentInfo(
+    reviewer: AgentInfo = AgentInfo(
         agent_name="Code Reviewer",
         agent_id="REV_09",
         alias="reviewer",
@@ -281,7 +283,7 @@ class AgentRegistry(Enum):
         recursion_limit=25,
         use_rag=False,
     )
-    rag_middleware = AgentInfo(
+    rag_middleware: AgentInfo = AgentInfo(
         agent_name="RAG Middleware",
         agent_id="RAG_MW_07",
         alias="rag_middleware",
@@ -292,7 +294,7 @@ class AgentRegistry(Enum):
         recursion_limit=25,
         use_rag=False,
     )
-    research = AgentInfo(
+    research: AgentInfo = AgentInfo(
         agent_name="Research Assistant",
         agent_id="RES_08",
         alias="research",
@@ -305,29 +307,29 @@ class AgentRegistry(Enum):
         use_rag=False,
     )
 
-    @classmethod
-    def values(cls) -> Iterator[AgentInfo]:
+    def values(self) -> Iterator[AgentInfo]:
         """
-        Yield all AgentInfo instances in the registry.
+        Yield all AgentInfo instances defined in this registry.
         """
-        for member in cls:
-            yield member.value
+        for f in fields(self):
+            yield getattr(self, f.name)
 
-    @classmethod
-    def has_agent(cls, alias: str) -> bool:
+    def has_agent(self, alias: str) -> bool:
         """
-        Check if an alias exists among the registered agents.
+        Returns True if an AgentInfo with the given alias exists.
         """
-        return any(info.alias == alias for info in cls.values())
+        return any(agent.alias == alias for agent in self.values())
 
-    @classmethod
-    def get_agent(cls, alias: str) -> AgentInfo:
+    def get_agent(self, alias: str) -> AgentInfo:
         """
-        Retrieve the AgentInfo for a given alias.
+        Retrieve the AgentInfo corresponding to the given alias.
+
+        Raises:
+            KeyError: If no agent with that alias is found.
         """
-        for info in cls.values():
-            if info.alias == alias:
-                return info
+        for agent in self.values():
+            if agent.alias == alias:
+                return agent
         raise KeyError(f"No agent with alias {alias!r}")
 
 
