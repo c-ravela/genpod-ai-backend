@@ -51,7 +51,7 @@ rag_agents:
   mismo-3.6-rag:
     description: Specialized RAG agent for MISMO 3.6 standards, providing accurate, comprehensive responses.
     collection_name: MISMO-version-3.6-docs
-    vector_database_path: /home/cravela/intelops/projects/genpod-ai-BE/container/genpod-ai-backend/vector_collections
+    vector_database_path: <path to vector db>
   fr_2025a_rag:
     description: |
       The document provides instructions and guidelines for reporting financial data, specifically related to the FR 2052a report. It covers 
@@ -59,8 +59,8 @@ rag_agents:
       reported. It includes details on reporting inflows, handling non-performing loans, and categorizing different types of financial 
       transactions and entities, such as retail and small business. The document also outlines specific reporting requirements for options 
       and derivatives, as well as the treatment of encumbered assets.
-    collection_name: "my_collection"
-    vector_database_path: "/home/cravela/Downloads/edge/imagevision/storage/storage/chroma"
+    collection_name: my_collection
+    vector_database_path: <path to vector db>
 
 max_graph_recursion_limit: 1500
 
