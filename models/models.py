@@ -480,13 +480,17 @@ class RequirementsDocument(BaseModel):
     Represents a comprehensive document that encapsulates the various
     requirements of a project. This class includes details about the
     project's architecture, tasks, coding standards, implementation
-    process, and licensing information. It also provides methods to
-    generate a Markdown representation of the document.
+    process, licensing information, and now also the recommended technology stack.
+    It also provides methods to generate a Markdown representation of the document.
     """
 
     project_summary: str = Field(
         default="",
         description="A brief overview of the project, summarizing its goals and objectives."
+    )
+    tech_stack: str = Field(
+        default="",
+        description="The recommended technology stack for the project. This should include programming language(s), frameworks, libraries, database solutions, dependency management tools, testing frameworks, and any relevant deployment or containerization recommendations, including version details where applicable."
     )
     system_architecture: str = Field(
         default="",
@@ -524,11 +528,12 @@ class RequirementsDocument(BaseModel):
 
         Returns:
             str: A Markdown string representing the requirements document with 
-                sections for each attribute.
+                 sections for each attribute.
         """
 
         sections = [
             ("Project Summary", self.project_summary),
+            ("Tech Stack", self.tech_stack),
             ("System Architecture", self.system_architecture),
             ("File Structure", self.file_structure),
             ("Microservice Design", self.microservice_design),
@@ -539,11 +544,10 @@ class RequirementsDocument(BaseModel):
         ]
         
         markdown_sections = "\n\n".join(
-            f"{content}" for title, content in sections
+            f"{content}" for title, content in sections if content
         )
 
         return f"# Project Requirements Document\n\n{markdown_sections}"
-
 
 class WebSearchResult(BaseModel):
     title: str = Field(default="No Title", description="The title of the search result.")
