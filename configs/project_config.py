@@ -204,10 +204,9 @@ class RAGAgentInfo:
     vector_database_path: str = ""
     collection_name: str = ""
     llm: Optional[LLM] = None
-    recursion_limit: int = 0
+    recursion_limit: int = 25
 
 
-@dataclass(frozen=True)
 class AgentRegistry:
     """
     Registry of builtin AgentInfo definitions for standard agents.
@@ -307,30 +306,27 @@ class AgentRegistry:
         use_rag=False,
     )
 
-    def values(self) -> Iterator[AgentInfo]:
-        """
-        Yield all AgentInfo instances defined in this registry.
-        """
-        for f in fields(self):
-            yield getattr(self, f.name)
+    @classmethod
+    def values(cls) -> Iterator[AgentInfo]:
+        """Yield all AgentInfo instances in the registry."""
+        for attr in (
+            "supervisor", "architect", "coder", "planner",
+            "tests_generator", "reviewer", "rag_middleware", "research"
+        ):
+            yield getattr(cls, attr)
 
-    def has_agent(self, alias: str) -> bool:
-        """
-        Returns True if an AgentInfo with the given alias exists.
-        """
-        return any(agent.alias == alias for agent in self.values())
+    @classmethod
+    def has_agent(cls, alias: str) -> bool:
+        """Return True if an AgentInfo with the given alias exists."""
+        return any(a.alias == alias for a in cls.values())
 
-    def get_agent(self, alias: str) -> AgentInfo:
-        """
-        Retrieve the AgentInfo corresponding to the given alias.
-
-        Raises:
-            KeyError: If no agent with that alias is found.
-        """
-        for agent in self.values():
-            if agent.alias == alias:
-                return agent
-        raise KeyError(f"No agent with alias {alias!r}")
+    @classmethod
+    def get_agent(cls, alias: str) -> AgentInfo:
+        """Return the AgentInfo matching the alias, or raise KeyError."""
+        for a in cls.values():
+            if a.alias == alias:
+                return a
+        raise KeyError(f"No agent with alias={alias!r}")
 
 
 @auto_repr
