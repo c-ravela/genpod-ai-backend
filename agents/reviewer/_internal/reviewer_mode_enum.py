@@ -2,19 +2,17 @@ from enum import Enum
 
 
 class ReviewerMode(str, Enum):
-    """Reviewer mode."""
-
-    UNDER_REVIEW = "review"
+    """Reviewer operational mode."""
+    UNDER_REVIEW = "under_review"
     FINISHED = "finished"
 
     def __str__(self):
         return self.value
 
-
 class ReviewStage(str, Enum):
-    """Reviewer stage."""
-
-    STATIC_ANALYSIS = "static_code_analysis"
+    """Reviewer stage in the workflow."""
+    INITIALIZATION = "initialization"
+    RUN_CHECKS = "run_checks"
     FINISHED = "finished"
 
     def __str__(self):
