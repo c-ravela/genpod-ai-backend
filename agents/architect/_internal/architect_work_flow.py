@@ -161,6 +161,13 @@ class ArchitectWorkFlow(BaseWorkFlow[ArchitectPrompts]):
                     'additional_information': state.additional_information
                 }
             ),
+            'tech_stack': GenerationStepConfig(
+                prompt=self.prompts.tech_stack_prompt,
+                response_model=TaskResponse,
+                input_params={
+                    'user_request': state.user_prompt
+                }
+            ),
             'system_architecture': GenerationStepConfig(
                 prompt=self.prompts.system_architecture_prompt,
                 response_model=TaskResponse,
