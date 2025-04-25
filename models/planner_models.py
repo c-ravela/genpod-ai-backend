@@ -1,6 +1,7 @@
 from typing import List
 
-from pydantic import BaseModel, RootModel, Field, StrictBool, field_validator, model_validator
+from pydantic import (BaseModel, Field, RootModel, StrictBool, field_validator,
+                      model_validator)
 
 
 class BacklogList(RootModel[List[str]]):
