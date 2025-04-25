@@ -205,6 +205,24 @@ class ArchitectPrompts:
         )
         logger.info("Initialized license_details_prompt with use_rag=%s", self.use_rag)
 
+        tech_stack_prompt_template = PromptTemplate(
+            template=self.get_template('tech_stack_prompt_template'),
+            input_variables=[
+                'user_request'
+            ],
+            partial_variables={
+                "format_instructions": PydanticOutputParser(
+                    pydantic_object=TaskResponse
+                ).get_format_instructions()
+            }
+        )
+        logger.debug("Created license details prompt template.")
+        self.tech_stack_prompt = RagInstructionsPrompt(
+            adapter=PromptTemplateAdapter(tech_stack_prompt_template),
+            use_rag=self.use_rag
+        )
+        logger.info("Initialized tech_stack_prompt with use_rag=%s", self.use_rag)
+
         tasks_extraction_prompt_template = PromptTemplate(
             template=self.get_template('tasks_extraction_prompt_template'),
             input_variables=['tasks_summary'],
