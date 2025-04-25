@@ -23,7 +23,7 @@ class RAGAgent(BaseAgent[RAGGraph]):
         collection_name: str,
         persist_directory: str,
         recursion_limit: int,
-        persistance_db_path: str,
+        persistence_db_path: str,
     ):
         """
         Initialize the RAGAgent with the required workflow and graph components.
@@ -36,20 +36,20 @@ class RAGAgent(BaseAgent[RAGGraph]):
             collection_name (str): Name of the vector store collection.
             persist_directory (str): Directory where the vector store is persisted.
             recursion_limit (int): Maximum recursion depth for state transitions in the graph.
-            persistance_db_path (str): Path to the persistence database for saving graph state.
+            persistence_db_path (str): Path to the persistence database for saving graph state.
         """
         logger.info(
             "Initializing RAGAgent | ID: %s | Name: %s | Collection: %s | Persist Dir: %s | Recursion Limit: %d | Persistence DB: %s",
-            id, name, collection_name, persist_directory, recursion_limit, persistance_db_path
+            id, name, collection_name, persist_directory, recursion_limit, persistence_db_path
         )
 
         work_flow = RAGWorkFlow(id, name, llm, collection_name, persist_directory)
         logger.debug("RAGWorkFlow initialized for agent: %s", name)
 
-        rag_graph = RAGGraph(work_flow, recursion_limit, persistance_db_path)
+        rag_graph = RAGGraph(work_flow, recursion_limit, persistence_db_path)
         logger.debug(
             "RAGGraph created for agent: %s with recursion_limit=%d and persistence_db_path=%s",
-            name, recursion_limit, persistance_db_path
+            name, recursion_limit, persistence_db_path
         )
 
         super().__init__(id, name, description, llm, rag_graph)
