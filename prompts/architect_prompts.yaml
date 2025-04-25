@@ -156,16 +156,14 @@ tasks_summary_prompt_template:
 
     For each deliverable, please provide:
     1. **Deliverable Name:** A clear title for the task.
-    2. **Detailed Description:** A comprehensive explanation of what needs to 
-    be accomplished.
-    3. **Technical Requirements/Specifications:** Include any necessary setup 
-    files, configurations, or dependencies.
-
-    Additionally, if applicable, ensure that your breakdown covers:
-    - **Dockerfile:** Instructions for environment setup and deployment.
-    - **Package Manager Files:** For example, `requirements.txt` for Python or `package.json` for Node.js.
-    - **README.md:** An overview of the deliverable with instructions on how to run or test the component.
-    - **Microservice-Specific Configurations:** Any configurations unique to the microservice architecture.
+    2. **Detailed Description:** A comprehensive explanation of what needs to be accomplished.
+    3. **Technical Requirements/Specifications:** Include any necessary setup files, configurations, or dependencies. This should cover:
+       - **Project Scaffolding/Initialization:** Steps to create the core project structure (e.g., solution file, project files such as .csproj/.sln, initial version control setup).
+       - **Configuration Files:** Tasks for creating or updating essential configuration files (e.g., environment files, dependency manifests like package.json, requirements.txt, or others).
+       - **Dependency Management:** Instructions for installing required libraries, packages, or modules.
+       - **Testing Infrastructure:** Steps to set up unit, integration, or end-to-end tests, including the creation of test directories and configuration of test frameworks.
+       - **Environment Setup:** Tasks for configuring environment variables, secrets management, and any necessary runtime configurations.
+       - **Deployment Considerations:** If applicable, include deliverables for Dockerfile creation, container setup, and any deployment-specific configurations.
 
     Please format your response in markdown, starting with a "## Deliverables" heading, and use subheadings for each task.
 
@@ -257,6 +255,27 @@ license_details_prompt_template:
     - Format your response in markdown.
     - Begin with a "## License and Legal Considerations" heading.
 
+    **Output Format Instructions:**
+    `{format_instructions}`
+
+tech_stack_prompt_template:
+  template: |
+    Given the user request: "{user_request}"
+    
+    As a technical expert, provide a recommended technology stack for this project. Your answer should include:
+    - Programming language(s) to be used (include version or recommended version if applicable).
+    - Framework(s) and libraries (include version numbers for primary technologies).
+    - Database or data storage solution(s) (include version if relevant).
+    - Dependency management tools.
+    - Testing and CI/CD frameworks (if applicable).
+    - Any relevant deployment or containerization recommendations.
+    
+    Format your response in markdown, starting with a "## Tech Stack" heading.
+
+    Ensure that for each primary technology, you either specify the version number or mention the recommended version. Your response must be directly derived from the provided user request and should not include any extraneous commentary or analysis beyond the tech stack recommendations.
+    
+    Please format your answer as a concise, bullet-point list in markdown.
+    
     **Output Format Instructions:**
     `{format_instructions}`
 

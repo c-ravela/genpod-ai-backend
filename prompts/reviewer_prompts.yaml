@@ -29,3 +29,131 @@ static_code_analysis_prompt_template:
        each identified project-related issue.
 
     Please generate the issues accordingly.
+
+generic_check_issue_report_prompt_template:
+  template: |
+    You are an expert code reviewer tasked with analyzing the results of a code check performed on generated code. The check may be a static analysis, lint check, test execution, or any other quality assessment. Your goal is to generate an IssuesReport that captures any issues specifically found in the generated source code.
+
+    Follow these instructions carefully:
+    
+    1. Identify issues that are directly related to the quality, security, or functionality of the generated code.
+    2. Exclude any warnings, errors, or messages that arise solely from the analysis tool's execution, configuration, or inherent behavior.
+    3. If an error indicates that an expected file or configuration is missing or misconfigured, interpret and report the issue as a sign that the generated code is incomplete or misconfigured.
+    4. For each genuine issue in the generated code, provide:
+       - The file path where the issue was detected.
+       - The line number (if available) where the issue occurs.
+       - A detailed description of the issue that focuses on what is incorrect or absent in the generated code.
+       - Actionable suggestions for resolving the issue in the context of the generated code.
+    5. Ensure that your output strictly adheres to the formatting instructions provided below.
+
+    Formatting Instructions:
+    ```
+    {format_instructions}
+    ```
+
+    Check Details:
+    - Check Name: `{check_name}`
+    - Check Description: `{check_description}`
+    - Raw Check Output:
+    ```
+    {raw_check_output}
+    ```
+
+    Please generate the IssuesReport accordingly.
+
+dockerfile_selection_prompt_template:
+  template: |
+    You are an expert in Docker and containerization, tasked with selecting the most suitable Dockerfile for a specific job requirement. Evaluate the available Dockerfile objects based solely on the job description provided below.
+
+    Job Description: `{job_description}`
+
+    Available Dockerfiles:
+    ```
+    {available_dockerfiles}
+    ```
+
+    Formatting Instructions:
+    ```
+    {format_instructions}
+    ```
+
+    Your task is to:
+    1. Review the provided list of Dockerfile objects.
+    2. Based solely on the job description, determine which Dockerfile is best suited for the job.
+    3. Return only the `id` of the selected Dockerfile object (this id is separate from the Docker-assigned image id).
+
+    Please output the id of the selected Dockerfile as a JSON object with the key "id".
+
+docker_sandbox_executor_prompt_template:
+  template: |
+    You are an expert in Docker sandbox execution. Based on the task description and the Docker image description provided below, generate the parameters required to execute code in a Docker sandbox using the docker_sandbox_executor tool.
+
+    Task Description: `{task_description}`
+
+    Docker Image Description: `{docker_image_description}`
+
+    Formatting Instructions:
+    ```
+    {format_instructions}
+    ```
+
+    Your output must include only the following parameters as a JSON object:
+    - language: The programming language to use.
+    - command: The command to execute inside the container.
+    - libraries (optional): A list of libraries to install prior to execution, if applicable.
+
+    Provide your output as a JSON object containing these keys with the corresponding values and nothing else.
+
+language_selection_prompt_template:
+  template: |
+    You are an expert code reviewer responsible for determining the most suitable programming language for a project based on its requirements. Analyze the project requirements provided below and choose one language from the list of available languages.
+
+    Requirements:
+    ```
+    {requirements}
+    ```
+
+    Available Languages:
+    ```
+    {available_languages}
+    ```
+
+    Your task is to:
+    1. Evaluate the provided project requirements.
+    2. Consider the available languages (provided as keys).
+    3. Return only the selected programming language in lowercase. 
+       If none of the available languages match the requirements, return "unknown".
+
+    Please output the selected language as a JSON object with the key "language".
+
+    Formatting Instructions:
+    ```
+    {format_instructions}
+    ```
+
+file_path_selection_prompt_template:
+  template: |
+    You are an expert code reviewer. Given the provided project information, directory listing, check details, and the context of the command being executed, determine the most appropriate file or directory path **exclusively from the provided directory listing**.
+
+    Check Name: `{check_name}`
+    Check Description: `{check_description}`
+
+    Command: `{command}`
+    Command Description: `{command_description}`
+
+    Project Directory Inside Container: `{project_directory}`
+    Available Files and Directories (output of "ls -la"):
+    ```
+    {directory_listing}
+    ```
+
+    Your task is to:
+    1. Analyze the project directory structure, the requirements for the check, and the context provided by the command and its description.
+    2. Select the most relevant file or directory path that best suits the command's intended operation and the check's requirements **from the list provided above**.
+    3. If none of the paths in the provided directory listing is suitable, return an empty string.
+    4. Return the chosen file or directory path as a JSON object with the key "file_path".
+
+    Formatting Instructions:
+    ```
+    {format_instructions}
+    ```

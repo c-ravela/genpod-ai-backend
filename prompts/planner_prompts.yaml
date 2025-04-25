@@ -14,6 +14,11 @@ task_breakdown_prompt_template:
 
     **Format Instructions:**
     - provide a list of actionable subtasks needed to complete this deliverable.
+    - Include subtasks that ensure complete project setup and configuration. This should cover:
+      - Initializing the project scaffold (e.g., creating the basic folder structure).
+      - Creating essential configuration files and manifests (e.g., project files, dependency files like package.json, requirements.txt, .csproj, .sln, or equivalent for your technology stack).
+      - Setting up the testing infrastructure if the deliverable includes tests.
+      - Handling dependency management and any necessary configuration updates.
     - Provide your response as a raw Python list, exactly in the format shown below.
     - Do not include any markdown, code blocks, or additional text.
     - The output must match this example exactly, including the square brackets:
@@ -40,7 +45,13 @@ detailed_requirements_prompt_template:
     **Instructions:**
     - Refer to the sample requirements document below for guidance. If you have sufficient information, 
     provide the detailed technical requirements as a JSON object with the structure outlined below. 
-
+    - In addition to outlining the technical implementation details (such as service architecture, API design, database schema, etc.), ensure that your requirements include:
+      - Steps for initializing the project scaffold and directory structure.
+      - Creation and configuration of essential files or manifests (e.g., project files like .csproj/.sln, package.json, requirements.txt, or equivalents).
+      - Details on dependency management and installation.
+      - Setup instructions for testing infrastructure and any environment-specific configurations.
+    - Avoid adding generic comments within the JSON object. Use strict JSON format for comments about any object:
+    
     Avoid adding generic comments within the JSON object. Use strict JSON format for comments about any object:
     ```json
     {{
@@ -67,15 +78,20 @@ detailed_requirements_prompt_template:
                 ]
             }},
             "framework": "Framework to be used"
+        }},
+        "projectSetup": {{
+          "scaffolding": "Describe the required project structure",
+          "configurationFiles": "List and describe essential configuration files (e.g., project files, dependency manifests, test setup)",
+          "dependencies": "Details on dependency management and required packages"
         }}
     }}
     ```
-    
+
     **Remember:**
     - Focus on technical aspects and implementation details.
     - Consider architectural decisions, coding standards, and best practices.
     - Include any necessary API specifications, database schema changes, or UI/UX considerations.
-    - If critical technical information is missing, ask specific questions to clarify.
+    - If critical technical information is missing (including details on project setup), ask specific questions to clarify.
     - Ensure that all requirements are clear, measurable, and testable from a development perspective.
 
 segregation_prompt_template:
@@ -134,7 +150,6 @@ workpackage_update_extraction_prompt_template:
       - "update_changes": A concise description of the changes requested, based on the overall feedback.
     
     Return a valid JSON list containing one update instruction object per identifier found.
-
 
 workpackage_update_prompt_template:
   template: |
