@@ -174,7 +174,7 @@ class GenpodSettings(BaseModel):
     default: DefaultSettings
     providers: Dict[str, ProviderSettings]
     agents: Dict[str, AgentSettings]
-    rag_agents: Dict[str, RAGAgentSettings]
+    rag_agents: Dict[str, RAGAgentSettings] = Field(default_factory=dict)
     max_graph_recursion_limit: Optional[int] = Field(default=None, ge=1)
 
 
@@ -223,7 +223,7 @@ class AgentRegistry:
             "generating deliverables/tasks, developing code/projects, and ensuring thorough reviews. "
             "Guides iterative cycles until the reviewer yields zero issues."
         ),
-        recursion_limit=25,
+        recursion_limit=5000,
         use_rag=False,
     )
     architect: AgentInfo = AgentInfo(
@@ -234,7 +234,7 @@ class AgentRegistry:
             "Generates a detailed, comprehensive requirements document and outlines deliverable/tasks "
             "based on the user prompt, laying the foundation for the project's architectural framework."
         ),
-        recursion_limit=25,
+        recursion_limit=5000,
         use_rag=True,
     )
     coder: AgentInfo = AgentInfo(
@@ -245,7 +245,7 @@ class AgentRegistry:
             "Executes assigned tasks by generating code with proper license headers, "
             "ensuring adherence to coding standards and project requirements."
         ),
-        recursion_limit=25,
+        recursion_limit=3000,
         use_rag=False,
     )
     planner: AgentInfo = AgentInfo(
@@ -256,7 +256,7 @@ class AgentRegistry:
             "Transforms raw tasks or deliverables from the architect into detailed, actionable subtasks, "
             "and similarly refines issues identified by the reviewer into manageable tasks for execution."
         ),
-        recursion_limit=25,
+        recursion_limit=5000,
         use_rag=True,
     )
     tests_generator: AgentInfo = AgentInfo(
@@ -267,7 +267,7 @@ class AgentRegistry:
             "Prior to coding, generates detailed unit test cases and function signatures from the assigned tasks. "
             "These artifacts guide the Software Engineer in implementing functionality that meets quality and specification standards."
         ),
-        recursion_limit=25,
+        recursion_limit=3000,
         use_rag=False,
     )
     reviewer: AgentInfo = AgentInfo(
@@ -279,7 +279,7 @@ class AgentRegistry:
             "and compliance with both internal and external standards. After reviewing, compiles and reports issues "
             "that need resolution before final project approval."
         ),
-        recursion_limit=25,
+        recursion_limit=3000,
         use_rag=False,
     )
     rag_middleware: AgentInfo = AgentInfo(
@@ -290,7 +290,7 @@ class AgentRegistry:
             "Acts as a mediator for the Retrieval-Augmented Generation (RAG) process by maintaining a group of specialized RAG agents. "
             "Upon receiving a question, it determines the most suitable agent to address it, forwards the question, and returns the accurate answer provided."
         ),
-        recursion_limit=25,
+        recursion_limit=5000,
         use_rag=False,
     )
     research: AgentInfo = AgentInfo(
@@ -302,7 +302,7 @@ class AgentRegistry:
             "Supports the project by refining queries, gathering relevant data, and generating insights that complement "
             "the work of other agents."
         ),
-        recursion_limit=25,
+        recursion_limit=3000,
         use_rag=False,
     )
 
