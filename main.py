@@ -141,7 +141,7 @@ def main():
             action_obj.resume(user_id)
             logger.info("The 'resume' action completed successfully.")
 
-        elif requested_action == "microservice_insights":
+        elif requested_action == "insights":
             if len(sys.argv) < 5:
                 logger.error(
                     "Insufficient arguments for 'microservice_insights' action. Expected: <project_id> <service_id> <user_id>. "
