@@ -210,8 +210,7 @@ class LLM(ABC, Generic[TLLMInstance], metaclass=LLMMeta):
                     final_response = AdditionalInfoRequest(**parsed)
                 except ValidationError as e2:
                     raise ValueError(
-                        f"Response does not match expected model ({response_model.__name__}) "
-                        f"nor AdditionalInfoRequest: {e}; {e2}"
+                        f"Failed {response_model.__name__}: {e}. Failed AdditionalInfoRequest: {e2}"
                     )
             return final_response
         else:
