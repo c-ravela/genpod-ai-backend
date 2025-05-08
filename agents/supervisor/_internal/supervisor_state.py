@@ -40,7 +40,7 @@ def _default_planned_issue() -> PlannedIssue:
     return PlannedIssue(is_function_generation_required=False)
 
 
-class SupervisorOuptut(BaseOutputState):
+class SupervisorOutput(BaseOutputState):
     """ Output State for Supervisor """
     microservice_name: str = Field(
         description="Name of the microservice suggested by Architect"
@@ -217,4 +217,9 @@ class SupervisorState(BaseState):
     previous_project_status: PStatus = Field(
         default=PStatus.NONE,
         description="Stores the previous project status, representing the state of the project prior to the current update. Defaults to PStatus.NONE if no previous status exists."
+    )
+
+    has_abandoned_duplicate_issues: bool = Field(
+        default=False,
+        description="Whether there are abandoned duplicate issues that require human review."
     )
