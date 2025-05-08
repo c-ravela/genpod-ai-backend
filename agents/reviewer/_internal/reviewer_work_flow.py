@@ -329,7 +329,8 @@ class ReviewerWorkFlow(BaseWorkFlow[ReviewerPrompts]):
                 # Update the existing issue, not the new_issue
                 duplicate.issue_status = Status.ABANDONED
                 duplicate.duplicate_counter += 1
-                state.previous_issues.requeue_item(duplicate)
+                if not duplicate.human_reviewed:
+                    state.previous_issues.requeue_item(duplicate)
                 logger.debug("Duplicate skipped (abandoned): %s", duplicate.issue_details())
             else:
                 new_queue.add_item(new_issue)
