@@ -1,7 +1,7 @@
 import os
 
 from agents.supervisor._internal.supervisor_prompts import SupervisorPrompts
-from agents.supervisor._internal.supervisor_state import (SupervisorOuptut,
+from agents.supervisor._internal.supervisor_state import (SupervisorOutput,
                                                           SupervisorState)
 from context.agent_context import AgentContext
 from context.context import GenpodContext
@@ -158,6 +158,14 @@ class SupervisorWorkFlow(BaseWorkFlow[SupervisorPrompts]):
             logger.info("SupervisorWorkFlow router: EXECUTING status with tasks pending assignment; invoking call_supervisor.")
             return 'call_supervisor'
         elif state.project_status == PStatus.REVIEWING:
+            if state.has_abandoned_duplicate_issues:
+                # human review of abandoned duplicates
+                self._genpod_context.update(
+                    current_agent=AgentContext(agent_id="human", agent_name="human")
+                )
+                logger.info("SupervisorWorkFlow router: Invoking human for abandoned duplicate issues.")
+                return 'human'
+            
             logger.info("SupervisorWorkFlow router: REVIEWING status detected; invoking call_reviewer.")
             self._genpod_context.update(
                 current_agent=AgentContext(
@@ -373,17 +381,35 @@ class SupervisorWorkFlow(BaseWorkFlow[SupervisorPrompts]):
 
             return state
         elif state.project_status == PStatus.REVIEWING:
+            # 1) Check for abandoned duplicates first
+            abandoned = [
+                iss for iss in state.issues.items
+                if iss.issue_status == Status.ABANDONED
+                and getattr(iss, "duplicate_counter", 0) > 1
+                and not iss.human_reviewed
+            ]
+            if abandoned:
+                state.has_abandoned_duplicate_issues = True
+                logger.info("SupervisorWorkFlow call_supervisor: Abandoned duplicate issues pending human review.")
+                return state
+
+            # 2) Next, handle any real (new) issues
             if state.issues.has_pending_items():
+                state.has_abandoned_duplicate_issues = False
                 state.project_status = PStatus.RESOLVING
                 state.current_issue = Issue(
                     issue_status=Status.NEW,
                     description='Prepare planned issues'
                 )
-                logger.info("SupervisorWorkFlow call_supervisor: Issues detected during REVIEWING; project status set to RESOLVING.")
-            else:
-                state.project_status = PStatus.DONE
-                logger.info("SupervisorWorkFlow call_supervisor: No issues found during REVIEWING; project status set to DONE.")
+                logger.info("SupervisorWorkFlow call_supervisor: New issues detected; moving to RESOLVING.")
+                return state
+
+            # 3) If no abandoned *and* no real issues, we’re done
+            state.has_abandoned_duplicate_issues = False
+            state.project_status = PStatus.DONE
+            logger.info("SupervisorWorkFlow call_supervisor: No issues or abandoned duplicates; marking DONE.")
             return state
+
         elif state.project_status == PStatus.RESOLVING:
             if state.current_issue.issue_status == Status.DONE:
                 if not state.is_human_reviewed:
@@ -397,6 +423,12 @@ class SupervisorWorkFlow(BaseWorkFlow[SupervisorPrompts]):
                 )
                 state.current_issue = Issue()
                 state.is_human_reviewed = False
+            elif state.current_issue.issue_status == Status.ABANDONED:
+                state.previous_project_status = state.project_status
+                state.project_status = PStatus.REVIEWING
+                state.current_issue = Issue()
+                state.is_human_reviewed = False
+                logger.warning("Planner abandoned issue; moving back to REVIEWING.")
             elif state.current_task.task_status == Status.NEW:
                 if state.planned_issues.has_pending_items():
                     state.current_task.task_status = Status.INPROGRESS
@@ -525,17 +557,59 @@ class SupervisorWorkFlow(BaseWorkFlow[SupervisorPrompts]):
     @record_node()
     def call_human(self, state: SupervisorState) -> SupervisorState:
         """
-        Engage a human reviewer for validating or modifying project documents or work packages.
+        Engage a human reviewer either for abandoned duplicate issues (in REVIEWING)
+        or for document/work package review (in other HALTED contexts).
 
-        This method displays the relevant document information and instructions,
-        collects human feedback, and updates the state based on the reviewer's input.
-
-        Args:
-            state (SupervisorState): The current state of the SupervisorWorkFlow.
-
-        Returns:
-            SupervisorState: The updated state after incorporating human review feedback.
+        For abandoned duplicates:
+          - Present each issue not yet human reviewed.
+          - Ask the user whether to keep it; if yes, optionally collect a suggestion.
+          - Update issue.issue_status, duplicate_counter, suggestions, and human_reviewed.
+        Otherwise, fall back to the existing document review prompts.
         """
+        # --- 1) Handle abandoned duplicate issues ---
+        if state.has_abandoned_duplicate_issues:
+            pending = [
+                iss for iss in state.issues.items
+                if iss.issue_status == Status.ABANDONED
+                  and iss.duplicate_counter > 1
+                  and not iss.human_reviewed
+            ]
+            if pending:
+                print("\nThe following issues were automatically abandoned as duplicates. Please review:\n")
+                for issue in pending:
+                    print("-" * 60)
+                    print(issue.issue_details())
+                    print(f"(Seen {issue.duplicate_counter} times.)")
+                    # Ask the human to keep or discard
+                    resp = input("Keep this as a valid issue? (Y/N): ").strip().lower()
+                    if resp == "y":
+                        # Optionally collect a suggestion
+                        suggestion = input("Any suggestions to help resolve this issue? (press Enter to skip): ").strip()
+                        if suggestion:
+                            issue.suggestions = issue.suggestions or []
+                            issue.suggestions.append(suggestion)
+                            state.human_feedback.setdefault(issue.issue_id, []).append(suggestion)
+                            logger.info(f"call_human: Added suggestion to issue {self.team.reviewer.id} and recorded in human_feedback.")
+
+                        # Reactivate the issue
+                        issue.issue_status = Status.NEW
+                        issue.duplicate_counter = 0
+                        logger.info(f"call_human: Re-activated issue {issue.issue_id}.")
+                    else:
+                        logger.info(f"call_human: Confirmed abandonment of issue {issue.issue_id}.")
+                    # Mark that this issue has been human-reviewed
+                    issue.human_reviewed = True
+
+                # Clear the flag so we don’t loop again
+                state.has_abandoned_duplicate_issues = False
+            else:
+                logger.debug("call_human: No pending abandoned duplicates to review.")
+
+            # Indicate that human review is complete
+            state.is_human_reviewed = True
+            return state
+
+        # --- 2) Fallback to existing document/work‐package review ---
         if state.previous_project_status == PStatus.INITIAL:
             header = (
                 f"{self.team.architect.name} has completed the preparation of the project requirements document. "
@@ -583,10 +657,10 @@ class SupervisorWorkFlow(BaseWorkFlow[SupervisorPrompts]):
             print("   Package_id: <specific_work_package_id>")
             print("Clearly specify the changes you wish to apply.")
             print("------------------------------------------------------------\n")
-                
         else:
             return state
 
+        # Display the chosen document for review
         print(header)
         print(f"{path_label}: {file_path}\n")
         print(f"Does the {doc_type} meet the expected standards? Would you like to make any modifications? (Y/N): ")
@@ -595,14 +669,9 @@ class SupervisorWorkFlow(BaseWorkFlow[SupervisorPrompts]):
         if user_response == 'y':
             state.current_task.task_status = Status.INPROGRESS
             feedback = self._collect_feedback(doc_type)
-            if team_member_id in state.human_feedback:
-                state.human_feedback[team_member_id].append(feedback)
-            else:
-                state.human_feedback[team_member_id] = [feedback]
+            state.human_feedback.setdefault(team_member_id, []).append(feedback)
         else:
-            print(
-                f"\nNo modifications indicated for the {doc_type}. Proceeding with the current version."
-            )
+            print(f"\nNo modifications indicated for the {doc_type}. Proceeding with the current version.")
 
         state.is_human_reviewed = True
         return state
@@ -821,7 +890,8 @@ class SupervisorWorkFlow(BaseWorkFlow[SupervisorPrompts]):
             'project_name': state.microservice_name,
             'license_header': state.license_header,
             'requirements_document': state.requirements_document,
-            'chat_history': state.chat_history
+            'chat_history': state.chat_history,
+            'previous_issues': state.issues
         }
         try:
             reviwer_result = self.team.reviewer.invoke(reviewer_input)
@@ -839,7 +909,7 @@ class SupervisorWorkFlow(BaseWorkFlow[SupervisorPrompts]):
 
     @trace_span
     @record_node('exit')
-    def exit_node(self, state: SupervisorState) -> SupervisorOuptut:
+    def exit_node(self, state: SupervisorState) -> SupervisorOutput:
         """
         Finalize the SupervisorWorkFlow and return the final output state.
 
@@ -849,7 +919,7 @@ class SupervisorWorkFlow(BaseWorkFlow[SupervisorPrompts]):
             state (SupervisorState): The current state of the SupervisorWorkFlow.
 
         Returns:
-            SupervisorOuptut: The final output state of the SupervisorWorkFlow.
+            SupervisorOutput: The final output state of the SupervisorWorkFlow.
         """
         logger.info("SupervisorWorkFlow exit_node: Exiting workflow and returning final state.")
         return state
