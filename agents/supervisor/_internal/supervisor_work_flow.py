@@ -385,7 +385,6 @@ class SupervisorWorkFlow(BaseWorkFlow[SupervisorPrompts]):
             abandoned = [
                 iss for iss in state.issues.items
                 if iss.issue_status == Status.ABANDONED
-                and getattr(iss, "duplicate_counter", 0) > 1
                 and not iss.human_reviewed
             ]
             if abandoned:
@@ -571,7 +570,6 @@ class SupervisorWorkFlow(BaseWorkFlow[SupervisorPrompts]):
             pending = [
                 iss for iss in state.issues.items
                 if iss.issue_status == Status.ABANDONED
-                  and iss.duplicate_counter > 1
                   and not iss.human_reviewed
             ]
             if pending:
@@ -593,7 +591,6 @@ class SupervisorWorkFlow(BaseWorkFlow[SupervisorPrompts]):
 
                         # Reactivate the issue
                         issue.issue_status = Status.NEW
-                        issue.duplicate_counter = 0
                         logger.info(f"call_human: Re-activated issue {issue.issue_id}.")
                     else:
                         logger.info(f"call_human: Confirmed abandonment of issue {issue.issue_id}.")
