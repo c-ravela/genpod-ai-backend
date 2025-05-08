@@ -30,6 +30,13 @@ static_code_analysis_prompt_template:
 
     Please generate the issues accordingly.
 
+    ### Inverse Prompting:
+    If your output does not include:
+    - A list of code-related issues only (no tool-internal warnings or version errors),
+    - For each issue: a clear description and an actionable recommendation,
+    - Strict adherence to the provided formatting instructions,
+    Then revise your response to fully meet the expectations above.
+
 generic_check_issue_report_prompt_template:
   template: |
     You are an expert code reviewer tasked with analyzing the results of a code check performed on generated code. The check may be a static analysis, lint check, test execution, or any other quality assessment. Your goal is to generate an IssuesReport that captures any issues specifically found in the generated source code.
@@ -61,6 +68,14 @@ generic_check_issue_report_prompt_template:
 
     Please generate the IssuesReport accordingly.
 
+    ### Inverse Prompting:
+    If your output does not include:
+    - An IssuesReport containing only genuine code issues (no tool-only messages),
+    - For each reported issue: file path, optional line number, detailed description, and actionable suggestions,
+    - Correct handling of missing or misconfigured files as incomplete-code issues,
+    - Strict conformance to the formatting instructions,
+    Then revise your response to fully meet the expectations above.
+
 dockerfile_selection_prompt_template:
   template: |
     You are an expert in Docker and containerization, tasked with selecting the most suitable Dockerfile for a specific job requirement. Evaluate the available Dockerfile objects based solely on the job description provided below.
@@ -84,6 +99,12 @@ dockerfile_selection_prompt_template:
 
     Please output the id of the selected Dockerfile as a JSON object with the key "id".
 
+    ### Inverse Prompting:
+    If your output does not include:
+    - A valid JSON object containing only the key `"id"` with the selected Dockerfile’s identifier,
+    - No additional keys, text, or commentary,
+    Then revise your response to fully meet the expectations above.
+
 docker_sandbox_executor_prompt_template:
   template: |
     You are an expert in Docker sandbox execution. Based on the task description and the Docker image description provided below, generate the parameters required to execute code in a Docker sandbox using the docker_sandbox_executor tool.
@@ -103,6 +124,13 @@ docker_sandbox_executor_prompt_template:
     - libraries (optional): A list of libraries to install prior to execution, if applicable.
 
     Provide your output as a JSON object containing these keys with the corresponding values and nothing else.
+
+    ### Inverse Prompting:
+    If your output does not include:
+    - A JSON object with keys `"language"` and `"command"`,
+    - An optional `"libraries"` list only if required,
+    - No extra keys or explanatory text,
+    Then revise your response to fully meet the expectations above.
 
 language_selection_prompt_template:
   template: |
@@ -131,6 +159,13 @@ language_selection_prompt_template:
     {format_instructions}
     ```
 
+    ### Inverse Prompting:
+    If your output does not include:
+    - A JSON object with the single key `"language"` and the value as one of the available languages or `"unknown"`,
+    - The language in lowercase,
+    - No additional keys or commentary,
+    Then revise your response to fully meet the expectations above.
+
 file_path_selection_prompt_template:
   template: |
     You are an expert code reviewer. Given the provided project information, directory listing, check details, and the context of the command being executed, determine the most appropriate file or directory path **exclusively from the provided directory listing**.
@@ -157,3 +192,9 @@ file_path_selection_prompt_template:
     ```
     {format_instructions}
     ```
+
+    ### Inverse Prompting:
+    If your output does not include:
+    - A JSON object with the single key `"file_path"` and the selected path (or `""` if none),
+    - No extra keys, text, or commentary,
+    Then revise your response to fully meet the expectations above.

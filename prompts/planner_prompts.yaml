@@ -13,12 +13,7 @@ task_breakdown_prompt_template:
     Feedback: `{feedback}`
 
     **Format Instructions:**
-    - provide a list of actionable subtasks needed to complete this deliverable.
-    - Include subtasks that ensure complete project setup and configuration. This should cover:
-      - Initializing the project scaffold (e.g., creating the basic folder structure).
-      - Creating essential configuration files and manifests (e.g., project files, dependency files like package.json, requirements.txt, .csproj, .sln, or equivalent for your technology stack).
-      - Setting up the testing infrastructure if the deliverable includes tests.
-      - Handling dependency management and any necessary configuration updates.
+    - Provide a list of actionable subtasks needed to complete this deliverable.
     - Provide your response as a raw Python list, exactly in the format shown below.
     - Do not include any markdown, code blocks, or additional text.
     - The output must match this example exactly, including the square brackets:
@@ -29,6 +24,14 @@ task_breakdown_prompt_template:
     - The output must be directly convertible using `ast.literal_eval()`.
 
     Your goal is to provide a backlog of subtasks in the correct format for the provided deliverable.
+
+    ### Inverse Prompting:
+    If your output does not include:
+    - A valid Python list string matching the format `"['subtask1', 'subtask2']"`,
+    - Actionable and clearly stated subtasks that match the deliverable,
+    - No extra commentary, formatting, or code block markers,
+
+    Then revise your response to fully meet the expectations above.
 
 detailed_requirements_prompt_template:
   template: |
@@ -44,20 +47,29 @@ detailed_requirements_prompt_template:
 
     **Instructions:**
     - Refer to the sample requirements document below for guidance. If you have sufficient information, 
-    provide the detailed technical requirements as a JSON object with the structure outlined below. 
-    - In addition to outlining the technical implementation details (such as service architecture, API design, database schema, etc.), ensure that your requirements include:
-      - Steps for initializing the project scaffold and directory structure.
-      - Creation and configuration of essential files or manifests (e.g., project files like .csproj/.sln, package.json, requirements.txt, or equivalents).
-      - Details on dependency management and installation.
-      - Setup instructions for testing infrastructure and any environment-specific configurations.
-    - Avoid adding generic comments within the JSON object. Use strict JSON format for comments about any object:
-    
-    Avoid adding generic comments within the JSON object. Use strict JSON format for comments about any object:
+      provide the detailed technical requirements as a JSON object with the structure outlined below. 
+    - The output must contain:
+      1. A clear and **detailed task description**
+      2. Explicit **User Acceptance Criteria**
+      3. Suggestions for **unit test coverage** (if applicable)
+      4. **Priority** of the task (`low`, `medium`, or `high`)
+    - Avoid adding generic comments within the JSON object.
+    - Use strict JSON format only.
+
     ```json
     {{
         "description": "Detailed description of the task",
         "name": "Name of the service or component",
         "language": "Programming language to be used",
+        "priority": "low | medium | high",
+        "acceptanceCriteria": [
+            "Given condition, When action, Then expected result",
+            "Another acceptance point in clear, testable language"
+        ],
+        "unitTestSuggestions": [
+            "Describe what kinds of unit tests should be written",
+            "Edge cases or boundary conditions to validate"
+        ],
         "restConfig": {{
             "server": {{
                 "DB": "Database type",
@@ -71,28 +83,25 @@ detailed_requirements_prompt_template:
                             "FieldName": {{
                                 "datatype": "Data type of the field"
                             }}
-                            ...
                         }}
                     }}
-                    ...
                 ]
             }},
             "framework": "Framework to be used"
-        }},
-        "projectSetup": {{
-          "scaffolding": "Describe the required project structure",
-          "configurationFiles": "List and describe essential configuration files (e.g., project files, dependency manifests, test setup)",
-          "dependencies": "Details on dependency management and required packages"
         }}
     }}
     ```
 
-    **Remember:**
-    - Focus on technical aspects and implementation details.
-    - Consider architectural decisions, coding standards, and best practices.
-    - Include any necessary API specifications, database schema changes, or UI/UX considerations.
-    - If critical technical information is missing (including details on project setup), ask specific questions to clarify.
-    - Ensure that all requirements are clear, measurable, and testable from a development perspective.
+    ### Inverse Prompting:
+    If your output does not include:
+    - A **valid JSON object** with all required keys (`description`, `name`, `language`, `priority`, `acceptanceCriteria`, `unitTestSuggestions`, `restConfig`),
+    - A **detailed and specific** task description (not placeholder text),
+    - At least two **testable user acceptance criteria**,
+    - Relevant **unit test suggestions** or rationale for omission,
+    - A **priority level** clearly labeled as either `"low"`, `"medium"`, or `"high"`,
+    - **No markdown, code blocks, or explanation** outside the JSON object,
+
+    Then revise your response to fully meet the expectations above.
 
 segregation_prompt_template:
   template: |
@@ -119,6 +128,14 @@ segregation_prompt_template:
 
     "{work_package}"
 
+    ### Inverse Prompting:
+    If your output does not include:
+    - A clear binary decision on whether the task requires function writing,
+    - A brief, relevant explanation to support your classification,
+    - Formatting as described in the instructions block,
+
+    Then revise your response to fully meet the expectations above.
+
 issues_segregation_prompt_template:
   template: |
     You are an intelligent assistant designed to assess whether fixing an issue involves 
@@ -134,6 +151,13 @@ issues_segregation_prompt_template:
     {context}
 
     {format_instruction}
+
+    ### Inverse Prompting:
+    If your output does not include:
+    - A clear classification with a justified explanation based on the issue and code,
+    - The output structure specified by `format_instruction`,
+
+    Then revise your response to fully meet the expectations above.
 
 workpackage_update_extraction_prompt_template:
   template: |
@@ -151,6 +175,14 @@ workpackage_update_extraction_prompt_template:
     
     Return a valid JSON list containing one update instruction object per identifier found.
 
+    ### Inverse Prompting:
+    If your output does not include:
+    - A valid JSON list of objects with keys `target_id` and `update_changes`,
+    - Accurate extraction of identifiers from the feedback,
+    - Only the extracted updates and no extra commentary,
+
+    Then revise your response to fully meet the expectations above.
+
 workpackage_update_prompt_template:
   template: |
     You are a helpful assistant that updates work package details.
@@ -160,3 +192,11 @@ workpackage_update_prompt_template:
     {update_changes}
     Please produce a JSON object representing the updated work package details.
     The output should merge the current details with the requested changes, preserving any unchanged fields.
+
+    ### Inverse Prompting:
+    If your output does not include:
+    - A single valid JSON object representing the updated work package,
+    - A correct merge of the new updates into the existing package structure,
+    - No loss of unmodified fields from the original data,
+
+    Then revise your response to fully meet the expectations above.
