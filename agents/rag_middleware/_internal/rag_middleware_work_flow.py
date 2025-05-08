@@ -243,7 +243,11 @@ class RAGMiddlewareWorkFlow(BaseWorkFlow[RAGMiddlewarePrompts]):
                 func_name
             )
             state.response_type = RagResponseType.NO_AGENT_AVAILABLE
-            state.current_mode_stage = RAGQueryStage.FALLBACK_RESEARCH
+            state.current_mode_stage = (
+                RAGQueryStage.FALLBACK_RESEARCH
+                if self.use_research_agent
+                else RAGQueryStage.FINISHED
+            )
             return state
 
         agent_list_str = "\n".join(
@@ -267,7 +271,11 @@ class RAGMiddlewareWorkFlow(BaseWorkFlow[RAGMiddlewarePrompts]):
                 func_name
             )
             state.response_type = RagResponseType.NO_AGENT_AVAILABLE
-            state.current_mode_stage = RAGQueryStage.FALLBACK_RESEARCH
+            state.current_mode_stage = (
+                RAGQueryStage.FALLBACK_RESEARCH
+                if self.use_research_agent
+                else RAGQueryStage.FINISHED
+            )
             return state
 
         agent_entry = self.rag_agent_dict.get(selected_rag_agent_id)
@@ -277,7 +285,11 @@ class RAGMiddlewareWorkFlow(BaseWorkFlow[RAGMiddlewarePrompts]):
                 func_name, selected_rag_agent_id
             )
             state.response_type = RagResponseType.NO_AGENT_AVAILABLE
-            state.current_mode_stage = RAGQueryStage.FALLBACK_RESEARCH
+            state.current_mode_stage = (
+                RAGQueryStage.FALLBACK_RESEARCH
+                if self.use_research_agent
+                else RAGQueryStage.FINISHED
+            )
             return state
 
         state.selected_rag_agent = {
