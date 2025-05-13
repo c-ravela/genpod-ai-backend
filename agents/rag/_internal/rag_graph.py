@@ -113,6 +113,7 @@ class RAGGraph(BaseGraph[RAGWorkFlow]):
             self.work_flow.router,
             {
                 str(RAGNodeEnum.GENERATE_RESPONSE): str(RAGNodeEnum.GENERATE_RESPONSE),
+                str(RAGNodeEnum.TRANSFORM_QUERY): str(RAGNodeEnum.TRANSFORM_QUERY),
                 str(RAGNodeEnum.GRADE_RESPONSE): str(RAGNodeEnum.GRADE_RESPONSE),
                 str(RAGNodeEnum.EXIT): str(RAGNodeEnum.EXIT)
             }
