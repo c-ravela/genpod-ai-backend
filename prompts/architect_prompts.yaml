@@ -15,6 +15,14 @@ project_summary_prompt_template:
     Output format instructions:
     `{format_instructions}`
 
+    ### Inverse Prompting:
+    If your output does not include:
+    - A top-level "## Project Summary" heading,
+    - A concise summary of the project's purpose and goals,
+    - A structured list of core features or functionalities,
+    - An outline of required schema definition models (with key fields and relationships),
+    Then revise your response to fully meet the expectations above.
+
 system_architecture_prompt_template:
   template: |
     Based on the project overview provided, describe a high-level architecture for
@@ -27,12 +35,12 @@ system_architecture_prompt_template:
 
     ### Requirements:
 
-    1. **High-Level Diagram with Description**
-    - Create a text-based diagram illustrating the overall architecture.
-    - The diagram should detail the flow from client requests through various
-      layers (e.g., API gateway, business logic, data access layer, and database).
-    - Clearly label each component to show request processing and data management.
-    - Follow the diagram with brief descriptions of each component's role and interactions.
+    1. **High-Level Diagram with Mermaid Flowchart**
+    - Provide a Mermaid `flowchart` diagram to visually represent the overall architecture.
+    - Use clear node names without parentheses `()` to prevent syntax errors.
+    - Include components such as client, API gateway, services, databases, external systems, etc.
+    - Use directional arrows to show request and data flow.
+    - Ensure each component is labeled clearly and placed logically to reflect real-world interactions.
 
     2. **Key Components, Data Models, and Interactions**
     - List and describe the essential components and their responsibilities.
@@ -55,7 +63,7 @@ system_architecture_prompt_template:
     - Describe mechanisms for ensuring reliability (e.g., retries, failover, data replication).
     - Mention any trade-offs considered in relation to the CAP theorem.
 
-    6. *Application of the CAP Theorem**
+    6. **Application of the CAP Theorem**
     - Discuss how the principles of the CAP theorem (Consistency, Availability,
       Partition Tolerance) apply to this architecture.
     - Explain any trade-offs or prioritizations made to meet project goals, with
@@ -66,9 +74,22 @@ system_architecture_prompt_template:
     - Format your response in markdown, starting with a "## System Architecture" heading.
     - Address each requirement under clearly labeled subheadings.
     - Use bullet points or numbered lists to present details concisely.
+    - Include the Mermaid flowchart inside a fenced code block with `mermaid` syntax.
+    - Do not use parentheses `()` in Mermaid node labels.
 
     ### Output Format Instructions:
     `{format_instructions}`
+
+    ### Inverse Prompting:
+    If your output does not include all of:
+    - A "## System Architecture" heading,
+    - A valid Mermaid `flowchart` diagram in a fenced `mermaid` code block (no parentheses in labels),
+    - Subheading "### Key Components, Data Models, and Interactions" with bullet points,
+    - Subheading "### Data Flow Between Services" describing sync/async flows,
+    - Subheading "### External Integrations or APIs" listing each integration and purpose,
+    - Subheading "### Scalability and Reliability Considerations" covering scaling and reliability,
+    - Subheading "### Application of the CAP Theorem" with trade-off discussion,
+    Then revise your response to fully meet the expectations above.
 
 file_structure_prompt_template:
   template: |
@@ -87,24 +108,24 @@ file_structure_prompt_template:
 
     Your proposal should include:
 
-    1. **Root-Level Directories**: Outline the main directories at the project 
-    root.
-    2. **Service-Specific Directories**: Detail directories specific to 
-    individual services or modules.
-    3. **Shared/Common Directories**: Identify directories for shared code, 
-    utilities, or libraries.
-    4. **Test Directories**: Specify where unit, integration, and other tests 
-    will reside.
-    5. **Configuration Files**: Indicate the locations for configuration files 
-    and environment-specific settings.
-    6. **Directory Purpose Explanations**: Provide a brief explanation for each 
-    major directory, describing its purpose and contents.
+    1. **Root-Level Directories**: Outline the main directories at the project root.
+    2. **Service-Specific Directories**: Detail directories specific to individual services or modules.
+    3. **Shared/Common Directories**: Identify directories for shared code, utilities, or libraries.
+    4. **Test Directories**: Specify where unit, integration, and other tests will reside.
+    5. **Configuration Files**: Indicate the locations for configuration files and environment-specific settings.
+    6. **Directory Purpose Explanations**: Provide a brief explanation for each major directory, describing its purpose and contents.
 
-    Please format your response in markdown, starting with a "## File Structure" 
-    heading. Ensure that your answer is clear, concise, and follows best practices.
+    Please format your response in markdown, starting with a "## File Structure" heading. Ensure that your answer is clear, concise, and follows best practices.
 
     **Output Format Instructions:**
     {format_instructions}
+
+    ### Inverse Prompting:
+    If your output does not include:
+    - A "## File Structure" heading,
+    - A clear hierarchical listing of root, service-specific, shared, test, and config directories,
+    - Explanations for the purpose of each key directory,
+    Then revise your response to fully meet the expectations above.
 
 microservice_design_prompt_template:
   template: |
@@ -128,11 +149,21 @@ microservice_design_prompt_template:
     3. **Data Models/Schemas:** An outline of the essential data models or schemas used.
     4. **Internal Components/Modules:** A breakdown of major internal components or modules.
     5. **Dependencies & Integrations:** Any dependencies on other services or external systems.
+    6. **Architecture Visualization:** Use a `mermaid classDiagram` or `erDiagram` to visualize the services and data models.
+       - Avoid using parentheses in node names.
 
     Please format your response in markdown, starting with a "## Microservice Design" heading. Use subheadings for each service to clearly separate their details.
 
     **Output Format Instructions:**
     `{format_instructions}`
+
+    ### Inverse Prompting:
+    If your output does not include:
+    - A "## Microservice Design" heading,
+    - Separate subheadings for each microservice,
+    - Under each: service name & responsibility, endpoints/functions, data models/schemas, internal components/modules, dependencies & integrations,
+    - A fenced `mermaid classDiagram` or `erDiagram` without parentheses,
+    Then revise your response to fully meet the expectations above.
 
 tasks_summary_prompt_template:
   template: |
@@ -156,10 +187,11 @@ tasks_summary_prompt_template:
 
     For each deliverable, please provide:
     1. **Deliverable Name:** A clear title for the task.
-    2. **Detailed Description:** A comprehensive explanation of what needs to 
-    be accomplished.
-    3. **Technical Requirements/Specifications:** Include any necessary setup 
-    files, configurations, or dependencies.
+    2. **Detailed Description:** A comprehensive explanation of what needs to be accomplished.
+    3. **Technical Requirements/Specifications:** Include any necessary setup files, configurations, or dependencies.
+    4. **User Acceptance Criteria:** A concise list of clear, measurable criteria that will determine if the task is complete and successful.
+       - Acceptance criteria should reflect functional correctness, completeness, and observable outcomes.
+       - Write them as bullet points using the “Given / When / Then” or “Should” format.
 
     Additionally, if applicable, ensure that your breakdown covers:
     - **Dockerfile:** Instructions for environment setup and deployment.
@@ -171,6 +203,12 @@ tasks_summary_prompt_template:
 
     **Output Format Instructions:**
     `{format_instructions}`
+
+    ### Inverse Prompting:
+    If your output does not include:
+    - A "## Deliverables" heading,
+    - Subheadings and descriptions for each deliverable name, description, technical specs, and acceptance criteria,
+    Then revise your response to fully meet the expectations above.
 
 code_standards_prompt_template:
   template: |
@@ -200,6 +238,13 @@ code_standards_prompt_template:
 
     **Output Format Instructions:**
     {format_instructions}
+
+    ### Inverse Prompting:
+    If your output does not include:
+    - A "## Standards" heading,
+    - Subheadings for each of the five categories (12-Factor, Clean Code, Commenting, Language Standards, Additional),
+    - Bullet points under each subheading,
+    Then revise your response to fully meet the expectations above.
 
 implementation_details_prompt_template:
   template: |
@@ -233,6 +278,9 @@ implementation_details_prompt_template:
     - Indicate the package manager used and include a sample dependency file.
     6. **Dockerfile:**  
     - Outline the contents of the Dockerfile required for the project.
+    7. **Component Flow Diagram (Optional):**  
+    - Add a `mermaid flowchart TD` diagram showing how code components and configurations connect.
+    - Avoid parentheses in node names.
 
     **Formatting Requirements:**
     - Format your response in markdown.
@@ -241,6 +289,12 @@ implementation_details_prompt_template:
 
     **Output Format Instructions:**
     `{format_instructions}`
+
+    ### Inverse Prompting:
+    If your output does not include:
+    - A "## Implementation Details" heading,
+    - Subheadings for each of the seven categories (Source Files, Configuration, Unit Testing, OpenAPI, Dependency Management, Dockerfile, Component Flow Diagram),
+    Then revise your response to fully meet the expectations above.
 
 license_details_prompt_template:
   template: |
@@ -258,7 +312,47 @@ license_details_prompt_template:
     - Begin with a "## License and Legal Considerations" heading.
 
     **Output Format Instructions:**
+    {format_instructions}
+
+    ### Inverse Prompting:
+    If your output does not include:
+    - A "## License and Legal Considerations" heading,
+    - A valid license header formatted for source code inclusion,
+    - Clear guidance on where to apply it within the project,
+    Then revise your response to fully meet the expectations above.
+
+tech_stack_prompt_template:
+  template: |
+    Given the user request: "{user_request}"
+    
+    As a technical expert, provide a recommended technology stack for this project. Your answer should include:
+    - Programming language(s) to be used (include version or recommended version if applicable).
+    - Framework(s) and libraries (include version numbers for primary technologies).
+    - Database or data storage solution(s) (include version if relevant).
+    - Dependency management tools.
+    - Testing and CI/CD frameworks (if applicable).
+    - Any relevant deployment or containerization recommendations.
+    
+    Format your response in markdown, starting with a "## Tech Stack" heading.
+
+    Ensure that for each primary technology, you either specify the version number or mention the recommended version. Your response must be directly derived from the provided user request and should not include any extraneous commentary or analysis beyond the tech stack recommendations.
+    
+    Please format your answer as a concise, bullet-point list in markdown.
+    
+    **Output Format Instructions:**
     `{format_instructions}`
+
+    ### Inverse Prompting:
+    If your output does not include:
+    - A "## Tech Stack" heading,
+    - Bullet points covering:
+      - Programming languages with versions,
+      - Frameworks and libraries with versions,
+      - Databases or storage solutions with versions,
+      - Dependency management tools,
+      - Testing and CI/CD frameworks,
+      - Deployment or containerization recommendations,
+    Then revise your response to fully meet the expectations above.
 
 tasks_extraction_prompt_template:
   template: |
@@ -289,6 +383,12 @@ tasks_extraction_prompt_template:
     Output format instructions:
     '{format_instructions}'
 
+    ### Inverse Prompting:
+    If your output does not include:
+    - A JSON array (`[...]`) of strings,
+    - Each string exactly matching a deliverable section from the input, in order,
+    Then revise your response to fully meet the expectations above.
+
 gather_project_details_prompt_template:
   template: |
     Given the user's request: "{user_request}"
@@ -297,6 +397,12 @@ gather_project_details_prompt_template:
 
     Output format instructions:
     {format_instructions}
+
+    ### Inverse Prompting:
+    If your output does not include:
+    - A single, clear project name suggestion,
+    - Compliance with naming conventions appropriate to the request,
+    Then revise your response to fully meet the expectations above.
 
 additional_info_prompt_template:
   template: |
@@ -322,3 +428,9 @@ additional_info_prompt_template:
             pydantic_object=QueryResult
         ).get_format_instructions()
     }
+
+    ### Inverse Prompting:
+    If your output does not include:
+    - A context-bound answer strictly derived from `requirements_document`,
+    - No speculative or extra content outside the provided context,
+    Then revise your response to fully meet the expectations above.

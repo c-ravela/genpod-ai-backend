@@ -8,7 +8,7 @@ from core.decorators import rag_query_handler
 from core.prompt import BasePrompt
 from llms import LLM, LLMOutput
 from utils.decorators import auto_repr
-from utils.logs.logging_utils import logger
+from utils.logger import logger
 
 GenericAgentPrompt = TypeVar('GenericAgentPrompt')
 TResponse = TypeVar('TResponse', bound=BaseModel)

@@ -4,7 +4,7 @@ from sqlalchemy.exc import SQLAlchemyError
 
 from database.database import Database
 from database.entities.microservice_sessions import MicroserviceSession
-from utils.logs.logging_utils import logger
+from utils.logger import logger
 
 
 class MicroserviceSessionService:

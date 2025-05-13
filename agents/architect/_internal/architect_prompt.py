@@ -5,7 +5,7 @@ from langchain_core.prompts import PromptTemplate
 
 from core.prompt import *
 from models.architect_models import ProjectDetails, TaskList, TaskResponse
-from utils.logs.logging_utils import logger
+from utils.logger import logger
 from utils.yaml_utils import read_yaml
 
 ARCHITECT_PROMPTS_PATH = path.join(getcwd(), "prompts", "architect_prompts.yaml")
@@ -204,6 +204,24 @@ class ArchitectPrompts:
             use_rag=self.use_rag
         )
         logger.info("Initialized license_details_prompt with use_rag=%s", self.use_rag)
+
+        tech_stack_prompt_template = PromptTemplate(
+            template=self.get_template('tech_stack_prompt_template'),
+            input_variables=[
+                'user_request'
+            ],
+            partial_variables={
+                "format_instructions": PydanticOutputParser(
+                    pydantic_object=TaskResponse
+                ).get_format_instructions()
+            }
+        )
+        logger.debug("Created license details prompt template.")
+        self.tech_stack_prompt = RagInstructionsPrompt(
+            adapter=PromptTemplateAdapter(tech_stack_prompt_template),
+            use_rag=self.use_rag
+        )
+        logger.info("Initialized tech_stack_prompt with use_rag=%s", self.use_rag)
 
         tasks_extraction_prompt_template = PromptTemplate(
             template=self.get_template('tasks_extraction_prompt_template'),

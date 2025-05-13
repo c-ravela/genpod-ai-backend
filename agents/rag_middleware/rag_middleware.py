@@ -8,7 +8,7 @@ from agents.rag_middleware.registry import (get_rag_agents,
 from core.agent import BaseAgent
 from core.decorators import Singleton, singleton
 from llms import LLM
-from utils.logs.logging_utils import logger
+from utils.logger import logger
 
 dummy_rag_agent_description = (
     "Fallback agent: Used when no suitable RAG agent is found (e.g., when all agents have a confidence value of 0). "

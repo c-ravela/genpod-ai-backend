@@ -1,15 +1,22 @@
 delegator_prompt_template:
   template: |
-    You are a Supervisor of a team who always tracks the status of the project and the tasks \n 
+    You are a Supervisor of a team who always tracks the status of the project and the tasks. \n 
     Active team members are: \n\n {team_members} \n\n
-    What do each team memeber do:\n
-    Architect: ['Creates Requirements document','Creates Deliverables','Answer any additional information']
+    What do each team member do:\n
+    Architect: ['Creates Requirements document','Creates Deliverables','Answers any additional information']
     RAG: Contains proprietary information so must be called when such information is needed
 
     If the document contains keywords related to the user question, grade it as relevant. \n
     It does not need to be a stringent test. The goal is to filter out erroneous retrievals. \n
     Give a binary score 'yes' or 'no' score to indicate whether the document is relevant to the question. \n
-    Provide the binary score as a JSON with a single key 'score' and no premable or explanation.
+    Provide the binary score as a JSON with a single key 'score' and no preamble or explanation.
+
+    ### Inverse Prompting:
+    If your output does not include:
+    - A JSON object with only the key `'score'` and value as either `'yes'` or `'no'`,
+    - No preamble, commentary, or formatting beyond the JSON structure,
+
+    Then revise your response to fully meet the expectations above.
 
 response_evaluator_prompt_template:
   template: |
@@ -34,6 +41,13 @@ response_evaluator_prompt_template:
     or
     {"needs_additional_info": false}
 
+    ### Inverse Prompting:
+    If your output does not include:
+    - Only one JSON key `'needs_additional_info'` with a boolean value (`true` or `false`),
+    - No explanation or additional formatting outside the JSON block,
+
+    Then revise your response to fully meet the expectations above.
+
 architect_call_prompt_template:
   template: |
     This task is part of Project Initiation Phase and has two deliverables, a project requirements document and a list of project deliverables.\n
@@ -50,29 +64,28 @@ init_rag_questionaire_prompt_template:
     {user_prompt}
     ```
 
-    Generate a comprehensive list of questions to query the knowledge base which is
-    a vector DB.
+    Generate a comprehensive list of questions to query the knowledge base which is a vector DB.
 
     These questions should cover various aspects of the project requirements,
     technical specifications, and industry standards. Focus on the following areas:
-        1. Industry standards and regulations:
-        - What specific standards or regulations are relevant to this project?
-        - How do these standards impact the design and implementation?
+        1. Industry standards and regulations
+        2. Project-specific requirements
+        3. Data management
 
-        2. Project-specific requirements:
-        - What are the key components or features required for this project?
-        - Are there any specific data structures or formats that need to be considered?
-
-        3. Data management:
-        - What type of data storage is most suitable for this project?
-        - How should the data be structured for efficient retrieval and management?
-
-    Create a list response which containes one well-defined question for each
+    Create a list response which contains one well-defined question for each
     category that will help extract detailed information from our knowledge base
     to assist in creating a comprehensive requirements document.
 
     example output format: "['question1','question2','question3']"
     Use this additional context if an error exists in output: {context}
+
+    ### Inverse Prompting:
+    If your output does not include:
+    - A list with one relevant, domain-specific question per category,
+    - Only well-formed questions inside a single-line list format (as shown in the example),
+    - No commentary or extra text,
+
+    Then revise your response to fully meet the expectations above.
 
 follow_up_questions_template:
   template: |
@@ -100,64 +113,39 @@ follow_up_questions_template:
     [Briefly explain why the response is incomplete]
     Follow-up Query: [Provide a single, focused query to retrieve all the missing information]
 
-    Example outputs:
+    ### Inverse Prompting:
+    If your output does not include:
+    - Either `COMPLETE` or `INCOMPLETE` as the first line,
+    - A justification following that label,
+    - If `INCOMPLETE`, a clearly written follow-up query relevant to the missing details,
 
-    COMPLETE
-    The response fully addresses the user's query about the Title Requests Microservice,
-    covering MISMO v3.6 standards, GET REST API implementation, and .NET specifics.
-
-    INCOMPLETE
-    The response lacks details on specific MISMO v3.6 data structures for title requests.
-    Follow-up Query: What are the key MISMO v3.6 XML elements and data structures
-    required for implementing a Title Requests GET service in .NET?
-
-    Your evaluation and output.
+    Then revise your response to fully meet the expectations above.
 
 ideal_init_rag_questionaire_prompt_template:
   template: |
     Given the user prompt: "{user_prompt}", generate a comprehensive list of questions to query the knowledge base which is a vector DB. 
     These questions should cover various aspects of the project requirements, technical specifications, and industry standards. Focus on the following areas:
-        1. Industry standards and regulations:
-        - What specific standards or regulations are relevant to this project?
-        - How do these standards impact the design and implementation?
+        1. Industry standards and regulations
+        2. Project-specific requirements
+        3. Technical architecture
+        4. API design (if applicable)
+        5. Implementation details
+        6. Data management
+        7. Security and compliance
+        8. Performance and scalability
+        9. Testing and validation
+        10. Documentation and specifications
 
-        2. Project-specific requirements:
-        - What are the key components or features required for this project?
-        - Are there any specific data structures or formats that need to be considered?
-
-        3. Technical architecture:
-        - What is the recommended architecture for this type of project?
-        - Are there any specific design patterns or best practices to follow?
-
-        4. API design (if applicable):
-        - What are the best practices for designing the API for this service?
-        - How should the API endpoints be structured?
-
-        5. Implementation details:
-        - What are the recommended frameworks or libraries for this project?
-        - Are there any specific features of the chosen technology that align well with the project requirements?
-
-        6. Data management:
-        - What type of data storage is most suitable for this project?
-        - How should the data be structured for efficient retrieval and management?
-
-        7. Security and compliance:
-        - What security measures should be implemented for this project?
-        - Are there any specific compliance requirements to consider?
-
-        8. Performance and scalability:
-        - What are the expected performance metrics for this service?
-        - How can we ensure scalability of the system?
-
-        9. Testing and validation:
-        - What types of tests should be implemented for this project?
-        - How can we validate that the service meets all requirements and standards?
-
-        10. Documentation and specifications:
-            - What should be included in the project documentation?
-            - Are there any standard tools or formats recommended for documentation in this domain?
-
-    Create a list response which containes one well-defined question for each category that will help extract 
+    Create a list response which contains one well-defined question for each category that will help extract 
     detailed information from our knowledge base to assist in creating a comprehensive requirements document.
+
     example output format: "['question1','question2','question3']"
     Use this additional context if an error exists in output: {context}
+
+    ### Inverse Prompting:
+    If your output does not include:
+    - A total of 10 distinct, well-scoped questions—one for each of the 10 categories,
+    - Output in list format exactly like: `['question1', 'question2', ...]`,
+    - No additional explanation or formatting outside the list,
+
+    Then revise your response to fully meet the expectations above.

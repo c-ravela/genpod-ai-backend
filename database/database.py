@@ -5,7 +5,7 @@ from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.orm import Session, sessionmaker
 
 from database.database_base import Base
-from utils.logs.logging_utils import logger
+from utils.logger import logger
 
 
 class Database(ABC):

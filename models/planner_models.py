@@ -1,20 +1,23 @@
 from typing import List
 
-from pydantic import BaseModel, Field, StrictBool, field_validator
+from pydantic import (BaseModel, Field, RootModel, StrictBool, field_validator,
+                      model_validator)
 
 
-class BacklogList(BaseModel):
-    backlogs: List[str] = Field(..., description="List of backlog items")
-
-    @field_validator('backlogs')
+class BacklogList(RootModel[List[str]]):
+    @field_validator('root', mode="before")
     @classmethod
-    def check_backlog_items(cls, v):
+    def check_backlogs(cls, v):
         if not isinstance(v, list):
-            raise ValueError('Backlogs must be a list')
+            raise ValueError("Input must be a list")
         for item in v:
             if not isinstance(item, str):
-                raise ValueError('Each backlog item must be a string')
+                raise ValueError("All backlog items must be strings")
         return v
+
+    def __iter__(self):
+        return iter(self.root)
+
 
 class Segregation(BaseModel):
     """

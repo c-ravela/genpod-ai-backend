@@ -1,11 +1,11 @@
 from langgraph.graph import StateGraph
 
 from agents.supervisor._internal.supervisor_state import (SupervisorInput,
-                                                          SupervisorOuptut,
+                                                          SupervisorOutput,
                                                           SupervisorState)
 from agents.supervisor._internal.supervisor_work_flow import SupervisorWorkFlow
 from core.graph import BaseGraph
-from utils.logs.logging_utils import logger
+from utils.logger import logger
 
 
 class SupervisorGraph(BaseGraph[SupervisorWorkFlow]):
@@ -36,7 +36,7 @@ class SupervisorGraph(BaseGraph[SupervisorWorkFlow]):
         Returns:
             StateGraph: A fully defined state graph for the supervisor workflow.
         """
-        state_graph = StateGraph(SupervisorState, input=SupervisorInput, output=SupervisorOuptut)
+        state_graph = StateGraph(SupervisorState, input=SupervisorInput, output=SupervisorOutput)
         team = self.work_flow.team
 
         node_mapping = {

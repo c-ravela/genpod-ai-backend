@@ -1,99 +1,123 @@
-# NOTE: `api_key` supports using environment variables as its value.
-# If a direct API key is passed, the whole string is considered the key.
-# To use an environment variable, pass the key in the format `$<env_variable_name>`.
+# -------------------------------------------------------------------
+# Genpod configuration
+# -------------------------------------------------------------------
+
+schema_version: '1.0'
 
 default:
-  # Default LLM configuration, used when agent-specific values are not set
+  # Default LLM config used when agent‑specific overrides are absent
   llm_config:
-    provider: 'openai'
-    model: 'gpt-4o-2024-08-06'
+    provider: openai
+    model: gpt-4o-2024-11-20
     config:
-      temperature: 0.3
       top_p: 0.4
       max_retries: 3
-      streaming: True
-  max_retries: 3 # Maximum retries for internal handling, not specific to any provider
-  retry_backoff: 3 # Time (in seconds) to wait before retrying a request
+      streaming: true
+  max_retries: 3               # Fallback retry count
+  retry_backoff: 3             # Fallback backoff in seconds
   max_graph_recursion_limit: 1000
 
-# Configuration for supported LLM providers and their respective models
+# Reusable Anthropic/Claude anchor for all 3.5‑based agents
+claude_base: &claude_base
+  llm_config:
+    provider: anthropic
+    model: claude-3-5-sonnet-20241022
+    config:
+      streaming: true
+
+agents:
+  supervisor:
+    description: Oversees and coordinates the task execution of other agents, ensuring efficiency and alignment.
+  architect:
+    description: Designs the high-level system and architecture, creating project requirements.
+  coder:
+    <<: *claude_base
+    description: Writes and optimizes code, focusing on clean practices and performance.
+  research:
+    description: Conducts in-depth research by aggregating and synthesizing online sources for actionable insights.
+  rag_middleware:
+    description: Mediates the RAG flow—selects the right RAG agent, forwards queries, and returns answers.
+  planner:
+    <<: *claude_base
+    description: Manages planning, timelines, and task prioritization for smooth progress.
+  tests_generator:
+    <<: *claude_base
+    description: Generates and validates test cases to ensure standards and quality checks are met.
+  reviewer:
+    description: Reviews code, suggests improvements, and ensures outputs meet quality and performance standards.
+
+rag_agents:
+  # Any number of RAG agents can be defined here and will be picked up dynamically
+  mismo-3.6-rag:
+    description: Specialized RAG agent for MISMO 3.6 standards, providing accurate, comprehensive responses.
+    collection_name: MISMO-version-3.6-docs
+    vector_database_path: <path to vector db>
+  fr_2025a_rag:
+    description: |
+      The document provides instructions and guidelines for reporting financial data, specifically related to the FR 2052a report. It covers 
+      topics such as the scope of the consolidated entity, rules of consolidation, frequency and timing of data submission, and what must be 
+      reported. It includes details on reporting inflows, handling non-performing loans, and categorizing different types of financial 
+      transactions and entities, such as retail and small business. The document also outlines specific reporting requirements for options 
+      and derivatives, as well as the treatment of encumbered assets.
+    collection_name: my_collection
+    vector_database_path: <path to vector db>
+
+max_graph_recursion_limit: 1500
+
+
 providers:
   openai:
-    name: 'openai'
     setting:
+      api_key: $OPENAI_API_KEY
       max_retries: 3
       retry_backoff: 3
-      api_key: '$OPENAI_API_KEY' # Default API key for OpenAI; used if model-specific keys are not provided
     models:
-      chatgpt_4o_latest:
-        name: 'chatgpt-4o-latest'
-        description: 'The latest version of ChatGPT, optimized for dynamic and conversational AI tasks.'
-        api_key: ''
-      gpt_4o_2024_08_06:
-        name: 'gpt-4o-2024-08-06'
-        description: 'GPT-4 optimized model from the August 2024 release.'
-        api_key: ''
-      gpt_4o_2024_05_13:
-        name: 'gpt-4o-2024-05-13'
-        description: 'May 2024 release of GPT-4 optimized for efficient text generation and multi-turn dialogue.'
-        api_key: ''
-      o1_preview_2024_09_12:
-        name: 'o1-preview-2024-09-12'
-        description: "Preview model for OpenAI's One model, released in September 2024."
-        api_key: ''
-      o1_mini_2024_09_12:
-        name: 'o1-mini-2024-09-12'
-        description: "Preview model for OpenAI's One model, released in September 2024."
-        api_key: ''
+      chatgpt-4o-latest:
+        description: The latest version of ChatGPT, optimized for dynamic and conversational AI tasks.
+        api_key: null
+      gpt-4o-2024-11-20:
+        description: GPT-4 model from the November 2024 release, offering advanced reasoning and understanding.
+        api_key: null
+      gpt-4o-2024-08-06:
+        description: GPT-4 model from the August 2024 release, optimized for efficient throughput.
+        api_key: null
+      gpt-4o-2024-05-13:
+        description: GPT-4 model from the May 2024 release, balanced for performance and context handling.
+        api_key: null
+      o1-preview-2024-09-12:
+        description: OpenAI One preview model released in September 2024, early access for emerging use cases.
+        api_key: null
+      o1-mini-2024-09-12:
+        description: Compact version of OpenAI One preview model from September 2024, optimized for low-latency.
+        api_key: null
+      gpt-3.5-turbo:
+        description: GPT-3.5 Turbo, a high-throughput model for fast conversational responses.
+        api_key: null
+      o3-mini:
+        description: Compact version of OpenAI's GPT-4 optimized for efficient inference and lower latency.
+        api_key: null
+
   ollama:
-    name: 'ollama'
     setting:
       api_key: ''
     models:
       llama3:
-        name: 'llama3'
-        description: 'Llama3 model, a high-performance open-source LLM suited for general-purpose language understanding and generation.'
-        api_key: ''
+        description: Llama3, a high-performance open-source LLM for general understanding and generation.
+        api_key: null
+
   anthropic:
-    name: 'anthropic'
     setting:
-      api_key: '$ANTHROPIC_API_KEY'
-      models:
-        claude_3_5_sonnet_20240620:
-          name: 'claude-3-5-sonnet-20240620'
-          description: ''
-          api_key: ''
-
-# Configuration for project agents and their LLM settings
-agents:
-  supervisor: 
-    description: 'Oversees and coordinates the task execution of other agents, ensuring efficiency and alignment with goals.'
-  architect:
-    llm_config:
-      provider: 'openai'
-      model: 'gpt-4o-2024-08-06'
-      config:
-        temperature: 0.5
-        max_retries: 4
-        streaming: True
-    description: 'Designs the high-level system and architecture, responsible for creating requirements for project.'
-  coder:
-    description: 'Writes and optimizes code based on the architecture, focusing on implementing functionality with clean coding practices.'
-  research:
-    description: 'Conducts in-depth research by aggregating and synthesizing information from various online sources to generate actionable insights and refined queries.'
-  rag_middleware:
-    description: 'Acts as a mediator for the Retrieval-Augmented Generation (RAG) process by maintaining a group of specialized RAG agents. Upon receiving a question, it determines the most suitable agent to address it, forwards the question, and returns the accurate answer provided.'
-  planner:
-    description: 'Manages project planning, timelines, and task prioritization, ensuring smooth progress and resource allocation.'
-  tests_generator:
-    description: 'Generates and validates test cases to ensure that code meets the required standards and passes all quality checks.'
-  reviewer:
-    description: 'Performs code reviews, suggests improvements, and ensures that all outputs meet quality and performance standards.'
-
-rag_agents:
-  mismo_3_6_rag:
-    description: "Specialized RAG agent that addresses queries related to MISMO 3.6 standards, providing accurate and comprehensive responses."
-    collection_name: "MISMO-version-3.6-docs"
-    vector_database_path: "/opt/genpod/vector_collections"
-
-max_graph_recursion_limit: 1500
+      api_key: $ANTHROPIC_API_KEY
+    models:
+      claude-3-5-sonnet-20240620:
+        description: Claude 3.5 Sonnet released June 2024, balanced performance for chat and reasoning.
+        api_key: null
+      claude-3-5-sonnet-20241022:
+        description: Claude 3.5 Sonnet updated October 2024 with improved context handling and stability.
+        api_key: null
+      claude-3-7-sonnet-20250219:
+        description: Claude 3.7 Sonnet released February 2025, enhanced reasoning and knowledge capabilities.
+        api_key: null
+      claude-instant-1.2:
+        description: Claude Instant v1.2, optimized for low-latency, high-throughput applications.
+        api_key: null

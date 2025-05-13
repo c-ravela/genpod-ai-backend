@@ -3,7 +3,7 @@ from typing import Literal
 from core.search.engines.duckduckgo.duckduckgo import duckduckgo_search
 from core.search.engines.google.google import google_search
 from models import WebSearchResults
-from utils.logs.logging_utils import logger
+from utils.logger import logger
 
 SearchEngine = Literal['google', 'duckduckgo']
 
@@ -27,7 +27,7 @@ class WebSearch:
     def search(
         self, 
         query: str, 
-        engine: SearchEngine = 'duckduckgo', 
+        engine: SearchEngine = 'google', 
         max_results: int = 5, 
         **kwargs
     ) -> WebSearchResults:

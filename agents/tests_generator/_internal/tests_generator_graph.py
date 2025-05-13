@@ -9,7 +9,7 @@ from agents.tests_generator._internal.tests_generator_state import (
 from agents.tests_generator._internal.tests_generator_work_flow import \
     TestCoderWorkFlow
 from core.graph import BaseGraph
-from utils.logs.logging_utils import logger
+from utils.logger import logger
 
 
 class TestCoderGraph(BaseGraph[TestCoderWorkFlow]):

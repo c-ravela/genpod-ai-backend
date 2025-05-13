@@ -1,0 +1,183 @@
+languages:
+  python:
+    static_analysis:
+      tool_name: semgrep
+      dockerfile: "/home/cravela/.config/genpod/sandbox/Dockerfile.python"
+      image: ""
+      working_dir: "/app"
+      command: "semgrep scan {project_directory} --verbose --config=r/all"
+      command_description: >
+        The placeholder {project_directory} will be replaced with the absolute path of the project directory.
+        This command scans the entire project for issues.
+    lint:
+      tool_name: flake8
+      dockerfile: "/home/cravela/.config/genpod/sandbox/Dockerfile.python"
+      image: ""
+      working_dir: "/app"
+      command: "flake8 {file_path}"
+      command_description: >
+        The placeholder {file_path} will be replaced with the full path to the file that needs to be linted.
+    test:
+      tool_name: pytest
+      dockerfile: "/home/cravela/.config/genpod/sandbox/Dockerfile.python"
+      image: ""
+      working_dir: "/app"
+      command: "pytest {file_path}"
+      command_description: >
+        The placeholder {file_path} will be replaced with the full path to the file or directory containing tests.
+
+  java:
+    static_analysis:
+      tool_name: semgrep
+      dockerfile: "/home/cravela/.config/genpod/sandbox/Dockerfile.java"
+      image: ""
+      working_dir: "/app"
+      command: "semgrep scan {project_directory} --verbose --config=r/all"
+      command_description: >
+        {project_directory} is substituted with the absolute path of the Java project directory.
+    lint:
+      tool_name: checkstyle
+      dockerfile: "/home/cravela/.config/genpod/sandbox/Dockerfile.java"
+      image: ""
+      working_dir: "/app"
+      command: "java -jar /opt/checkstyle-all.jar -c /google_checks.xml {file_path}"
+      command_description: >
+        {file_path} is replaced by the complete path of the Java file to be analyzed by Checkstyle.
+    test:
+      tool_name: junit
+      dockerfile: "/home/cravela/.config/genpod/sandbox/Dockerfile.java"
+      image: ""
+      working_dir: "/app"
+      command: "mvn test"
+      command_description: >
+        Runs the Maven test lifecycle, using the project's POM to execute unit tests.
+
+  javascript:
+    static_analysis:
+      tool_name: semgrep
+      dockerfile: "/home/cravela/.config/genpod/sandbox/Dockerfile.javascript"
+      image: ""
+      working_dir: "/app"
+      command: "semgrep scan {project_directory} --verbose --config=r/all"
+      command_description: >
+        {project_directory} denotes the absolute directory path of the JavaScript project to be scanned.
+    lint:
+      tool_name: eslint
+      dockerfile: "/home/cravela/.config/genpod/sandbox/Dockerfile.javascript"
+      image: ""
+      working_dir: "/app"
+      command: "eslint {file_path}"
+      command_description: >
+        {file_path} is substituted with the full path to the JavaScript file for linting.
+    test:
+      tool_name: jest
+      dockerfile: "/home/cravela/.config/genpod/sandbox/Dockerfile.javascript"
+      image: ""
+      working_dir: "/app"
+      command: "jest"
+      command_description: >
+        Executes Jest to run tests as defined in the project configuration.
+
+  cpp:
+    static_analysis:
+      tool_name: semgrep
+      dockerfile: "/home/cravela/.config/genpod/sandbox/Dockerfile.cpp"
+      image: ""
+      working_dir: "/app"
+      command: "semgrep scan {project_directory} --verbose --config=r/all"
+      command_description: >
+        {project_directory} will be replaced with the absolute path of the C++ project to be scanned.
+    lint:
+      tool_name: clang-tidy
+      dockerfile: "/home/cravela/.config/genpod/sandbox/Dockerfile.cpp"
+      image: ""
+      working_dir: "/app"
+      command: "clang-tidy {file_path}"
+      command_description: >
+        {file_path} is replaced with the full path to the C++ source file for linting.
+    test:
+      tool_name: ctest
+      dockerfile: "/home/cravela/.config/genpod/sandbox/Dockerfile.cpp"
+      image: ""
+      working_dir: "/app"
+      command: "ctest"
+      command_description: >
+        Runs the CTest test runner, assuming tests are properly configured in the C++ build system.
+
+  go:
+    static_analysis:
+      tool_name: semgrep
+      dockerfile: "/home/cravela/.config/genpod/sandbox/Dockerfile.go"
+      image: ""
+      working_dir: "/app"
+      command: "semgrep --verbose run {file_path}"
+      command_description: >
+        {file_path} is substituted with the full path of the Go file or package to be scanned.
+    lint:
+      tool_name: golint
+      dockerfile: "/home/cravela/.config/genpod/sandbox/Dockerfile.go"
+      image: ""
+      working_dir: "/app"
+      command: "golint {file_path}"
+      command_description: >
+        {file_path} will be replaced with the full path of the Go source file for lint analysis.
+    test:
+      tool_name: go test
+      dockerfile: "/home/cravela/.config/genpod/sandbox/Dockerfile.go"
+      image: ""
+      working_dir: "/app"
+      command: "go test ./..."
+      command_description: >
+        Executes 'go test' on the entire project, running all available tests.
+
+  ruby:
+    static_analysis:
+      tool_name: semgrep
+      dockerfile: "/home/cravela/.config/genpod/sandbox/Dockerfile.ruby"
+      image: ""
+      working_dir: "/app"
+      command: "semgrep scan {project_directory} --verbose --config=r/all"
+      command_description: >
+        {project_directory} is substituted with the absolute path of the Ruby project directory.
+    lint:
+      tool_name: rubocop
+      dockerfile: "/home/cravela/.config/genpod/sandbox/Dockerfile.ruby"
+      image: ""
+      working_dir: "/app"
+      command: "rubocop {file_path}"
+      command_description: >
+        {file_path} will be replaced with the full path to the Ruby file for style checking.
+    test:
+      tool_name: rspec
+      dockerfile: "/home/cravela/.config/genpod/sandbox/Dockerfile.ruby"
+      image: ""
+      working_dir: "/app"
+      command: "rspec"
+      command_description: >
+        Runs RSpec to execute the test suite, reading configurations from the project.
+
+  csharp:
+    static_analysis:
+      tool_name: semgrep
+      dockerfile: "/home/cravela/.config/genpod/sandbox/Dockerfile.csharp"
+      image: ""
+      working_dir: "/app"
+      command: "semgrep scan {project_directory} --verbose --config=r/all"
+      command_description: >
+        {project_directory} represents the absolute path to the C# project directory for scanning.
+    lint:
+      tool_name: dotnet-format
+      dockerfile: "/home/cravela/.config/genpod/sandbox/Dockerfile.csharp"
+      image: ""
+      working_dir: "/app"
+      command: "dotnet format {file_path} --verbosity diagnostic"
+      command_description: >
+        {file_path} is replaced with the full path to the project's .csproj/.sln file that should be formatted and linted.
+    test:
+      tool_name: xunit
+      dockerfile: "/home/cravela/.config/genpod/sandbox/Dockerfile.csharp"
+      image: ""
+      working_dir: "/app"
+      command: "dotnet test {file_path}"
+      command_description: >
+        {file_path} is substituted with the path to the test suite's .csproj/.sln file, triggering unit tests.

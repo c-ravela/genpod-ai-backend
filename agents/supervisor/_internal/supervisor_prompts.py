@@ -3,7 +3,7 @@ from os import getcwd, path
 from langchain_core.prompts import PromptTemplate
 
 from core.prompt import Prompt, PromptTemplateAdapter
-from utils.logs.logging_utils import logger
+from utils.logger import logger
 from utils.yaml_utils import read_yaml
 
 SUPERVISOR_PROMPTS_PATH = path.join(getcwd(), "prompts", "supervisor_prompts.yaml")

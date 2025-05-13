@@ -4,7 +4,7 @@ from sqlalchemy.exc import SQLAlchemyError
 
 from database.database import Database
 from database.entities.microservice_llm_metrics import MicroserviceLLMMetrics
-from utils.logs.logging_utils import logger
+from utils.logger import logger
 
 
 class MicroserviceLLMMetricsService:
@@ -105,14 +105,16 @@ class MicroserviceLLMMetricsService:
             logger.error(f"Error deleting microservice token metric with ID {token_metrics_id}: {e}")
             raise
 
-    def get_token_metrics_by_microservice_id(self, microservice_id: int) -> List[MicroserviceLLMMetrics]:
+    def get_token_metrics_by_microservice_id(self, microservice_id: int, project_id: int, user_id: int) -> List[MicroserviceLLMMetrics]:
         """
         Retrieves all microservice token metrics for a specific microservice.
         """
         logger.info(f"Retrieving microservice token metrics for microservice ID: {microservice_id}")
         try:
             token_metrics = self.db_session.query(MicroserviceLLMMetrics).filter(
-                MicroserviceLLMMetrics.microservice_id == microservice_id
+                MicroserviceLLMMetrics.microservice_id == microservice_id,
+                MicroserviceLLMMetrics.project_id == project_id,
+                MicroserviceLLMMetrics.created_by == user_id
             ).all()
             logger.info(f"Retrieved {len(token_metrics)} token metrics for microservice ID {microservice_id}.")
             return token_metrics

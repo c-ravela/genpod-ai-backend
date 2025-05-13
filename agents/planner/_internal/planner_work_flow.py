@@ -14,382 +14,657 @@ from core.decorators import (handle_errors_and_reset, record_node,
 from core.workflow import BaseWorkFlow
 from llms.llm import LLM
 from models.constants import PStatus, Status
-from models.models import PlannedIssue, PlannedTask, PlannedTaskQueue
+from models.models import PlannedIssue, PlannedTask
 from models.planner_models import BacklogList, Segregation
 from tools.file_system import FS
-from utils.logs.logging_utils import logger
+from utils.logger import logger
 
 
 class PlannerWorkFlow(BaseWorkFlow[PlannerPrompts]):
+    """
+    A workflow class to manage the planning process for tasks and issues.
+
+    This class directs the flow of planning by routing to specific nodes based on the current planner state,
+    invoking language model prompts, and updating the state accordingly.
+    """
 
     def __init__(
         self,
         agent_id: str,
         agent_name: str,
         llm: LLM,
-        use_rag = False
+        use_rag: bool = False
     ):
+        """
+        Initialize the PlannerWorkFlow.
+
+        Args:
+            agent_id (str): Unique identifier for the agent.
+            agent_name (str): Name of the agent.
+            llm (LLM): Language model instance used for generating prompts.
+            use_rag (bool): Flag to determine if Retrieval-Augmented Generation is enabled.
+        """
         super().__init__(agent_id, agent_name, PlannerPrompts(use_rag), llm, use_rag)
         self.file_count = 0
 
     @route_on_errors
     def router(self, state: PlannerState) -> str:
         """
-        Routes the planner workflow to the appropriate node based on the current state.
+        Determine the next workflow node based on the current planner state.
 
-        The router inspects the operational mode and current mode stage within the PlannerState,
-        and determines the next node in the workflow. The routing logic is as follows:
-
-        For TASK_PLANNING:
-        - If the current mode stage is TASK_BREAKDOWN, route to the TASK_BREAKDOWN node.
-        - If the current mode stage is REQUIREMENTS_ANALYZER, route to the REQUIREMENTS_ANALYZER node.
-        - If the current mode stage is FINISHED (using IssuePlanningStage.FINISHED in this branch), route to the EXIT node.
-
-        For ISSUE_PLANNING:
-        - If the current mode stage is ISSUE_BREAKDOWN, route to the ISSUE_BREAKDOWN node.
-        - If the current mode stage is FINISHED, route to the EXIT node.
-
-        If an unexpected operational mode or mode stage is encountered, a warning is logged and
-        the router defaults to the EXIT node.
+        This method inspects the planner's operational_mode and current_mode_stage to decide which node should execute next.
+        The decision logic is:
+          - For TASK_PLANNING mode:
+              • If current_mode_stage is DELIVERABLE_BREAKDOWN, route to the TASK_DELIVERABLE_BREAKDOWN node.
+              • If current_mode_stage is REQUIREMENTS_ANALYSIS, route to the REQUIREMENTS_ANALYSIS node.
+              • If current_mode_stage is TASK_WORKPACKAGE_UPDATE, route to the TASK_WORKPACKAGE_UPDATE node.
+              • If current_mode_stage is FINISHED (using IssuePlanningStage for fallback), route to the EXIT node.
+          - For ISSUE_PLANNING mode:
+              • If current_mode_stage is ISSUE_BREAKDOWN, route to the ISSUE_BREAKDOWN node.
+              • If current_mode_stage is ISSUE_WORKPACKAGE_UPDATE, route to the ISSUE_WORKPACKAGE_UPDATE node.
+              • If current_mode_stage is FINISHED, route to the EXIT node.
+          - For any unknown or unmatched stage, a warning is logged and the workflow defaults to the EXIT node.
 
         Args:
-            state (PlannerState): The current state of the planner, which includes the operational mode
-                                    and the current mode stage.
+            state (PlannerState): The current planner state, including operational_mode and current_mode_stage.
 
         Returns:
-            str: The string representation of the next node in the planner workflow.
+            str: The identifier of the next node to execute in the workflow.
         """
-        logger.debug("Routing invoked with operational_mode: %s and current_mode_stage: %s",
-                    state.operational_mode, state.current_mode_stage)
-                    
+        func_name = "router"
+        logger.debug(f"[{func_name}] Routing invoked with operational_mode: {state.operational_mode} and current_mode_stage: {state.current_mode_stage}")      
+            
         if state.operational_mode == PlannerMode.TASK_PLANNING:
-            logger.debug("Operational mode set to TASK_PLANNING")
-            if state.current_mode_stage == TaskPlanningStage.TASK_BREAKDOWN:
-                logger.debug("Current stage is TASK_BREAKDOWN; routing to TASK_BREAKDOWN node")
-                return str(PlannerNodeEnum.TASK_BREAKDOWN)
-            elif state.current_mode_stage == TaskPlanningStage.REQUIREMENTS_ANALYZER:
-                logger.debug("Current stage is REQUIREMENTS_ANALYZER; routing to REQUIREMENTS_ANALYZER node")
-                return str(PlannerNodeEnum.REQUIREMENTS_ANALYZER)
+            logger.debug(f"{func_name}: Detected TASK_PLANNING mode.")
+            if state.current_mode_stage == TaskPlanningStage.DELIVERABLE_BREAKDOWN:
+                logger.debug(f"{func_name}: Stage is DELIVERABLE_BREAKDOWN; routing to TASK_DELIVERABLE_BREAKDOWN node.")
+                return str(PlannerNodeEnum.TASK_DELIVERABLE_BREAKDOWN)
+            elif state.current_mode_stage == TaskPlanningStage.REQUIREMENTS_ANALYSIS:
+                logger.debug(f"{func_name}: Stage is REQUIREMENTS_ANALYSIS; routing to REQUIREMENTS_ANALYSIS node.")
+                return str(PlannerNodeEnum.REQUIREMENTS_ANALYSIS)
+            elif state.current_mode_stage == TaskPlanningStage.TASK_WORKPACKAGE_UPDATE:
+                logger.debug(f"{func_name}: Stage is TASK_WORKPACKAGE_UPDATE; routing to TASK_WORKPACKAGE_UPDATE node.")
+                return str(PlannerNodeEnum.TASK_WORKPACKAGE_UPDATE)
             elif state.current_mode_stage == IssuePlanningStage.FINISHED:
-                logger.debug("Current stage is FINISHED (from IssuePlanningStage); routing to EXIT node")
+                logger.debug(f"{func_name}: Stage is FINISHED; routing to EXIT node.")
                 return str(PlannerNodeEnum.EXIT)
             else:
-                logger.warning("Unexpected Task Planning stage encountered: %s. Defaulting to EXIT node.",
-                            state.current_mode_stage)
+                logger.warning(f"{func_name}: Unrecognized Task Planning stage: {state.current_mode_stage}. Defaulting to EXIT node.")
         elif state.operational_mode == PlannerMode.ISSUE_PLANNING:
-            logger.debug("Operational mode set to ISSUE_PLANNING")
+            logger.debug(f"{func_name}: Detected ISSUE_PLANNING mode.")
             if state.current_mode_stage == IssuePlanningStage.ISSUE_BREAKDOWN:
-                logger.debug("Current stage is ISSUE_BREAKDOWN; routing to ISSUE_BREAKDOWN node")
+                logger.debug(f"{func_name}: Stage is ISSUE_BREAKDOWN; routing to ISSUE_BREAKDOWN node.")
                 return str(PlannerNodeEnum.ISSUE_BREAKDOWN)
+            elif state.current_mode_stage == IssuePlanningStage.ISSUE_WORKPACKAGE_UPDATE:
+                logger.debug(f"{func_name}: Stage is ISSUE_WORKPACKAGE_UPDATE; routing to ISSUE_WORKPACKAGE_UPDATE node.")
+                return str(PlannerNodeEnum.ISSUE_WORKPACKAGE_UPDATE)
             elif state.current_mode_stage == IssuePlanningStage.FINISHED:
-                logger.debug("Current stage is FINISHED; routing to EXIT node")
+                logger.debug(f"{func_name}: Stage is FINISHED; routing to EXIT node.")
                 return str(PlannerNodeEnum.EXIT)
             else:
-                logger.warning("Unexpected Issue Planning stage encountered: %s. Defaulting to EXIT node.",
-                            state.current_mode_stage)
-
-        logger.debug("No matching stage found; routing to EXIT node by default")
+                logger.warning(f"{func_name}: Unrecognized Issue Planning stage: {state.current_mode_stage}. Defaulting to EXIT node.")
+        else:
+            logger.warning(f"{func_name}: Unknown operational mode: {state.operational_mode}. Defaulting to EXIT node.")
+        
+        logger.debug(f"{func_name}: No matching stage found; defaulting to EXIT node.")
         return str(PlannerNodeEnum.EXIT)
 
     @record_node(PlannerNodeEnum.ENTRY)
     def entry_node(self, state: PlannerState) -> PlannerState:
         """
-        Entry node for the Planner Workflow.
+        Initialize the planning process by setting the appropriate operational mode and stage.
 
-        This method initializes the planner's operational mode and current mode stage based on the
-        project's status and the current task's status. Specifically:
-
-        - For a project in the EXECUTING status:
-            - If the current task is NEW, the planner switches to TASK_PLANNING mode and sets the stage to TASK_BREAKDOWN.
-            - Otherwise, a warning is logged indicating an unexpected task status.
-        
-        - For a project in the RESOLVING status:
-            - If the current task is NEW, the planner switches to ISSUE_PLANNING mode and sets the stage to ISSUE_BREAKDOWN.
-            - Otherwise, a warning is logged indicating an unexpected task status.
-        
-        - For any other project status, a warning is logged.
+        This entry node examines the current project and task/issue statuses to determine whether to start task planning
+        or issue planning. It verifies if the current task or issue has been processed before by checking processed_item_ids,
+        and then sets the operational mode and stage accordingly:
+          - For a project in PLANNING status:
+              • If the current task is NEW and unprocessed, clear existing planned tasks, set mode to TASK_PLANNING,
+                set stage to DELIVERABLE_BREAKDOWN, and add the task ID to processed_item_ids.
+              • If the task has been processed before, set the stage to TASK_WORKPACKAGE_UPDATE.
+          - For a project in RESOLVING status:
+              • If the current issue is NEW and unprocessed, clear existing planned issues, set mode to ISSUE_PLANNING,
+                set stage to ISSUE_BREAKDOWN, and add the issue ID to processed_item_ids.
+              • If the issue has been processed before, set the stage to ISSUE_WORKPACKAGE_UPDATE.
+          - For any other project status, set the operational mode to FINISHED.
 
         Args:
-            state (PlannerState): The current state of the planner, including project and task statuses.
+            state (PlannerState): The current state including project status, task/issue status, and processed item IDs.
 
         Returns:
-            PlannerState: The updated planner state with the operational mode and mode stage set accordingly.
+            PlannerState: The updated planner state with operational mode and stage initialized.
         """
-        logger.debug("Entering entry_node with project_status: %s and task_status: %s",
-                    state.project_status, state.current_task.task_status)
+        func_name = "entry_node"
+        logger.debug(f"{func_name}: Entering with project_status: {state.project_status} and task_status: {state.current_task.task_status}")
 
-        if state.project_status == PStatus.EXECUTING:
-            logger.debug("Project status is EXECUTING.")
+        if state.project_status == PStatus.PLANNING:
+            logger.debug(f"[{func_name}] Project status is {PStatus.PLANNING}.")
             if state.current_task.task_status == Status.NEW:
-                if state.task_to_file_map.get(state.current_task.task_id):
-                    logger.debug("Existing work packages found for current task (ID: %s). Deleting outdated work packages.",
-                                state.current_task.task_id)
-                    self._delete_work_packages_for_task(state, state.project_directory, state.current_task.task_id)
-
-                logger.debug("Current task status is NEW. Preparing for task planning: Clearing planned tasks, setting operational mode to TASK_PLANNING, and stage to TASK_BREAKDOWN.")
-                state.planned_tasks.clear()
-                state.operational_mode = PlannerMode.TASK_PLANNING
-                state.current_mode_stage = TaskPlanningStage.TASK_BREAKDOWN
-                logger.info("Operational mode updated to TASK_PLANNING with stage TASK_BREAKDOWN. Planned tasks queue cleared.")
+                if state.current_task.task_id in state.processed_item_ids:
+                    logger.info(f"[{func_name}] Task with ID {state.current_task.task_id} has been processed previously. Marking for update.")
+                    state.operational_mode = PlannerMode.TASK_PLANNING
+                    state.current_mode_stage = TaskPlanningStage.TASK_WORKPACKAGE_UPDATE
+                else:
+                    logger.debug(f"[{func_name}] Current task is NEW and unprocessed. Preparing for task planning.")
+                    state.planned_tasks.clear()
+                    state.operational_mode = PlannerMode.TASK_PLANNING
+                    state.current_mode_stage = TaskPlanningStage.DELIVERABLE_BREAKDOWN
+                    state.processed_item_ids.add(state.current_task.task_id)
+                    logger.info(f"[{func_name}] Operational mode set to {PlannerMode.TASK_PLANNING} with stage {TaskPlanningStage.DELIVERABLE_BREAKDOWN}. Added task ID {state.current_task.task_id} to processed_item_ids and cleared planned tasks queue.")
             else:
-                logger.warning("Unexpected current task status '%s' for a project in EXECUTING status. No operational mode change performed.",
-                            state.current_task.task_status)
+                state.operational_mode = PlannerMode.FINISHED
+                logger.warning(f"[{func_name}] Unexpected task status '{state.current_task.task_status}' for a project in {PStatus.EXECUTING} status. No mode change performed.")
         elif state.project_status == PStatus.RESOLVING:
-            logger.debug("Project status is RESOLVING.")
+            logger.debug(f"[{func_name}] Project status is {PStatus.RESOLVING}.")
             if state.current_issue.issue_status == Status.NEW:
-                logger.debug("Current issue status is NEW. Preparing for issue planning: Clearing planned issues, setting operational mode to ISSUE_PLANNING, and stage to ISSUE_BREAKDOWN.")
-                state.planned_issues.clear()
-                state.operational_mode = PlannerMode.ISSUE_PLANNING
-                state.current_mode_stage = IssuePlanningStage.ISSUE_BREAKDOWN
-                logger.info("Operational mode updated to ISSUE_PLANNING with stage ISSUE_BREAKDOWN. Planned issues queue cleared.")
+                if state.current_issue.issue_id in state.processed_item_ids:
+                    logger.info(f"[{func_name}] Issue with ID {state.current_issue.issue_id} has been processed previously. Marking for update.")
+                    state.operational_mode = PlannerMode.ISSUE_PLANNING
+                    state.current_mode_stage = IssuePlanningStage.ISSUE_WORKPACKAGE_UPDATE
+                else:
+                    logger.debug(f"[{func_name}] Current issue is NEW and unprocessed. Preparing for issue planning.")
+                    state.planned_issues.clear()
+                    state.operational_mode = PlannerMode.ISSUE_PLANNING
+                    state.current_mode_stage = IssuePlanningStage.ISSUE_BREAKDOWN
+                    state.processed_item_ids.add(state.current_issue.issue_id)
+                    logger.info(f"[{func_name}] Operational mode set to {PlannerMode.ISSUE_PLANNING} with stage {IssuePlanningStage.ISSUE_BREAKDOWN}. Added issue ID {state.current_issue.issue_id} to processed_item_ids and cleared planned issues queue.")
             else:
-                logger.warning("Unexpected current issue status '%s' for a project in RESOLVING status. No operational mode change performed.",
-                            state.current_issue.issue_status)
+                state.operational_mode = PlannerMode.FINISHED
+                logger.warning(f"[{func_name}] Unexpected issue status '{state.current_issue.issue_status}' for a project in {PStatus.RESOLVING} status. No mode change performed.")
         else:
             state.operational_mode = PlannerMode.FINISHED
-            logger.warning("Unexpected project status '%s'. Operational mode set to FINISHED; no changes made to mode stage.",
-                        state.project_status)
+            logger.warning(f"[{func_name}] Unexpected project status '{state.project_status}'. Operational mode set to {PlannerMode.FINISHED}; no changes made to the stage.")
 
-        logger.debug("Exiting entry_node with operational_mode: %s and current_mode_stage: %s",
-                    state.operational_mode, state.current_mode_stage)
+        logger.debug(f"[{func_name}] Exiting with operational_mode: {state.operational_mode} and current_mode_stage: {state.current_mode_stage}")
         return state
 
-    @record_node(PlannerNodeEnum.TASK_BREAKDOWN)
+    @record_node(PlannerNodeEnum.TASK_DELIVERABLE_BREAKDOWN)
     @handle_errors_and_reset
     def task_breakdown_node(self, state: PlannerState) -> PlannerState:
         """
-        Process the task breakdown stage of the planning workflow.
+        Execute the deliverable breakdown stage to generate backlog items for each task deliverable.
 
-        In this node, the planner invokes a language model (LLM) using the task breakdown prompt,
-        passing in the current task description, requirements document (formatted as Markdown), any
-        additional information, and feedback from previous errors. The LLM's response is expected to
-        be a string representation of a list of backlog items. This response is parsed and used to update
-        the state's planned backlogs. After processing the LLM response, the state is advanced to the
-        REQUIREMENTS_ANALYZER stage.
+        This node processes each deliverable in the state's deliverable_list by:
+          1. Sending a task breakdown prompt to the language model with the deliverable description, the markdown-formatted
+             requirements document, additional context, and any previous error feedback.
+          2. Expecting a JSON-formatted response representing a list of backlog items.
+          3. Parsing the response and wrapping it in a BacklogList.
+          4. Appending an entry to the state's planned_backlogs with the deliverable ID, description, and generated backlogs.
 
-        Args:
-            state (PlannerState): The current state of the planner, which includes details about the current task,
-                                    requirements, and any error messages.
-
-        Returns:
-            PlannerState: The updated planner state with the planned backlogs and the current mode stage set to
-                        REQUIREMENTS_ANALYZER.
-        """
-        logger.debug("Entering task_breakdown_node with task description: %s", state.current_task.description)
-    
-        llm_response = self.invoke(
-            self.prompts.task_breakdown_prompt,
-            {
-                "deliverable": state.current_task.description,
-                "context": f"{state.requirements_document.to_markdown()}\n\n{state.additional_information}",
-                "feedback": state.error_message
-            }, 'string'
-        )
-        logger.debug("Received LLM response: %s", llm_response.response)
-
-        backlogs_list = ast.literal_eval(llm_response.response)
-        logger.debug("Parsed LLM response into backlogs_list: %s", backlogs_list)
-
-        state.planned_backlogs = BacklogList(backlogs=backlogs_list).backlogs
-        logger.info("Updated planned_backlogs in state.")
-
-        state.current_mode_stage = TaskPlanningStage.REQUIREMENTS_ANALYZER
-        logger.debug("Updated current_mode_stage to: %s", state.current_mode_stage)
-
-        logger.debug("Exiting task_breakdown_node with updated state.")
-        return state
-
-    @record_node(PlannerNodeEnum.REQUIREMENTS_ANALYZER)
-    @handle_errors_and_reset
-    def requirements_analyzer_node(self, state: PlannerState) -> PlannerState:
-        """
-        Analyze detailed requirements for each backlog item and update the planner state with planned tasks.
-
-        For each backlog item in the state's planned backlogs, this node:
-        1. Invokes the detailed requirements prompt via the language model (LLM) to gather additional
-            information on the task.
-        2. Cleans and parses the LLM's JSON response.
-        3. Determines if function generation is required for the given backlog using the _task_segregation method.
-        4. Creates a new PlannedTask using the parsed details and augments its description with the parsed
-            response along with task identifiers.
-        5. Adds the newly created PlannedTask to the state's planned tasks queue.
-
-        After processing all backlog items, the method:
-        - Writes the planned tasks (work packages) to files.
-        - Updates the state's file count with the total number of files written.
-        - Transitions the state's current mode stage to FINISHED.
+        After all deliverables are processed, the node updates the stage to REQUIREMENTS_ANALYSIS.
 
         Args:
-            state (PlannerState): The current planner state containing the planned backlogs, task details, and other relevant information.
+            state (PlannerState): The current state containing the deliverable queue, requirements document, and context.
 
         Returns:
-            PlannerState: The updated planner state including the newly added planned tasks and file count.
+            PlannerState: The updated state with planned_backlogs populated and stage set to REQUIREMENTS_ANALYSIS.
         """
-        logger.debug("Entering requirements_analyzer_node with %d planned backlog item(s).", len(state.planned_backlogs))
-      
-        for backlog in state.planned_backlogs:
-            logger.debug("Processing backlog item: '%s'", backlog)
-            
-            llm_response = self.invoke(
-                self.prompts.detailed_requirements_prompt,
+        func_name = "task_breakdown_node"
+        logger.debug(f"[{func_name}] Entering: Starting to process deliverable queue.")
+
+        while state.deliverable_list.has_pending_items():
+            deliverable = state.deliverable_list.get_next_item()
+            logger.debug(f"[{func_name}] Processing deliverable with task_id: {deliverable.task_id} and description: {deliverable.description}")
+
+            llm_output = self.invoke(
+                self.prompts.task_breakdown_prompt,
                 {
-                    'backlog': backlog,
-                    'deliverable': state.current_task.description,
+                    'deliverable': deliverable.description,
                     'context': f"{state.requirements_document.to_markdown()}\n\n{state.additional_information}",
                     'feedback': state.error_message
                 },
                 'string'
             )
-            logger.debug("Received LLM response for backlog '%s': %s", backlog, llm_response.response)
-        
+            logger.debug(f"[{func_name}] LLM response for deliverable {deliverable.task_id}: {llm_output.response}")
 
-            cleaned_response = self._clean_json_response(llm_response.response)
-            logger.debug("Cleaned LLM response for backlog '%s': %s", backlog, cleaned_response)
-        
-            parsed_response: dict = json.loads(cleaned_response)
-            logger.debug("Parsed response for backlog '%s': %s", backlog, parsed_response)
+            backlogs_list = ast.literal_eval(llm_output.response)
+            logger.debug(f"[{func_name}] Parsed backlog items for deliverable {deliverable.task_id}: {backlogs_list}")
 
-            is_function_generation_required = self._task_segregation(backlog, parsed_response)
-            logger.debug("Function generation required for backlog '%s': %s", backlog, is_function_generation_required)
+            state.planned_backlogs.append({
+                'deliverable_id': deliverable.task_id,
+                'deliverable_description': deliverable.description,
+                'backlogs': BacklogList(backlogs_list)
+            })
+            logger.info(f"[{func_name}] Added planned backlog for deliverable {deliverable.task_id}.")
 
-            planned_task = PlannedTask(
-                parent_task_id=state.current_task.task_id,
-                task_status=Status.NEW,
-                is_function_generation_required=is_function_generation_required
-            )
-            logger.debug("Created PlannedTask with task ID: %s", planned_task.task_id)
-        
-            task_details = {
-                "task_id": planned_task.task_id,
-                "work_package_name": backlog,
-                **parsed_response
-            }
-            planned_task.description = json.dumps(task_details)
-            logger.debug("Updated PlannedTask description for backlog '%s': %s", backlog, planned_task.description)
-        
-            state.planned_tasks.add_item(planned_task)
-            logger.info("Added PlannedTask for backlog '%s' with task ID: %s", backlog, planned_task.task_id)
+        state.current_mode_stage = TaskPlanningStage.REQUIREMENTS_ANALYSIS
+        logger.debug(f"[{func_name}] Updated current_mode_stage to {TaskPlanningStage.REQUIREMENTS_ANALYSIS}.")
 
-        files_written, total_files_written = self._write_workpackages_to_files(state, state.project_directory, state.planned_tasks)
-        state.file_count = total_files_written
-        logger.info("Work packages written to files. Files written: %d, Total files: %d", files_written, total_files_written)
+        logger.debug(f"[{func_name}] Exiting with updated state.")
+        return state
+
+    @record_node(PlannerNodeEnum.REQUIREMENTS_ANALYSIS)
+    @handle_errors_and_reset
+    def requirements_analyzer_node(self, state: PlannerState) -> PlannerState:
+        """
+        Analyze detailed requirements for each backlog item and generate planned tasks.
+
+        This node iterates over each entry in planned_backlogs. For every backlog item within each deliverable:
+          1. It invokes a detailed requirements prompt with the backlog item, deliverable description, markdown-formatted
+             requirements, additional context, and any error feedback.
+          2. The JSON response is cleaned, parsed, and merged with the deliverable details.
+          3. It determines if function creation is required by invoking the _task_segregation method.
+          4. Constructs a new PlannedTask with the parent_task_id set to the deliverable ID.
+          5. Appends the new PlannedTask to the state's planned_tasks and writes the corresponding work package file.
+          6. Finally, it marks the processed deliverable as DONE in the deliverable_list.
+
+        After processing, the node updates the stage to FINISHED.
+
+        Args:
+            state (PlannerState): The current state with planned_backlogs, requirements, additional context, and deliverable_list.
+
+        Returns:
+            PlannerState: The updated state with new PlannedTasks, work package files stored, and deliverables marked as DONE.
+        """
+        func_name = "requirements_analyzer_node"
+        logger.debug(f"{func_name}: Beginning detailed requirements analysis for {len(state.planned_backlogs)} backlog entries.")
+
+        for backlog_info in state.planned_backlogs:
+            deliverable_id = backlog_info.get("deliverable_id")
+            deliverable_description = backlog_info.get("deliverable_description", "")
+            backlog_list = backlog_info.get("backlogs")  # Expected to be an instance of BacklogList
+
+            logger.debug(f"[{func_name}] Processing deliverable '{deliverable_id}' with description: {deliverable_description}")
+
+            for backlog in backlog_list:
+                logger.debug(f"[{func_name}] Processing backlog item for deliverable '{deliverable_id}': {backlog}")
+
+                llm_output = self.invoke(
+                    self.prompts.detailed_requirements_prompt,
+                    {
+                        "backlog": backlog,
+                        "deliverable": deliverable_description,
+                        "context": f"{state.requirements_document.to_markdown()}\n\n{state.additional_information}",
+                        "feedback": state.error_message or ""
+                    },
+                    "string"
+                )
+                logger.debug(f"[{func_name}] Received LLM response for backlog '{backlog}': {llm_output.response}")
+
+                cleaned_response = self._clean_json_response(llm_output.response)
+                logger.debug(f"[{func_name}] Cleaned response for backlog '{backlog}': {cleaned_response}")
+
+                parsed_response: dict = json.loads(cleaned_response)
+                logger.debug(f"[{func_name}] Parsed response for backlog '{backlog}': {parsed_response}")
+
+                is_function_generation_required = self._task_segregation(backlog, parsed_response)
+                logger.debug(f"[{func_name}] Function generation required for backlog '{backlog}': {is_function_generation_required}")
+
+                planned_task = PlannedTask(
+                    parent_task_id=deliverable_id,
+                    task_status=Status.NEW,
+                    is_function_generation_required=is_function_generation_required
+                )
+                logger.debug(f"[{func_name}] Created PlannedTask with task ID: {planned_task.task_id} for deliverable '{deliverable_id}'")
+
+                task_details = {
+                    "parent_task_id": deliverable_id,
+                    "task_id": planned_task.task_id,
+                    "work_package_name": backlog,
+                    "deliverable_description": deliverable_description,
+                    **parsed_response
+                }
+                planned_task.description = json.dumps(task_details)
+                logger.debug(f"[{func_name}] Set PlannedTask description for backlog '{backlog}': {planned_task.description}")
+
+                state.planned_tasks.add_item(planned_task)
+                logger.info(f"[{func_name}] Added PlannedTask for deliverable '{deliverable_id}' with task ID: {planned_task.task_id}")
+
+                self._write_workpackage_file(state, planned_task, package_type="task")
+
+            for deliverable in state.deliverable_list.items:
+                if deliverable.task_id == deliverable_id:
+                    deliverable.task_status = Status.DONE
+                    logger.info(f"[{func_name}] Marked deliverable {deliverable.task_id} as DONE.")
 
         state.current_mode_stage = TaskPlanningStage.FINISHED
-        logger.debug("Transitioned current_mode_stage to FINISHED")
-        
-        logger.debug("Exiting requirements_analyzer_node")
+        logger.debug(f"[{func_name}] Set current_mode_stage to {TaskPlanningStage.FINISHED}.")
+
+        logger.debug(f"[{func_name}] Exiting with updated state.")
+        return state
+
+    @record_node(PlannerNodeEnum.TASK_WORKPACKAGE_UPDATE)
+    @handle_errors_and_reset
+    def task_workpackage_update_node(self, state: PlannerState) -> PlannerState:
+        """
+        Update task work packages based on human-provided feedback.
+
+        This node processes update instructions extracted from human feedback to modify existing task work packages.
+        The process includes:
+          1. Extracting update instructions from human feedback via the LLM.
+          2. Identifying target PlannedTask objects in the state's planned_tasks based on the provided target_id.
+          3. For each matching PlannedTask, invoking an update prompt with current task details and update changes,
+             then updating the task description with the returned JSON response.
+          4. Updating the corresponding work package file on disk.
+          5. Marking associated deliverables in deliverable_list as DONE after updates.
+
+        Args:
+            state (PlannerState): The current state containing human feedback, planned_tasks, and project directory.
+
+        Returns:
+            PlannerState: The updated state with revised PlannedTask descriptions, updated files, and deliverable statuses set to DONE.
+        """
+        func_name = "task_workpackage_update_node"
+        logger.debug(f"[{func_name}] Entering update process with human feedback: {state.human_feedback}")
+    
+        # Step 1: Extract update instructions.
+        extraction_response = self.invoke(
+            self.prompts.workpackage_update_extraction_prompt,
+            {"feedback": state.human_feedback},
+            "json"
+        )
+        update_instructions = ast.literal_eval(extraction_response.response)
+        logger.debug(f"[{func_name}] Extracted update instructions: {update_instructions}")
+
+        # Step 2: Process each update instruction.
+        for instruction in update_instructions:
+            target_id = instruction.get("target_id")
+            update_changes = instruction.get("update_changes")
+            if not target_id or not update_changes:
+                logger.warning(f"[{func_name}] Incomplete update instruction: {instruction}")
+                continue
+
+            logger.debug(f"[{func_name}] Processing update for target_id: {target_id} with changes: {update_changes}")
+
+            # Identify tasks to update.
+            tasks_to_update = [task for task in state.planned_tasks.items 
+                            if task.parent_task_id == target_id or task.task_id == target_id]
+            if not tasks_to_update:
+                logger.warning(f"[{func_name}] No PlannedTask found for target_id: {target_id}")
+                continue
+
+            # Step 3: Update each targeted PlannedTask.
+            for task in tasks_to_update:
+                logger.debug(f"[{func_name}] Updating PlannedTask with task_id: {task.task_id}")
+                update_prompt_input = {
+                    "current_work_package": task.description,
+                    "update_changes": update_changes
+                }
+                update_response = self.invoke(
+                    self.prompts.workpackage_update_prompt,
+                    update_prompt_input,
+                    "json"
+                )
+                logger.debug(f"[{func_name}] Received update response for task {task.task_id}: {update_response.response}")
+
+                updated_details = update_response.response
+                logger.debug(f"[{func_name}] Updated details for task {task.task_id}: {updated_details}")
+
+                task.description = json.dumps(updated_details)
+                logger.info(f"[{func_name}] Updated PlannedTask {task.task_id} description.")
+
+                # Step 4: Update the file on disk in place using the helper.
+                self._update_workpackage_file(task, state, package_type="task", details=updated_details)
+                logger.info(f"[{func_name}] Updated file on disk for task {task.task_id}.")
+
+        updated_deliverable_ids = set()
+        for instruction in update_instructions:
+            target_id = instruction.get("target_id")
+            if not target_id:
+                continue
+            # First, check if target_id matches a deliverable in the deliverable_list.
+            deliverable_found = False
+            for deliverable in state.deliverable_list.items:
+                if deliverable.task_id == target_id:
+                    updated_deliverable_ids.add(deliverable.task_id)
+                    deliverable_found = True
+                    break
+            # If not, assume target_id is a PlannedTask id; find its parent_task_id.
+            if not deliverable_found:
+                for task in state.planned_tasks.items:
+                    if task.task_id == target_id:
+                        updated_deliverable_ids.add(task.parent_task_id)
+                        break
+
+        for d_id in updated_deliverable_ids:
+            for deliverable in state.deliverable_list.items:
+                if deliverable.task_id == d_id:
+                    deliverable.task_status = Status.DONE
+                    logger.info(f"[{func_name}] Marked deliverable {d_id} as DONE due to update instruction.")
+
+        state.current_mode_stage = TaskPlanningStage.FINISHED
+        logger.debug(f"[{func_name}] Update process completed. Current mode stage set to {TaskPlanningStage.FINISHED}.")
         return state
 
     @record_node(PlannerNodeEnum.ISSUE_BREAKDOWN)
     @handle_errors_and_reset
     def issues_preparation_node(self, state: PlannerState) -> PlannerState:
         """
-        Prepare issues by segregating issue details and generating planned issues.
+        Process the issue breakdown stage to generate planned issues.
 
-        This node processes the current issue by:
-        1. Reading the file content from the current issue's file path.
-        2. Invoking the language model (LLM) using the issues segregation prompt with the issue details
-            and file content. The LLM response is validated against the Segregation model.
-        3. Creating a new PlannedIssue using the current issue's data combined with the LLM's validated response.
-        4. Adding the newly created PlannedIssue to the state's collection of planned issues.
+        This node iterates over each issue in the state's issue_list by:
+          1. Reading the file content of the issue.
+          2. Invoking the issues segregation prompt via the LLM with issue details, file content, and additional context.
+          3. Validating and parsing the LLM response using the Segregation model.
+          4. Creating a new PlannedIssue using the original issue data combined with the validated response.
+          5. Adding the new PlannedIssue to the planned_issues queue.
+          6. Writing the issue work package file to disk.
+          7. Marking each processed issue as DONE.
+          8. Updating the stage to FINISHED.
 
         Args:
-            state (PlannerState): The current state of the planner, which includes the current issue.
+            state (PlannerState): The current state containing issue_list, requirements, additional context, and project directory.
 
         Returns:
-            PlannerState: The updated state with the new planned issue added.
+            PlannerState: The updated state with new PlannedIssue entries, issues marked as DONE, and stage set to FINISHED.
         """
-        logger.debug("Entering issues_preparation_node for issue_id: %s", state.current_issue.issue_id)
+        func_name = "issues_preparation_node"
+        logger.debug(f"[{func_name}] Entering. Processing {len(state.issue_list)} issues from issue_list.")
 
-        file_content = FS.read_file(state.current_issue.file_path)
-        logger.debug("Read file content from %s", state.current_issue.file_path)
-        
-        llm_output = self.invoke_with_pydantic_model(
-            self.prompts.issues_segregation_prompt,
-            {
-                "issue_details": state.current_issue.issue_details(),
-                "file_content": file_content
-            },
-            Segregation
-        )
-        logger.debug("LLM output received for issue_id %s: %s", state.current_issue.issue_id, llm_output.response)
-    
-        validated_response = llm_output.response
-        logger.debug("Validated response: %s", validated_response)
-    
-        planned_issue = PlannedIssue(
-            parent_id=state.current_issue.issue_id,
-            status=Status.NEW,
-            file_path=state.current_issue.file_path,
-            line_number=state.current_issue.line_number,
-            description=state.current_issue.description,
-            suggestions=state.current_issue.suggestions,
-            is_function_generation_required=validated_response.requires_function_creation
-        )
-        logger.info("Created PlannedIssue for issue_id %s with status %s", state.current_issue.issue_id, planned_issue.status)
-    
-        state.planned_issues.add_item(planned_issue)
-        logger.info("Added PlannedIssue with parent_id %s to planned issues", planned_issue.parent_id)
-        
+        while state.issue_list.has_pending_items():
+            issue = state.issue_list.get_next_item()
+            file_path = issue.file_path
+
+            if not file_path or not os.path.isfile(file_path):
+                reason = "missing" if not file_path else "not a valid file"
+                issue.issue_status = Status.ABANDONED
+                logger.warning(
+                    f"[{func_name}] Abandoning issue {issue.issue_id}: {reason} '{file_path}'"
+                )
+                continue
+
+            try:
+                file_content = FS.read_file(file_path)
+            except Exception as e:
+                issue.issue_status = Status.ABANDONED
+                logger.error(
+                    f"[{func_name}] Abandoning issue {issue.issue_id} due to read error: {e}"
+                )
+                continue
+
+            logger.debug(f"[{func_name}] Read file content from: {file_path}")
+
+            llm_output = self.invoke_with_pydantic_model(
+                self.prompts.issues_segregation_prompt,
+                {
+                    "issue_details": issue.issue_details(),
+                    "file_content": file_content,
+                    "context": state.additional_information
+                },
+                Segregation
+            )
+            logger.debug(f"[{func_name}] Received LLM output for issue_id {issue.issue_id}: {llm_output.response}")
+
+            validated_response = llm_output.response
+            logger.debug(f"[{func_name}] Validated LLM response for issue_id {issue.issue_id}: {validated_response}")
+
+            planned_issue = PlannedIssue(
+                parent_id=issue.issue_id,
+                status=Status.NEW,
+                file_path=issue.file_path,
+                line_number=issue.line_number,
+                description=issue.description,
+                suggestions=issue.suggestions,
+                is_function_generation_required=validated_response.requires_function_creation
+            )
+            logger.info(f"[{func_name}] Created PlannedIssue for issue_id {issue.issue_id} with status {planned_issue.status}")
+
+            state.planned_issues.add_item(planned_issue)
+            logger.info(f"[{func_name}] Added PlannedIssue for issue_id {issue.issue_id} to planned issues.")
+
+            self._write_workpackage_file(state, planned_issue, package_type="issue")
+            logger.debug(f"[{func_name}] Work package file written for issue {issue.issue_id}.")
+            issue.issue_status = Status.DONE
+
         state.current_mode_stage = IssuePlanningStage.FINISHED
-        logger.debug("Exiting issues_preparation_node")
+        logger.debug(f"[{func_name}] Set current_mode_stage to {IssuePlanningStage.FINISHED}. Exiting node.")
+        return state
+
+    @record_node(PlannerNodeEnum.ISSUE_WORKPACKAGE_UPDATE)
+    @handle_errors_and_reset
+    def issue_workpackage_update_node(self, state: PlannerState) -> PlannerState:
+        """
+        Update issue work packages based on human-provided feedback.
+
+        This node processes update instructions extracted from human feedback to modify existing issue work packages.
+        The procedure includes:
+          1. Extracting update instructions via the LLM from the human feedback.
+          2. Identifying target PlannedIssue objects based on the provided target_id.
+          3. For each matching PlannedIssue, invoking an update prompt to merge new update changes into the current details.
+          4. Updating the PlannedIssue description with the merged details.
+          5. Updating the corresponding work package file on disk.
+          6. Marking associated issues in issue_list as DONE.
+
+        Args:
+            state (PlannerState): The current state including human feedback, planned_issues, and project directory.
+
+        Returns:
+            PlannerState: The updated state with revised PlannedIssue descriptions, updated files, and issues marked as DONE.
+        """
+        func_name = "issue_workpackage_update_node"
+        logger.debug(f"[{func_name}] Entering. Processing human feedback: {state.human_feedback}")
+        
+        extraction_response = self.invoke(
+            self.prompts.workpackage_update_extraction_prompt,
+            {"feedback": state.human_feedback},
+            "json"
+        )
+        update_instructions = ast.literal_eval(extraction_response.response)
+        logger.debug(f"[{func_name}] Extracted update instructions: {update_instructions}")
+  
+        # Step 2: Process each update instruction.
+        for instruction in update_instructions:
+            target_id = instruction.get("target_id")
+            update_changes = instruction.get("update_changes")
+            if not target_id or not update_changes:
+                logger.warning(f"[{func_name}] Incomplete update instruction: {instruction}")
+                continue
+
+            logger.debug(f"[{func_name}] Processing update for target_id: {target_id} with changes: {update_changes}")
+
+            # Identify issues to update.
+            issues_to_update = [issue for issue in state.planned_issues.items 
+                                if issue.parent_id == target_id or issue.id == target_id]
+            if not issues_to_update:
+                logger.warning(f"[{func_name}] No PlannedIssue found for target_id: {target_id}")
+                continue
+
+            # Step 3: Update each targeted PlannedIssue.
+            for issue in issues_to_update:
+                logger.debug(f"[{func_name}] Updating PlannedIssue with issue_id: {issue.id}")
+                update_prompt_input = {
+                    "current_work_package": issue.model_dump_json(),
+                    "update_changes": update_changes
+                }
+                update_response = self.invoke(
+                    self.prompts.workpackage_update_prompt,
+                    update_prompt_input,
+                    "json"
+                )
+                logger.debug(f"[{func_name}] LLM update response for issue {issue.id}: {update_response.response}")
+
+                updated_details = update_response.response
+                for i, existing_issue in enumerate(state.planned_issues.items):
+                    if existing_issue.id == issue.id:
+                        state.planned_issues.items[i] = issue.model_copy(update=updated_details)
+                        issue = issue.model_copy(update=updated_details)
+                        break
+                logger.info(f"[{func_name}] Updated PlannedIssue {issue.id}.")
+
+                # Step 4: Update the file on disk in place using the helper.
+                self._update_workpackage_file(issue, state, package_type="issue", details=json.loads(issue.model_dump_json()))
+                logger.info(f"[{func_name}] Successfully updated work package file for issue {issue.id}.")
+
+        updated_issue_ids = set()
+        for instruction in update_instructions:
+            target_id = instruction.get("target_id")
+            if not target_id:
+                continue
+            # Check if target_id matches an issue in issue_list.
+            for issue in state.issue_list.items:
+                if issue.issue_id == target_id:
+                    updated_issue_ids.add(issue.issue_id)
+                    break
+            # Otherwise, if target_id is a PlannedIssue id, find its parent_id.
+            else:
+                for planned_issue in state.planned_issues.items:
+                    if planned_issue.id == target_id:
+                        updated_issue_ids.add(planned_issue.parent_id)
+                        break
+
+        for u_id in updated_issue_ids:
+            for issue in state.issue_list.items:
+                if issue.issue_id == u_id:
+                    issue.issue_status = Status.DONE
+                    logger.info(f"[{func_name}] Marked issue {u_id} as DONE based on update instructions.")
+
+        state.current_mode_stage = IssuePlanningStage.FINISHED
+        logger.debug(f"[{func_name}] Exiting after processing update instructions.")
         return state
 
     @record_node(PlannerNodeEnum.EXIT)
     def exit_node(self, state: PlannerState) -> PlannerOutput:
         """
-        Finalize the planning process and update the status of the current task or issue.
+        Finalize the planning process and adjust the status of the current task or issue.
 
-        Depending on the operational mode and the current mode stage, this node sets the status of:
-        - The current task (in TASK_PLANNING mode):
-            - To INPROGRESS if the TaskPlanningStage is FINISHED.
-            - To ABANDONED if the TaskPlanningStage is not FINISHED.
-        - The current issue (in ISSUE_PLANNING mode):
-            - To INPROGRESS if the IssuePlanningStage is FINISHED.
-            - To ABANDONED if the IssuePlanningStage is not FINISHED.
-
-        If an unknown operational mode is encountered, a warning is logged.
+        Depending on the operational mode and current stage, this node sets:
+          - For TASK_PLANNING mode:
+              • Current task status to DONE if stage is FINISHED, or ABANDONED otherwise.
+          - For ISSUE_PLANNING mode:
+              • Current issue status to DONE if stage is FINISHED, or ABANDONED otherwise.
+          - Logs a warning for any unknown operational mode.
 
         Args:
-            state (PlannerState): The current state of the planner, including operational mode and current mode stage.
+            state (PlannerState): The current state containing operational mode and stage.
 
         Returns:
-            PlannerOutput: The updated state with the task or issue status adjusted accordingly.
+            PlannerOutput: The final planner state with updated task or issue status.
         """
-        logger.debug("Entering exit_node with operational_mode: %s and current_mode_stage: %s",
-                    state.operational_mode, state.current_mode_stage)
+        func_name = "exit_node"
+        logger.debug(f"[{func_name}] Entering with operational_mode: {state.operational_mode} and current_mode_stage: {state.current_mode_stage}")
 
         if state.operational_mode == PlannerMode.TASK_PLANNING:
-            logger.debug("Operational mode: TASK_PLANNING")
+            logger.debug(f"[{func_name}] Operational mode: {PlannerMode.TASK_PLANNING}")
             if state.current_mode_stage == TaskPlanningStage.FINISHED:
-                state.current_task.task_status = Status.INPROGRESS
-                logger.info("Task planning finished; setting current task status to INPROGRESS.")
+                state.current_task.task_status = Status.DONE
+                logger.info(f"[{func_name}] Task planning finished; setting current task status to {Status.DONE}.")
             else:
                 state.current_task.task_status = Status.ABANDONED
-                logger.info("Task planning not finished; setting current task status to ABANDONED.")
+                logger.info(f"[{func_name}] Task planning not finished; setting current task status to {Status.ABANDONED}.")
         elif state.operational_mode == PlannerMode.ISSUE_PLANNING:
-            logger.debug("Operational mode: ISSUE_PLANNING")
+            logger.debug(f"[{func_name}] Operational mode: {PlannerMode.ISSUE_PLANNING}")
             if state.current_mode_stage == IssuePlanningStage.FINISHED:
-                state.current_issue.issue_status = Status.INPROGRESS
-                logger.info("Issue planning finished; setting current issue status to INPROGRESS.")
+                state.current_issue.issue_status = Status.DONE
+                logger.info(f"[{func_name}] Issue planning finished; setting current issue status to {Status.DONE}.")
             else:
                 state.current_issue.issue_status = Status.ABANDONED
-                logger.info("Issue planning not finished; setting current issue status to ABANDONED.")
+                logger.info(f"[{func_name}] Issue planning not finished; setting current issue status to {Status.ABANDONED}.")
         else:
-            logger.warning("Unknown operational mode encountered: %s", state.operational_mode)
+            logger.warning(f"[{func_name}] Unknown operational mode encountered: {state.operational_mode}")
 
-        logger.debug("Exiting exit_node with updated state: %s", state)
+        logger.debug(f"[{func_name}] Exiting with updated state: {state}")
         return state
 
     def _clean_json_response(self, response: str) -> str:
         """
-        Cleans a JSON response string by removing unnecessary code block markers.
+        Remove markdown code block markers from a JSON response string.
+
+        This method strips extraneous formatting (e.g., ```json markers) from the LLM response to ensure valid JSON.
 
         Args:
-            response (str): JSON response string.
+            response (str): The raw JSON response string.
 
         Returns:
-            str: Cleaned JSON string.
+            str: The cleaned JSON string.
         """
         logger.info(f"{self.agent_name}: Cleaning JSON response.")
         cleaned_response = response.strip()
@@ -404,14 +679,14 @@ class PlannerWorkFlow(BaseWorkFlow[PlannerPrompts]):
 
     def _task_segregation(self, workpackage_name: str, requirements: dict) -> bool:
         """
-        Determines if a work package requires function creation.
+        Determine whether the work package requires function creation based on its requirements.
 
         Args:
-            workpackage_name (str): Name of the work package.
-            requirements (dict): Detailed requirements for the work package.
+            workpackage_name (str): The name of the work package.
+            requirements (dict): The detailed requirements for the work package.
 
         Returns:
-            bool: True if function creation is required, otherwise False.
+            bool: True if function creation is required, False otherwise.
         """
         logger.info(f"{self.agent_name}: Initiating task segregation for work package: {workpackage_name}")
 
@@ -441,100 +716,98 @@ class PlannerWorkFlow(BaseWorkFlow[PlannerPrompts]):
                     self.error_count = 0
                     return False
 
-    def _write_workpackages_to_files(
-        self,
-        state: PlannerState,
-        output_dir: str,
-        planned_tasks: PlannedTaskQueue
-    ) -> tuple[int, int]:
+    def _write_workpackage_file(self, state: PlannerState, planned_item, package_type: str) -> None:
         """
-        Writes work packages from a queue to individual JSON files.
+        Writes a work package file for a planned item (task or issue) and updates the workpackage_file_map.
+
+        The workpackage_file_map in PlannerState is structured as:
+            {
+                parent_id: {
+                    planned_item_id: file_path,
+                    ...
+                },
+                ...
+            }
+        This method determines the correct directory based on the package_type, creates (or overwrites) a file named
+        "<planned_item_id>.json" in that directory, writes the JSON representation of the planned item's description
+        to the file, and updates the mapping accordingly.
 
         Args:
-            output_dir (str): Base directory for output files.
-            planned_tasks (PlannedTaskQueue): Queue containing planned tasks.
-
-        Returns:
-            tuple[int, int]: Number of work packages written successfully and the 
-            total count.
+            state (PlannerState): The current planner state, which includes project_directory and workpackage_file_map.
+            planned_item: The planned item object (either a PlannedTask or PlannedIssue). For tasks, it must have attributes:
+                        task_id, parent_task_id, description; for issues, it must have attributes:
+                        issue_id, parent_id, description.
+            package_type (str): Either "task" or "issue", indicating the type of work package.
         """
-        
-        if len(planned_tasks) < 0:
-            logger.warning(f"{self.agent_name}: No work packages available for writing.")
-            return 0, self.file_count
 
-        logger.info(f"{self.agent_name}: Writing work packages to the 'docs/work_packages' folder.")
-        work_packages_dir = os.path.join(output_dir, "docs", "work_packages")
-        os.makedirs(work_packages_dir, exist_ok=True)
+        func_name = "_write_workpackage_file"
+        base_folder = "work_packages" if package_type == "task" else "issue_packages"
+        base_dir = os.path.join(state.project_directory, "docs", base_folder)
+        os.makedirs(base_dir, exist_ok=True)
+    
+        try:
+            if package_type == "task":
+                item_id = planned_item.task_id
+                content_to_write = json.loads(planned_item.description)
+            elif package_type == "issue":
+                item_id = planned_item.id
+                content_to_write = json.loads(planned_item.model_dump_json())
+            else:
+                raise ValueError(f"Unsupported package_type '{package_type}'")
 
-        session_file_count = 0
-        for planned_task in planned_tasks:
-            file_name = f'work_package_{self.file_count + 1}.json'
-            file_path = os.path.join(work_packages_dir, file_name)
-            work_package: dict = json.loads(planned_task.description)
-            
+            file_path = os.path.join(base_dir, f"{item_id}.json")
+
+            with codecs.open(file_path, 'w', encoding='utf-8') as f:
+                json.dump(content_to_write, f, indent=4)
+            logger.info(f"[{func_name}] Work package for {item_id} written to file: {file_path} using utf-8 encoding.")
+        except UnicodeEncodeError:
             try:
-                with codecs.open(file_path, 'w', encoding='utf-8') as file:
-                    json.dump(work_package, file, indent=4)
-
-                logger.info(f"{self.agent_name}: Work package written to: {file_path}")
-                parent_id = planned_task.parent_task_id
-                if parent_id in state.task_to_file_map:
-                    state.task_to_file_map[parent_id].append(file_name)
-                else:
-                    state.task_to_file_map[parent_id] = [file_name]
-            except UnicodeEncodeError:
-                try:
-                    with codecs.open(file_path, 'w', encoding='utf-8-sig') as file:
-                        json.dump(work_package, file, indent=4)
-                    logger.info(f"{self.agent_name}: Work package written to: {file_path} (with BOM)")
-
-                    parent_id = planned_task.parent_task_id
-                    if parent_id in state.task_to_file_map:
-                        state.task_to_file_map[parent_id].append(file_name)
-                    else:
-                        state.task_to_file_map[parent_id] = [file_name]
-                except Exception as e:
-                    logger.error(f"{self.agent_name}: Failed to write work package to {file_path}. Error: {e}")
+                with codecs.open(file_path, 'w', encoding='utf-8-sig') as f:
+                    json.dump(planned_item.description, f, indent=4)
+                logger.info(f"[{func_name}] Work package for {item_id} written to file: {file_path} using utf-8-sig encoding.")
             except Exception as e:
-                logger.error(f"{self.agent_name}: Failed to write work package to {file_path}. Error: {e}")
-
-            self.file_count += 1
-            session_file_count += 1
-        return session_file_count, self.file_count
-
-    def _delete_work_packages_for_task(self, state: PlannerState, output_dir: str, task_id: str) -> None:
-        """
-        Private helper method to delete the work package files associated with a specific task,
-        and update the file_count accordingly.
-
-        Args:
-            output_dir (str): The base directory where the 'docs/work_packages' folder is located.
-            task_id (str): The ID of the task whose work package files should be deleted.
-            state (PlannerState): The current state containing the mapping of task IDs to file names.
-        
-        This method deletes only the files listed in the state's task_to_file_map for the given task_id,
-        subtracts the number of deleted files from the file_count, and removes the entry from the map.
-        """
-        files_for_task = state.task_to_file_map.get(task_id, [])
-        if not files_for_task:
-            logger.info(f"No work package files found for task ID {task_id}. Nothing to delete.")
+                logger.error(f"[{func_name}] Failed to write work package for {item_id} at file {file_path} with utf-8-sig: {e}")
+                return
+        except Exception as e:
+            logger.error(f"[{func_name}] Failed to write work package for {item_id} at file {file_path}: {e}")
             return
 
-        work_packages_dir = os.path.join(output_dir, "docs", "work_packages")
-        deleted_count = 0
-        for file_name in files_for_task:
-            file_path = os.path.join(work_packages_dir, file_name)
-            try:
-                os.remove(file_path)
-                deleted_count += 1
-                logger.info(f"Deleted work package file: {file_path}")
-            except Exception as e:
-                logger.error(f"Failed to delete file {file_path}. Error: {e}")
-        
-        # Update the global file count: subtract only the deleted count.
-        self.file_count -= deleted_count
-        logger.info(f"Deleted {deleted_count} files for task ID {task_id}. Updated file_count: {self.file_count}")
+    def _update_workpackage_file(self, planned_item, state: PlannerState, package_type: str, details: dict) -> None:
+        """
+        Updates the work package file for a planned item (task or issue) in place.
 
-        # Remove the entry for this task ID from the mapping.
-        del state.task_to_file_map[task_id]
+        The file path is computed based on the project's directory, the appropriate folder (either "docs/work_packages" 
+        for tasks or "docs/issue_packages" for issues), and the planned item’s ID (task_id or issue_id). The file is named 
+        "<planned_item_id>.json" and is overwritten with the new details.
+
+        Args:
+            planned_item: The planned item object (PlannedTask or PlannedIssue) with attributes:
+                        - For tasks: task_id, description.
+                        - For issues: issue_id, description.
+            state (PlannerState): The current planner state, including project_directory.
+            package_type (str): Either "task" or "issue".
+            details (dict): The updated work package details.
+        """
+        func_name = "_update_workpackage_file"
+        base_folder = "work_packages" if package_type == "task" else "issue_packages"
+        base_dir = os.path.join(state.project_directory, "docs", base_folder)
+        os.makedirs(base_dir, exist_ok=True)
+        
+        # Compute item ID and file path.
+        item_id = planned_item.task_id if package_type == "task" else planned_item.id
+        file_path = os.path.join(base_dir, f"{item_id}.json")
+
+        logger.debug(f"[{func_name}] Updating file for planned_item_id '{item_id}' at path: {file_path}")
+        try:
+            with codecs.open(file_path, 'w', encoding='utf-8') as f:
+                json.dump(details, f, indent=4)
+            logger.info(f"[{func_name}] Successfully updated work package for '{item_id}' at file: {file_path} using utf-8 encoding.")
+        except UnicodeEncodeError:
+            try:
+                with codecs.open(file_path, 'w', encoding='utf-8-sig') as f:
+                    json.dump(details, f, indent=4)
+                logger.info(f"[{func_name}] Successfully updated work package for '{item_id}' at file: {file_path} using utf-8-sig encoding.")
+            except Exception as e:
+                logger.error(f"[{func_name}] Failed to update work package for '{item_id}' at file {file_path} with utf-8-sig: {e}")
+        except Exception as e:
+            logger.error(f"[{func_name}] Failed to update work package for '{item_id}' at file {file_path}: {e}")

@@ -6,7 +6,7 @@ from langchain_core.runnables.base import RunnableSequence
 from langchain_ollama import ChatOllama
 
 from llms.llm import LLM
-from utils.logs.logging_utils import logger
+from utils.logger import logger
 
 
 class Ollama(LLM[ChatOllama]):

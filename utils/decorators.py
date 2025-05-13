@@ -3,7 +3,7 @@ from enum import Enum
 from functools import wraps
 from pprint import pformat
 
-from utils.logs.logging_utils import logger
+from utils.logger import logger
 
 
 def auto_init(init_func):

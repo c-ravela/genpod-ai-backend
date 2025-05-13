@@ -1,6 +1,6 @@
 from inspect import _empty, signature
 
-from utils.logs.logging_utils import logger
+from utils.logger import logger
 
 
 def validate_workflow_node_signature(func, decorator_name: str):

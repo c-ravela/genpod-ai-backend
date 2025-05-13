@@ -16,7 +16,7 @@ from core.state import RAGQueryInput, RAGQueryOutput
 from core.workflow import BaseWorkFlow
 from llms import LLM
 from models import PStatus, RagResponseType, RagSelectionResponse, Status, Task
-from utils.logs.logging_utils import logger
+from utils.logger import logger
 
 ERROR_THRESHOLD = 3
 
@@ -243,7 +243,11 @@ class RAGMiddlewareWorkFlow(BaseWorkFlow[RAGMiddlewarePrompts]):
                 func_name
             )
             state.response_type = RagResponseType.NO_AGENT_AVAILABLE
-            state.current_mode_stage = RAGQueryStage.FALLBACK_RESEARCH
+            state.current_mode_stage = (
+                RAGQueryStage.FALLBACK_RESEARCH
+                if self.use_research_agent
+                else RAGQueryStage.FINISHED
+            )
             return state
 
         agent_list_str = "\n".join(
@@ -267,7 +271,11 @@ class RAGMiddlewareWorkFlow(BaseWorkFlow[RAGMiddlewarePrompts]):
                 func_name
             )
             state.response_type = RagResponseType.NO_AGENT_AVAILABLE
-            state.current_mode_stage = RAGQueryStage.FALLBACK_RESEARCH
+            state.current_mode_stage = (
+                RAGQueryStage.FALLBACK_RESEARCH
+                if self.use_research_agent
+                else RAGQueryStage.FINISHED
+            )
             return state
 
         agent_entry = self.rag_agent_dict.get(selected_rag_agent_id)
@@ -277,7 +285,11 @@ class RAGMiddlewareWorkFlow(BaseWorkFlow[RAGMiddlewarePrompts]):
                 func_name, selected_rag_agent_id
             )
             state.response_type = RagResponseType.NO_AGENT_AVAILABLE
-            state.current_mode_stage = RAGQueryStage.FALLBACK_RESEARCH
+            state.current_mode_stage = (
+                RAGQueryStage.FALLBACK_RESEARCH
+                if self.use_research_agent
+                else RAGQueryStage.FINISHED
+            )
             return state
 
         state.selected_rag_agent = {
@@ -354,7 +366,7 @@ class RAGMiddlewareWorkFlow(BaseWorkFlow[RAGMiddlewarePrompts]):
         rag_output: RAGQueryOutput = state.rag_agent_output
         logger.debug("%s: Raw RAG output: %s", func_name, rag_output)
 
-        if self.use_research_agent and rag_output.response_type not in (RagResponseType.ANSWERED, RagResponseType.REJECTED, RagResponseType.FROM_CACHE):
+        if self.use_research_agent and rag_output.response_type not in (RagResponseType.ANSWERED, RagResponseType.FROM_CACHE):
             state.current_mode_stage = RAGQueryStage.FALLBACK_RESEARCH
             return state
 

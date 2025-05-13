@@ -2,7 +2,7 @@ from typing import List, Optional
 
 from apis.microservice.service import MicroserviceService
 from database.entities.microservices import Microservice
-from utils.logs.logging_utils import logger
+from utils.logger import logger
 
 
 class MicroserviceController:

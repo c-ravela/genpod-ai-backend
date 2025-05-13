@@ -14,7 +14,7 @@ from models.architect_models import ProjectDetails, TaskList, TaskResponse
 from models.constants import PStatus, Status
 from models.models import Task, TaskQueue
 from tools.code import CodeFileWriter
-from utils.logs.logging_utils import logger
+from utils.logger import logger
 
 
 @dataclass
@@ -159,6 +159,13 @@ class ArchitectWorkFlow(BaseWorkFlow[ArchitectPrompts]):
                     'user_request': state.user_prompt,
                     'task_description': state.current_task.description,
                     'additional_information': state.additional_information
+                }
+            ),
+            'tech_stack': GenerationStepConfig(
+                prompt=self.prompts.tech_stack_prompt,
+                response_model=TaskResponse,
+                input_params={
+                    'user_request': state.user_prompt
                 }
             ),
             'system_architecture': GenerationStepConfig(

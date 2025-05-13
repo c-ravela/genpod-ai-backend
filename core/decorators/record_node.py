@@ -1,7 +1,7 @@
 from functools import wraps
 
 from core.decorators.utils import validate_workflow_node_signature
-from utils.logs.logging_utils import logger
+from utils.logger import logger
 
 
 def record_node(node_name: str = None):

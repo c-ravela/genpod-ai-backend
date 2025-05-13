@@ -18,6 +18,14 @@ source_selection_prompt_template:
     Output Instructions:
     {format_instructions}
 
+    ### Inverse Prompting:
+    If your output does not include:
+    - A detailed evaluation of each source in the list,
+    - A clear reason for each source's relevance or irrelevance,
+    - A confidence score between 0 and 1 for each evaluation,
+
+    Then revise your response to fully meet the expectations above.
+
 relevance_check_prompt_template:
   template: |
     You are a helpful relevance evaluation assistant. Your task is to assess whether the 
@@ -39,6 +47,15 @@ relevance_check_prompt_template:
     Output Instructions:
     {format_instructions}
 
+    ### Inverse Prompting:
+    If your output does not include:
+    - A clear judgment about the response's relevance,
+    - A concise explanation justifying your assessment,
+    - Suggested improvements (if the response is not relevant),
+    - And optionally a relevance score between 0 and 1,
+
+    Then revise your response to fully meet the expectations above.
+
 generate_response_prompt_template:
   template: |
     You are a highly capable response generation assistant. Your task is to produce a 
@@ -56,3 +73,11 @@ generate_response_prompt_template:
 
     Please ensure that your generated response synthesizes the information from the web 
     search results to directly and accurately answer the query.
+
+    ### Inverse Prompting:
+    If your output does not include:
+    - A well-structured and informative response,
+    - Accurate synthesis of key information from the search results,
+    - A direct and relevant answer to the query based on the evidence provided,
+
+    Then revise your response to fully meet the expectations above.

@@ -14,3 +14,12 @@ rag_agent_selection_prompt_template:
     
     Output Instructions:
     {format_instructions}
+
+    ### Inverse Prompting:
+    If your output does not include:
+    - An evaluation for every agent listed in `agent_list`,
+    - A clear justification for why each agent is or isn’t a good fit for the query,
+    - A confidence score (between 0 and 1) for each agent,
+    - And identification of the most appropriate agent based on both reasoning and score,
+
+    Then revise your response to fully meet the expectations above.

@@ -22,18 +22,24 @@ from .rag_models import BinaryScore, PromptResponse
 from .research_models import (EvaluationDetail, GeneratedResponse,
                               RelevanceEvaluationResponse,
                               SourceSelectionResponse)
-from .reviewer_models import IssuesReport
+from .reviewer_models import (DockerfileSelectionResponse, FilePathSelectionResponse, FileIssue,
+                              DockerSandboxExecutorParams, IssuesReport, LanguageSelectionResponse)
 
 __all__ = [
     'AdditionalInfoRequest',
     'BinaryScore',
     'ChatRoles',
+    'DockerfileSelectionResponse',
+    'DockerSandboxExecutorParams',
     'ErrorRegistry',
     'EvaluationDetail',
+    'FileIssue',
+    'FilePathSelectionResponse',
     'GeneratedResponse',
     'Issue',
     'IssuesQueue',
     'IssuesReport',
+    'LanguageSelectionResponse',
     'PlannedIssue',
     'PlannedIssuesQueue',
     'PlannedTask',

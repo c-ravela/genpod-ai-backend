@@ -4,7 +4,7 @@ from agents.tests_generator._internal.tests_generator_work_flow import \
     TestCoderWorkFlow
 from core.agent import BaseAgent
 from llms import LLM
-from utils.logs.logging_utils import logger
+from utils.logger import logger
 
 
 class TestsGeneratorAgent(BaseAgent[TestCoderGraph]):

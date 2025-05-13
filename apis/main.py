@@ -1,24 +1,50 @@
 import os
-import sys
 import time
-from typing import List, Optional
+from enum import Enum
+from typing import List, Optional, Dict, Type, Any
+
+from rich.live import Live
 
 from agents.rag import RAGAgent
 from agents.rag_middleware import RAGMiddleware, register_rag_agent
 from agents.research import ResearchAgent
 from agents.supervisor import SupervisorAgent, SupervisorInput
 from apis.microservice.controller import MicroserviceController
+from apis.microservice_llm_metrics.controller import \
+    MicroserviceLLMMetricsController
 from apis.microservice_session.controller import MicroserviceSessionController
 from apis.project.controller import ProjectController
-from configs.project_config import AgentRegistry, RAGAgentRegistry
+from configs.project_config import AgentRegistry, RAGAgentInfo, AgentInfo
 from context.context import GenpodContext
 from database.entities.microservice_sessions import MicroserviceSession
 from database.entities.microservices import Microservice
 from database.entities.projects import Project
 from genpod import Team
 from models.constants import PStatus
-from utils.logs.logging_utils import logger
-from utils.project_status import ProjectStatus
+from utils.logger import logger
+from utils.microservice_insights import MicroserviceInsights
+from core.agent import BaseAgent
+
+
+class MethodNames(Enum):
+    ARCHITECT = "call_architect"
+    PLANNER = "call_planner"
+    CODER = "call_coder"
+    TESTS_GENERATOR = "call_test_code_generator"
+    REVIEWER = "call_reviewer"
+
+
+def create_method_to_agent_mapping(agent_registry: AgentRegistry) -> dict:
+    """
+    Dynamically create the mapping between method names and agents.
+    """
+    return {
+        method.value: getattr(agent_registry, method.name.lower())
+        for method in MethodNames
+    }
+
+
+METHOD_TO_AGENT = create_method_to_agent_mapping(AgentRegistry)
 
 
 class ActionManager:
@@ -26,24 +52,15 @@ class ActionManager:
     Manager class for handling microservice actions including team member setup,
     supervisor interactions, and RAG (Retrieval-Augmented Generation) setup.
     """
+
     def __init__(
         self,
         microservice: Microservice,
         agent_registry: AgentRegistry,
-        rag_agent_registry: RAGAgentRegistry,
+        rag_agent_registry: Dict[str, RAGAgentInfo],
         database_path: str,
         graph_recursion_limit: int,
     ):
-        """
-        Initialize the ActionManager.
-
-        Args:
-            microservice (Microservice): The microservice instance.
-            agent_registry (AgentRegistry): Registry containing agent information.
-            rag_agent_registry (RAGAgentRegistry): Registry for RAG agents.
-            database_path (str): Path to the persistence database.
-            graph_recursion_limit (int): Maximum recursion limit for graph operations.
-        """
         logger.debug("Initializing ActionManager.")
         self.microservice = microservice
         self.agent_registry = agent_registry
@@ -54,8 +71,56 @@ class ActionManager:
         self.session_controller = MicroserviceSessionController()
         self._genpod_context = GenpodContext.get_context()
         self.is_rag_enabled = False
-        self.supervisor = None
+        self.supervisor: Optional[SupervisorAgent] = None
+        self.genpod_team: Optional[Team] = None
         logger.info("ActionManager initialized successfully.")
+
+    def _update_context_sessions(self, new_sessions: Dict[str, int]):
+        """
+        Merge new_sessions into GenpodContext.agents_session.
+        """
+        existing = self._genpod_context.agents_session or {}
+        merged = {**existing, **new_sessions}
+        self._genpod_context.update(agents_session=merged)
+        logger.debug("GenpodContext.agents_session updated with new sessions.")
+
+    def _create_session_for_agent(self, agent: BaseAgent) -> int:
+        """
+        Helper method to create a session for a given agent and return the session ID.
+        """
+        session = MicroserviceSession(
+            agent_id=agent.id,
+            project_id=self.microservice.project_id,
+            microservice_id=self.microservice.id,
+            created_by=self.microservice.created_by,
+            updated_by=self.microservice.created_by
+        )
+        self.session_controller.create(session)
+        agent.set_thread_id(session.id)
+        logger.info(f"Session created for agent '{agent.id}': {session}")
+        return session.id
+
+    def _build_and_attach_agent(
+        self,
+        cls: Type[BaseAgent],
+        info: AgentInfo,
+        sessions: Dict[str, int],
+        **extra_kwargs: Any
+    ) -> BaseAgent:
+        """
+        Instantiate an Agent subclass, create its session, attach it, and return it.
+        """
+        agent = cls(
+            id=info.agent_id,
+            name=info.agent_name,
+            description=info.description,
+            llm=info.llm,
+            recursion_limit=info.recursion_limit,
+            persistence_db_path=self.database_path,
+            **extra_kwargs
+        )
+        sessions[agent.id] = self._create_session_for_agent(agent)
+        return agent
 
     def setup_team_members(self):
         """
@@ -63,81 +128,40 @@ class ActionManager:
 
         This method creates sessions for each team member in the team and for the supervisor,
         updates the GenpodContext with the session IDs, and configures the supervisor with the team.
-
-        Raises:
-            Exception: Propagates any exceptions encountered during team setup.
         """
         logger.info("Setting up team members.")
         try:
-            self.genpod_team = Team(
-                self.agent_registry,
-                self.database_path
-            )
+            # Instantiate the genpod_team
+            self.genpod_team = Team(self.agent_registry, self.database_path)
+            sessions: Dict[str, int] = {}
 
-            agents_session: dict[str, int] = {}
+            # Create sessions for each team member
             for member in self.genpod_team.get_team_members():
-                session = MicroserviceSession(
-                    agent_id=member.id,
-                    project_id=self.microservice.project_id,
-                    microservice_id=self.microservice.id,
-                    created_by=self.microservice.created_by,
-                    updated_by=self.microservice.created_by
-                )
-                self.session_controller.create(session)
-                member.set_thread_id(session.id)
-                agents_session[member.id] = session.id
-                logger.info(f"Session created for team member '{member.id}': {session}")
+                sessions[member.id] = self._create_session_for_agent(member)
 
-            supervisor_details = self.agent_registry.supervisor
-            supervisor = SupervisorAgent(
-                id=supervisor_details.agent_id,
-                name=supervisor_details.agent_name,
-                description=supervisor_details.description,
-                llm=supervisor_details.llm,
-                recursion_limit=self.graph_recursion_limit,
-                persistence_db_path=self.database_path,
-                use_rag=supervisor_details.use_rag
+            # Build and attach the supervisor
+            sup = self._build_and_attach_agent(
+                SupervisorAgent,
+                self.agent_registry.supervisor,
+                sessions,
+                use_rag=self.agent_registry.supervisor.use_rag
             )
-            session = MicroserviceSession(
-                agent_id=supervisor.id,
-                project_id=self.microservice.project_id,
-                microservice_id=self.microservice.id,
-                created_by=self.microservice.created_by,
-                updated_by=self.microservice.created_by
-            )
-            self.session_controller.create(session)
-            supervisor.set_thread_id(session.id)
-            agents_session[supervisor.id] = session.id
-            logger.info(f"Session created for supervisor '{supervisor.id}': {session}")
 
-            if not self._genpod_context.agents_session:
-                self._genpod_context.update(agents_session=agents_session)
-                logger.debug("GenpodContext.agents_session was empty; set to new sessions.")
-            else:
-                updated_sessions = {**self._genpod_context.agents_session, **agents_session}
-                self._genpod_context.update(agents_session=updated_sessions)
-                logger.debug("GenpodContext.agents_session updated with new sessions.")
+            # Merge new sessions into context
+            self._update_context_sessions(sessions)
 
-            supervisor.setup_team(self.genpod_team)
-            self.supervisor = supervisor
+            # Configure supervisor with the team
+            sup.setup_team(self.genpod_team)
+            self.supervisor = sup
 
             logger.info("Team members set up successfully.")
         except Exception as e:
             logger.error(f"Error during team setup: {e}")
             raise
 
-    def process_supervisor_response(self, supervisor_response):
+    def process_supervisor_response(self, supervisor_response: List[dict]):
         """
         Process supervisor responses and update the microservice if necessary.
-
-        This method aggregates the supervisor's responses and, if any differences in the
-        microservice's name or project status are detected, updates the microservice accordingly.
-
-        Args:
-            supervisor_response (list[dict[str, any]]): List of response dictionaries from the supervisor.
-
-        Raises:
-            Exception: Propagates any exceptions encountered during processing.
         """
         logger.info("Processing supervisor response.")
         try:
@@ -145,18 +169,20 @@ class ActionManager:
             new_project_status = self.microservice.status
 
             for res in supervisor_response:
-                for node_name, super_state in res.items():
-                    if 'microservice_name' in super_state and new_microservice_name != super_state['microservice_name']:
+                for _, super_state in res.items():
+                    if ('microservice_name' in super_state and
+                            super_state['microservice_name'] != new_microservice_name):
                         new_microservice_name = super_state['microservice_name']
-                    if 'project_status' in super_state and new_project_status != str(super_state['project_status']):
+                    if ('project_status' in super_state and
+                            str(super_state['project_status']) != new_project_status):
                         new_project_status = str(super_state['project_status'])
-            
+
             if (new_microservice_name != self.microservice.microservice_name or
-                new_project_status != self.microservice.status):
+                    new_project_status != self.microservice.status):
                 logger.debug(
-                    f"Updating microservice: name from '{self.microservice.microservice_name}' "
-                    f"to '{new_microservice_name}', status from '{self.microservice.status}' "
-                    f"to '{new_project_status}'."
+                    f"Updating microservice: name '{self.microservice.microservice_name}'→"
+                    f"'{new_microservice_name}', status '{self.microservice.status}'→"
+                    f"'{new_project_status}'."
                 )
                 self.microservice.microservice_name = new_microservice_name
                 self.microservice.status = new_project_status
@@ -168,18 +194,9 @@ class ActionManager:
             logger.error(f"Error processing supervisor response: {e}")
             raise
 
-    def send_to_supervisor(self, data: SupervisorInput) -> any:
+    def send_to_supervisor(self, data: SupervisorInput) -> Any:
         """
         Send data to the supervisor and return its response.
-
-        Args:
-            data (SupervisorInput): The input data for the supervisor.
-
-        Returns:
-            any: The response from the supervisor.
-
-        Raises:
-            Exception: Propagates any exceptions encountered during data transmission.
         """
         logger.info("Sending data to supervisor.")
         try:
@@ -189,141 +206,268 @@ class ActionManager:
         except Exception as e:
             logger.exception("Error sending data to supervisor.")
             raise
-    
+
     def setup_rag(self):
         """
         Set up Retrieval-Augmented Generation (RAG) agents if not already enabled.
-
-        This method registers RAG-related agents, creates sessions for them, and updates the GenpodContext
-        with the new session IDs. After a successful setup, RAG functionality is marked as enabled.
-
-        Raises:
-            Exception: Propagates any exceptions encountered during RAG setup.
         """
-        logger.info("Setting up RAG agents.")
-        if not self.is_rag_enabled:
-            try:
-                rag_related_agents = []
-
-                # Initialize the MISMO 3.6 RAG agent.
-                mismo_3_6_rag_details = self.rag_agent_registry.mismo_3_6_rag
-                mismo_3_6_rag = RAGAgent(
-                    id=mismo_3_6_rag_details.agent_id,
-                    name=mismo_3_6_rag_details.agent_name,
-                    description=mismo_3_6_rag_details.description,
-                    llm=mismo_3_6_rag_details.llm,
-                    collection_name=mismo_3_6_rag_details.collection_name,
-                    persist_directory=mismo_3_6_rag_details.vector_database_path,
-                    recursion_limit=mismo_3_6_rag_details.recursion_limit,
-                    persistance_db_path=self.database_path
-                )
-                register_rag_agent(mismo_3_6_rag, mismo_3_6_rag_details.description)
-                rag_related_agents.append(mismo_3_6_rag)
-
-                research_details = self.agent_registry.research
-                research_agent = ResearchAgent(
-                    id=research_details.agent_id,
-                    name=research_details.agent_name,
-                    description=research_details.description,
-                    llm=research_details.llm,
-                    recursion_limit=research_details.recursion_limit,
-                    persistence_db_path=self.database_path
-                )
-                rag_related_agents.append(research_agent)
-
-                # Initialize the RAG middleware agent.
-                rag_middleware_details = self.agent_registry.rag_middleware
-                rag_middleware = RAGMiddleware(
-                    id=rag_middleware_details.agent_id,
-                    name=rag_middleware_details.agent_name,
-                    description=rag_middleware_details.description,
-                    llm=rag_middleware_details.llm,
-                    research_agent=research_agent,
-                    recursion_limit=rag_middleware_details.recursion_limit,
-                    persistence_db_path=self.database_path,
-                    use_research_agent=True
-                )
-                rag_related_agents.append(rag_middleware)
-
-                rag_agents_session: dict[str, int] = {}
-                for agent in rag_related_agents:
-                    session = MicroserviceSession(
-                        agent_id=agent.id,
-                        project_id=self.microservice.project_id,
-                        microservice_id=self.microservice.id,
-                        created_by=self.microservice.created_by,
-                        updated_by=self.microservice.created_by
-                    )
-                    self.session_controller.create(session)
-                    agent.set_thread_id(session.id)
-                    rag_agents_session[agent.id] = session.id
-                    logger.info(f"Session created for RAG agent '{agent.id}': {session}")
-
-                # Update the GenpodContext with RAG sessions.
-                if not self._genpod_context.agents_session:
-                    self._genpod_context.update(agents_session=rag_agents_session)
-                    logger.debug("GenpodContext.agents_session was empty; set to new RAG sessions.")
-                else:
-                    updated_sessions = {**self._genpod_context.agents_session, **rag_agents_session}
-                    self._genpod_context.update(agents_session=updated_sessions)
-                    logger.debug("GenpodContext.agents_session updated with new RAG sessions.")
-
-                self.is_rag_enabled = True
-                logger.info("RAG agents set up successfully.")
-            except Exception as e:
-                logger.exception("Error during RAG setup.")
-                raise
-        else:
+        if self.is_rag_enabled:
             logger.info("RAG agents are already enabled; skipping setup.")
+            return
+
+        logger.info("Setting up RAG agents.")
+        rag_sessions: Dict[str, int] = {}
+
+        # Instantiate and register RAGAgents
+        for info in self.rag_agent_registry.values():
+            rag = RAGAgent(
+                id=info.agent_id,
+                name=info.agent_name,
+                description=info.description,
+                llm=info.llm,
+                collection_name=info.collection_name,
+                persist_directory=info.vector_database_path,
+                recursion_limit=info.recursion_limit,
+                persistence_db_path=self.database_path,
+            )
+            register_rag_agent(rag, info.description)
+            rag_sessions[rag.id] = self._create_session_for_agent(rag)
+
+        # Research Agent
+        research = self._build_and_attach_agent(
+            ResearchAgent,
+            self.agent_registry.research,
+            rag_sessions
+        )
+
+        # RAG Middleware
+        mw_info = self.agent_registry.rag_middleware
+        self._build_and_attach_agent(
+            RAGMiddleware,
+            mw_info,
+            rag_sessions,
+            research_agent=research,
+            use_research_agent=True
+        )
+
+        # Merge new RAG sessions into context
+        self._update_context_sessions(rag_sessions)
+
+        self.is_rag_enabled = True
+        logger.info("RAG agents set up successfully.")
+
+    def rehydrate_rag(self, session_map: Dict[str, int]) -> None:
+        """
+        Rehydrate Retrieval Augmented Generation (RAG) agents from existing sessions.
+        """
+        if self.is_rag_enabled:
+            return
+
+        logger.info("Hydrating RAG agents from existing sessions.")
+        # Rehydrate each RAGAgent
+        for info in self.rag_agent_registry.values():
+            tid = session_map.get(info.agent_id)
+            if not tid:
+                continue
+            agent = RAGAgent(
+                id=info.agent_id,
+                name=info.agent_name,
+                description=info.description,
+                llm=info.llm,
+                collection_name=info.collection_name,
+                persist_directory=info.vector_database_path,
+                recursion_limit=info.recursion_limit,
+                persistence_db_path=self.database_path,
+            )
+            register_rag_agent(agent, info.description)
+            agent.set_thread_id(tid)
+
+        # ResearchAgent
+        research_info = self.agent_registry.research
+        research_tid = session_map.get(research_info.agent_id)
+        research_agent = None
+        if research_tid:
+            research_agent = ResearchAgent(
+                id=research_info.agent_id,
+                name=research_info.agent_name,
+                description=research_info.description,
+                llm=research_info.llm,
+                recursion_limit=research_info.recursion_limit,
+                persistence_db_path=self.database_path
+            )
+            research_agent.set_thread_id(research_tid)
+
+        # RAGMiddleware
+        mw_info = self.agent_registry.rag_middleware
+        mw_tid = session_map.get(mw_info.agent_id)
+        if mw_tid:
+            middleware = RAGMiddleware(
+                id=mw_info.agent_id,
+                name=mw_info.agent_name,
+                description=mw_info.description,
+                llm=mw_info.llm,
+                research_agent=research_agent,
+                recursion_limit=mw_info.recursion_limit,
+                persistence_db_path=self.database_path,
+                use_research_agent=bool(research_agent),
+            )
+            middleware.set_thread_id(mw_tid)
+
+        self.is_rag_enabled = True
+        logger.info("RAG agents rehydrated successfully.")
+
+    def rehydrate_team(self, session_map: Dict[str, int]) -> None:
+        """
+        Rehydrate team members from existing sessions.
+        """
+        self.genpod_team = Team(self.agent_registry, self.database_path)
+        for member in self.genpod_team.get_team_members():
+            tid = session_map.get(member.id)
+            if tid:
+                member.set_thread_id(tid)
+
+    def rehydrate_supervisor(self, session_map: Dict[str, int]) -> None:
+        """
+        Rehydrate the supervisor from existing sessions.
+        """
+        info = self.agent_registry.supervisor
+        sup = SupervisorAgent(
+            id=info.agent_id,
+            name=info.agent_name,
+            description=info.description,
+            llm=info.llm,
+            recursion_limit=self.graph_recursion_limit,
+            persistence_db_path=self.database_path,
+            use_rag=info.use_rag,
+        )
+        tid = session_map.get(sup.id)
+        if tid:
+            sup.set_thread_id(tid)
+        self.supervisor = sup
+
+    def run_supervisor_flow(self, init_data: Optional[SupervisorInput] = None):
+        """
+        Pull the last saved state from the supervisor graph,
+        update context, resend to supervisor, and process the response.
+        """
+        payload = init_data or self.supervisor.graph.get_last_saved_state()
+        prompt = getattr(payload, "user_prompt", "") or payload.get("user_prompt", "")
+
+        # Update prompt in context
+        self._genpod_context.update(user_prompt=prompt)
+
+        # IMPORTANT: use the existing genpod_team (whether from setup or rehydrate)
+        self.supervisor.setup_team(self.genpod_team)
+
+        # Send & process
+        response = self.send_to_supervisor(payload)
+        self.process_supervisor_response(response)
+
+    def microservice_insights(
+        self,
+        user_id: int,
+        project_id: int,
+        microservice_id: int
+    ) -> None:
+        """
+        Continuously retrieve and display insights for a microservice.
+        """
+        logger.info("Starting to monitor microservice insights.")
+        try:
+            ms_ctrl = MicroserviceController()
+            metrics_ctrl = MicroserviceLLMMetricsController()
+
+            picked_microservice = ms_ctrl.get_microservice(microservice_id)
+            if not picked_microservice:
+                logger.warning(f"No active service for ID: {microservice_id}")
+                print(f"No active service found for ID {microservice_id}.")
+                return
+
+            session_details = Action._get_session_details(user_id, project_id, picked_microservice.id)
+            if not session_details:
+                logger.warning("No sessions found for insights.")
+                print("No sessions found for this service.")
+                return
+            session_map = {s.agent_id: s.id for s in session_details}
+
+            sup_info = self.agent_registry.supervisor
+            supervisor = SupervisorAgent(
+                id=sup_info.agent_id,
+                name=sup_info.agent_name,
+                description=sup_info.description,
+                llm=sup_info.llm,
+                recursion_limit=self.graph_recursion_limit,
+                persistence_db_path=self.database_path,
+                use_rag=sup_info.use_rag
+            )
+            sup_tid = session_map.get(supervisor.id)
+            if not sup_tid:
+                logger.warning("Supervisor session not found for insights.")
+                print("Supervisor session not found.")
+                return
+            supervisor.set_thread_id(sup_tid)
+
+            _team = Team(self.agent_registry, self.database_path)
+            insights = MicroserviceInsights({})
+
+            with Live(insights.build_renderable(), screen=True, refresh_per_second=2) as live:
+                while True:
+                    last_saved_state = supervisor.graph.get_last_saved_state()
+                    token_metrics = metrics_ctrl.get_token_metrics_by_microservice(
+                        microservice_id, project_id, user_id
+                    )
+                    active_node = last_saved_state.get("active_node", "")
+                    agent_info = METHOD_TO_AGENT.get("call_architect")
+                    agent_state = None
+
+                    if agent_info:
+                        member = next(
+                            (a for a in _team.get_team_members() if a.id == agent_info.agent_id),
+                            None
+                        )
+                        tid = session_map.get(agent_info.agent_id)
+                        if member and tid:
+                            member.set_thread_id(tid)
+                            agent_state = member.graph.get_last_saved_state()
+                            agent_state["agent_name"] = agent_info.agent_name
+
+                    insights.data = last_saved_state
+                    insights.token_metrics = token_metrics
+                    insights.current_agent = agent_state
+                    live.update(insights.build_renderable())
+                    time.sleep(5)
+
+        except KeyboardInterrupt:
+            logger.info("Microservice insights monitoring stopped by user.")
+        except Exception as e:
+            logger.error(f"Error retrieving microservice insights: {e}")
+            raise
 
 
 class Action:
     """
     Action class responsible for managing projects and microservice operations.
-
-    This includes creating projects, generating microservices, resuming microservices,
-    and continuously monitoring service status. User interactions for input validation
-    are also handled by this class.
     """
 
     def __init__(
         self,
         agents: AgentRegistry,
-        rag_agents: RAGAgentRegistry,
+        rag_agents: Dict[str, RAGAgentInfo],
         database_path: str,
         graph_recursion_limit: int
     ):
-        """
-        Initialize the Action instance.
-
-        Args:
-            agents (AgentRegistry): Registry of agents for microservice operations.
-            rag_agents (RAGAgentRegistry): Registry of RAG (Retrieval-Augmented Generation) agents.
-            database_path (str): File system path to the persistence database.
-            graph_recursion_limit (int): Recursion limit for graph-based operations.
-        """
         self._genpod_context = GenpodContext.get_context()
         self.agents = agents
         self.rag_agents = rag_agents
         self.database_path = database_path
         self.graph_recursion_limit = graph_recursion_limit
-    
+
     def add_project(self, user_id: int):
         """
         Add a new project to the system based on user-provided inputs.
-
-        Prompts the user for the project name and description, validates the inputs,
-        creates a new Project instance, and persists it via the ProjectController.
-
-        Args:
-            user_id (int): The ID of the user creating the project.
-
-        Raises:
-            Exception: Propagates any errors encountered during project creation.
         """
         logger.info("Starting to add a new project.")
         project_controller = ProjectController()
-
         try:
             project_name = self._prompt_for_input("Enter the project name (at least 3 characters)", min_length=3)
             project_description = self._prompt_for_input("Enter the project description (at least 10 characters)", min_length=10)
@@ -342,31 +486,23 @@ class Action:
             logger.error(f"Failed to add project: {e}")
             raise
 
-    def generate(self, project_id: int, user_id: int, project_path: str, license_header: str, license_url: str):
+    def generate(
+        self,
+        project_id: int,
+        user_id: int,
+        project_path: str,
+        license_header: str,
+        license_url: str
+    ):
         """
         Generate a new microservice for a given project.
-
-        This method retrieves project details, creates a new Microservice,
-        initializes an ActionManager to set up team members and RAG agents,
-        sends the user's project idea to the supervisor, and processes the supervisor's response.
-
-        Args:
-            project_id (int): The ID of the project for which the microservice is generated.
-            user_id (int): The ID of the user generating the microservice.
-            project_path (str): File system path where the project resides.
-            license_header (str): License header text for the microservice.
-            license_url (str): URL pointing to the license file.
-
-        Raises:
-            ValueError: If the specified project is not found.
-            Exception: Propagates any other errors encountered during microservice generation.
         """
         logger.info("Starting microservice generation.")
         try:
             project = self._get_project(project_id, user_id)
             if project is None:
                 raise ValueError("Project not found.")
-            
+
             microservice = Microservice(
                 project_id=project.id,
                 status=str(PStatus.NEW),
@@ -384,30 +520,18 @@ class Action:
                 self.database_path,
                 self.graph_recursion_limit
             )
-            
+
             human_prompt = Action._prompt_user_for_project_generation(
                 manual_prompt="Enter your project idea (at least 10 characters)",
                 min_length=10,
             )
-            # TODO: Need to add support for multiple files just for this input
-            # additional_input_prompt = Action._prompt_user_for_project_generation(
-            #     manual_prompt="Enter additional input (at least 10 characters)",
-            #     min_length=10,
-            # )
 
-            final_human_input = (
-                "Human Prompt: "
-                f"{human_prompt}"
-                # "Additional Details:"
-                # f"{additional_input_prompt}"
-            )
+            final_human_input = f"Human Prompt: {human_prompt}"
             manager.microservice.prompt = final_human_input
             manager.microservice_controller.create(manager.microservice)
             logger.info(f"Microservice created with ID {manager.microservice.id} for project ID {manager.microservice.project_id}.")
 
             self._genpod_context.update(user_prompt=final_human_input)
-            logger.debug("GenpodContext updated with user_prompt: %s", final_human_input)
-
             delay_seconds = 5
             print(
                 f"Service registered with the database.\n"
@@ -429,8 +553,7 @@ class Action:
                 license_url=manager.microservice.license_file_url
             )
 
-            supervisor_response = manager.send_to_supervisor(supervisor_data)
-            manager.process_supervisor_response(supervisor_response)
+            manager.run_supervisor_flow(supervisor_data)
 
             logger.info("Microservice generation completed successfully.")
             print(
@@ -445,16 +568,6 @@ class Action:
     def resume(self, user_id: int):
         """
         Resume an existing microservice project.
-
-        Retrieves the project and microservice details for the user,
-        reinitializes team members and RAG agents, and processes the supervisor's
-        latest state to resume operations.
-
-        Args:
-            user_id (int): The ID of the user resuming the project.
-
-        Raises:
-            Exception: Propagates any errors encountered during the resume process.
         """
         logger.info("Resuming microservice.")
         try:
@@ -470,11 +583,12 @@ class Action:
                 logger.warning("No active microservices found for the selected project.")
                 return
 
-            session_details = Action._get_session_details(user_id, picked_project_id, picked_microservice.id)
-            if not session_details:
+            sessions = Action._get_session_details(user_id, picked_project_id, picked_microservice.id)
+            if sessions is None:
                 print("No sessions found for this service.")
                 logger.warning("No sessions found for the selected microservice.")
                 return
+            session_map: Dict[str,int] = {s.agent_id: s.id for s in sessions}
 
             manager = ActionManager(
                 picked_microservice,
@@ -484,94 +598,51 @@ class Action:
                 self.graph_recursion_limit,
             )
 
-            manager.setup_team_members()
-            manager.setup_rag()
+            # Rehydrate flows
+            self._genpod_context.update(agents_session=session_map)
+            manager.rehydrate_team(session_map)
+            manager.rehydrate_supervisor(session_map)
+            manager.rehydrate_rag(session_map)
 
-            last_saved_state = manager.supervisor.graph.get_last_saved_state()
-
-            user_prompt = last_saved_state['user_prompt']
-            self._genpod_context.update(user_prompt=user_prompt)
-            logger.debug("GenpodContext updated with user_prompt: %s", user_prompt)
-
-            supervisor_response = manager.send_to_supervisor(last_saved_state)
-            manager.process_supervisor_response(supervisor_response)
+            # Run with the correct genpod_team attached
+            manager.run_supervisor_flow()
 
             logger.info("Microservice resumed successfully.")
             print(
-                f"Your service was resumed successfully! Project ID: {manager.microservice.project_id}, "
-                f"Service ID: {manager.microservice.id}, "
-                f"Service Name: {manager.microservice.microservice_name}, Location: {manager.microservice.project_location}."
+                f"Your service was resumed successfully! Project ID: {picked_microservice.project_id}, "
+                f"Service ID: {picked_microservice.id}, "
+                f"Name: {picked_microservice.microservice_name}, Location: {picked_microservice.project_location}."
             )
         except Exception as e:
             logger.error(f"Failed to resume microservice: {e}")
             raise
 
-    def microservice_status(
+    def microservice_insights(
         self,
         user_id: int,
         project_id: int,
         microservice_id: int
     ) -> None:
         """
-        Continuously display the status of a microservice.
-
-        Retrieves the microservice and its session details, then enters a loop to
-        periodically fetch and display the current project status via the supervisor.
-        The loop runs indefinitely with a 5-second interval between updates.
-
-        Args:
-            user_id (int): The ID of the user checking the status.
-            project_id (int): The ID of the project containing the microservice.
-            microservice_id (int): The ID of the microservice to monitor.
-
-        Raises:
-            Exception: Propagates any errors encountered during status retrieval.
+        Continuously retrieve and display insights for a microservice.
         """
-        logger.info("Checking microservice status.")
-        try:
-            microservice_controller = MicroserviceController()
-            picked_microservice = microservice_controller.get_microservice(microservice_id)
-            if not picked_microservice:
-                logger.warning(f"No active service found for microservice ID: {microservice_id}")
-                print("No active service found for the provided microservice ID.")
-                return
-
-            session_details = Action._get_session_details(user_id, project_id, picked_microservice.id)
-            if not session_details:
-                print("No sessions found for this service.")
-                logger.warning("No sessions found during status check.")
-                return
-
-            session_map = {session.agent_id: session.id for session in session_details}
-
-            supervisor_details = self.agents.supervisor
-            supervisor = SupervisorAgent(
-                id=supervisor_details.agent_id,
-                name=supervisor_details.agent_name,
-                description=supervisor_details.description,
-                llm=supervisor_details.llm,
-                recursion_limit=self.graph_recursion_limit,
-                persistence_db_path=self.database_path,
-                use_rag=supervisor_details.use_rag
-            )
-            supervisor_thread_id = session_map.get(supervisor.id)
-            if not supervisor_thread_id:
-                logger.warning("No session found for the supervisor agent.")
-                print("Supervisor session not found.")
-                return
-            supervisor.set_thread_id(session_map[supervisor.id])
-
-            logger.info("Entering status update loop for microservice.")
-            while True:
-                last_saved_state = supervisor.graph.get_last_saved_state()
-                project_status = ProjectStatus(last_saved_state)
-                
-                sys.stdout.write(project_status.display_project_status())
-                sys.stdout.flush()
-                time.sleep(5)
-        except Exception as e:
-            logger.error(f"Failed to get service status: {e}")
-            raise
+        logger.info("Starting to monitor microservice insights.")
+        manager = ActionManager(
+            Microservice(
+                project_id=project_id,
+                status="",
+                project_location="",
+                license_text="",
+                license_file_url="",
+                created_by=user_id,
+                updated_by=user_id
+            ),
+            self.agents,
+            self.rag_agents,
+            self.database_path,
+            self.graph_recursion_limit
+        )
+        manager.microservice_insights(user_id, project_id, microservice_id)
 
     @staticmethod
     def _prompt_user_for_project_generation(
@@ -582,25 +653,13 @@ class Action:
     ) -> str:
         """
         Generic method to prompt the user for input, either via a file or manually.
-
-        Args:
-            manual_prompt (str): The prompt message for manual input.
-            min_length (int): Minimum length for manual input (if applicable).
-            file_input_prompt (Optional[str]): Optional prompt for file input.
-            file_option_label (str): Label for the file input option.
-            manual_option_label (str): Label for the manual input option.
-            choice_prompt (str): Format string for the choice prompt.
-
-        Returns:
-            str: The validated user input.
         """
-        choice_prompt: str = "Enter {file_opt} to provide input via file, or {manual_opt} to enter manually: \n"
-
+        choice_prompt = "Enter {file_opt} to provide input via file, or {manual_opt} to enter manually: \n"
         while True:
             try:
-                prompt_msg = choice_prompt.format(file_opt=file_option_label, manual_opt=manual_option_label)
-                input_type = input(prompt_msg).strip()
-
+                input_type = input(choice_prompt.format(
+                    file_opt=file_option_label, manual_opt=manual_option_label
+                )).strip()
                 if input_type == file_option_label:
                     return Action._prompt_for_file_input()
                 elif input_type == manual_option_label:
@@ -615,17 +674,6 @@ class Action:
     def _get_project_details(user_id: int) -> Optional[int]:
         """
         Retrieve and validate project details for the given user.
-
-        Prompts the user to select a project from a list of available projects.
-
-        Args:
-            user_id (int): The ID of the user.
-
-        Returns:
-            Optional[int]: The selected project ID if available, else None.
-
-        Raises:
-            Exception: Propagates any errors encountered while retrieving projects.
         """
         logger.info(f"Retrieving project details for user ID: {user_id}")
         project_controller = ProjectController()
@@ -653,19 +701,6 @@ class Action:
     def _get_microservice_details(user_id: int, project_id: int) -> Optional[Microservice]:
         """
         Retrieve and validate microservice details for the given project.
-
-        Lists active microservices (i.e. those not marked as "DONE") and prompts the user
-        to select one for resuming.
-
-        Args:
-            user_id (int): The ID of the user.
-            project_id (int): The ID of the project.
-
-        Returns:
-            Optional[Microservice]: The selected Microservice if available, else None.
-
-        Raises:
-            Exception: Propagates any errors encountered while retrieving microservices.
         """
         logger.info(f"Retrieving microservice details for user ID: {user_id}, project ID: {project_id}")
         microservice_controller = MicroserviceController()
@@ -690,7 +725,6 @@ class Action:
                 lambda ms_id: any(ms.id == ms_id for ms in active_microservices),
                 "Invalid microservice ID. Please try again."
             )
-            logger.info(f"User selected microservice ID: {selected_id}")
             return next((ms for ms in active_microservices if ms.id == selected_id), None)
         except Exception as e:
             logger.exception("An error occurred while retrieving microservice details.")
@@ -700,17 +734,6 @@ class Action:
     def _get_session_details(user_id: int, project_id: int, microservice_id: int) -> Optional[List[MicroserviceSession]]:
         """
         Retrieve session details for the specified user, project, and microservice.
-
-        Args:
-            user_id (int): The ID of the user.
-            project_id (int): The ID of the project.
-            microservice_id (int): The ID of the microservice.
-
-        Returns:
-            Optional[List[MicroserviceSession]]: A list of sessions if available, else None.
-
-        Raises:
-            Exception: Propagates any errors encountered during session retrieval.
         """
         logger.info(f"Retrieving session details for user ID: {user_id}, project ID: {project_id}, microservice ID: {microservice_id}")
         session_controller = MicroserviceSessionController()
@@ -726,17 +749,9 @@ class Action:
             raise
 
     @staticmethod
-    def _list_items(items: List, display_func, title: str):
+    def _list_items(items: List[Any], display_func, title: str):
         """
         Display a list of items to the user.
-
-        Args:
-            items (List): The list of items to display.
-            display_func (Callable): Function that converts an item to its display string.
-            title (str): Title under which items will be listed.
-
-        Raises:
-            Exception: Propagates any errors encountered during listing.
         """
         logger.info(f"Listing items under '{title}'.")
         try:
@@ -752,19 +767,6 @@ class Action:
     def _prompt_user(prompt: str, validate_func, error_message: str) -> int:
         """
         Prompt the user for integer input and validate it.
-
-        Continuously prompts until a valid integer input is received.
-
-        Args:
-            prompt (str): The prompt message for the user.
-            validate_func (Callable): A function to validate the user input.
-            error_message (str): Error message to display if validation fails.
-
-        Returns:
-            int: The validated user input.
-
-        Raises:
-            Exception: Propagates any errors encountered during prompting.
         """
         while True:
             try:
@@ -772,11 +774,8 @@ class Action:
                 if validate_func(user_input):
                     logger.info(f"User input accepted: {user_input}")
                     return user_input
-                else:
-                    logger.warning(f"Invalid input: {user_input}. Prompting user again.")
-                    print(error_message)
+                print(error_message)
             except ValueError:
-                logger.warning("Invalid input type provided. Expected an integer.")
                 print("Invalid input. Please enter a valid integer.")
             except Exception as e:
                 logger.exception("An error occurred while prompting the user.")
@@ -785,17 +784,7 @@ class Action:
     @staticmethod
     def _prompt_for_input(prompt_message: str, min_length: int) -> str:
         """
-        Prompt the user for input and validate it based on a minimum length requirement.
-
-        Args:
-            prompt_message (str): The message displayed to prompt the user.
-            min_length (int): Minimum required length for the input.
-
-        Returns:
-            str: The validated input string.
-
-        Raises:
-            Exception: Propagates any errors encountered during input.
+        Prompt the user for input and validate by minimum length.
         """
         while True:
             try:
@@ -803,8 +792,7 @@ class Action:
                 if len(user_input) >= min_length:
                     logger.debug(f"User provided valid input: {user_input}")
                     return user_input
-                else:
-                    print(f"Input too short. Please enter at least {min_length} characters.")
+                print(f"Input too short. Please enter at least {min_length} characters.")
             except Exception as e:
                 logger.exception("Error during user input.")
                 raise
@@ -812,30 +800,18 @@ class Action:
     @staticmethod
     def _prompt_for_file_input() -> str:
         """
-        Prompt the user for a file path, validate the file type and content length.
-
-        Returns:
-            str: The validated file content.
-
-        Raises:
-            Exception: If the file is not valid or content is insufficient.
+        Prompt the user for a file path, validate extension, existence, and content length.
         """
         while True:
             try:
                 file_path = input("Enter the path to your Markdown file (.md): ").strip()
-
-                # Validate file extension
                 if not file_path.lower().endswith(".md"):
                     print("Invalid file type. Please provide a Markdown (.md) file.")
                     continue
-
-                # Validate file existence
                 if not os.path.exists(file_path):
                     print("File does not exist. Please enter a valid file path.")
                     continue
-
                 try:
-                    # Attempt to open the file
                     with open(file_path, "r", encoding="utf-8") as file:
                         content = file.read().strip()
                 except UnicodeDecodeError:
@@ -843,34 +819,19 @@ class Action:
                     print("Please provide a valid UTF-8 encoded Markdown (.md) file.")
                     logger.error(f"Unsupported characters detected in file: {file_path}")
                     continue
-
-                # Validate content length
                 if len(content) < 20:
                     print("File content is too short. Please provide a file with at least 20 characters.")
                     continue
-
                 logger.debug(f"User provided valid file input from {file_path}")
                 return content
-
             except Exception as e:
                 logger.exception("Error during file input processing.")
-                print("An unexpected error occurred while processing the file. Please try again.")
                 raise
 
     @staticmethod
     def _get_project(project_id: int, user_id: int) -> Optional[Project]:
         """
         Retrieve and validate project details for the specified user.
-
-        Args:
-            project_id (int): The ID of the project to retrieve.
-            user_id (int): The ID of the user who owns the project.
-
-        Returns:
-            Optional[Project]: The retrieved Project instance if found, else None.
-
-        Raises:
-            Exception: Propagates any errors encountered during project retrieval.
         """
         logger.info(f"Retrieving project details for project ID: {project_id} and user ID: {user_id}")
         project_controller = ProjectController()
@@ -879,7 +840,6 @@ class Action:
             if not user_project:
                 logger.warning(f"No project found with ID: {project_id} for user ID: {user_id}")
                 return None
-
             logger.info(f"Project details: ID={user_project.id}, Name={user_project.project_name}")
             return user_project
         except Exception as e:

@@ -1,0 +1,13 @@
+checks:
+  - name: "static_analysis"
+    order: 1
+    enabled: true
+    description: "Perform static code analysis using Semgrep."
+  - name: "lint"
+    order: 2
+    enabled: true
+    description: "Run linting tools (e.g., flake8) to check code style."
+  - name: "test"
+    order: 3
+    enabled: true
+    description: "Execute unit tests using pytest."

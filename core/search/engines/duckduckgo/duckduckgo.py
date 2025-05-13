@@ -4,7 +4,7 @@ from langchain_community.utilities import DuckDuckGoSearchAPIWrapper
 from pydantic import BaseModel, Field
 
 from models import WebSearchResults
-from utils.logs.logging_utils import logger
+from utils.logger import logger
 from utils.yaml_utils import read_yaml
 
 DEFAULT_CONFIG_PATH = Path("core/search/engines/duckduckgo/duckduckgo.yaml")
