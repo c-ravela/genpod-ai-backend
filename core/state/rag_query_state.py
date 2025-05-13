@@ -3,6 +3,7 @@ from typing import Any, Dict
 from pydantic import Field
 
 from core.state.base_state import BaseInputState, BaseOutputState, BaseState
+from models import RagResponseType
 
 
 class RAGQueryInput(BaseInputState):
@@ -31,7 +32,7 @@ class RAGQueryOutput(BaseOutputState):
     metadata: Dict[str, Any] = Field(
         description="Metadata related to the answer (e.g., document name, content excerpt)."
     )
-    response_type: str = Field(
+    response_type: RagResponseType = Field(
         description=("Indicates how the response was generated (e.g., 'rag_answered', "
                      "'no_rag_to_answer', 'rag_cache', 'rejected').")
     )
