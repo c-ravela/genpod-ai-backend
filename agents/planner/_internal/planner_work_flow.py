@@ -452,10 +452,26 @@ class PlannerWorkFlow(BaseWorkFlow[PlannerPrompts]):
 
         while state.issue_list.has_pending_items():
             issue = state.issue_list.get_next_item()
-            logger.debug(f"[{func_name}] Processing issue with issue_id: {issue.issue_id} and description: {issue.description}")
+            file_path = issue.file_path
 
-            file_content = FS.read_file(issue.file_path)
-            logger.debug(f"[{func_name}] Read file content from: {issue.file_path}")
+            if not file_path or not os.path.isfile(file_path):
+                reason = "missing" if not file_path else "not a valid file"
+                issue.issue_status = Status.ABANDONED
+                logger.warning(
+                    f"[{func_name}] Abandoning issue {issue.issue_id}: {reason} '{file_path}'"
+                )
+                continue
+
+            try:
+                file_content = FS.read_file(file_path)
+            except Exception as e:
+                issue.issue_status = Status.ABANDONED
+                logger.error(
+                    f"[{func_name}] Abandoning issue {issue.issue_id} due to read error: {e}"
+                )
+                continue
+
+            logger.debug(f"[{func_name}] Read file content from: {file_path}")
 
             llm_output = self.invoke_with_pydantic_model(
                 self.prompts.issues_segregation_prompt,

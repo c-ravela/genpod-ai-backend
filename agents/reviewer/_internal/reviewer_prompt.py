@@ -4,7 +4,8 @@ from langchain.output_parsers import PydanticOutputParser
 from langchain_core.prompts import PromptTemplate
 
 from core.prompt import Prompt, PromptTemplateAdapter
-from models import IssuesReport
+from models import (DockerfileSelectionResponse, DockerSandboxExecutorParams,
+                    IssuesReport, LanguageSelectionResponse)
 from utils.logger import logger
 from utils.yaml_utils import read_yaml
 
@@ -16,11 +17,18 @@ class ReviewerPrompts:
     Manages and provides prompt templates for code review.
 
     This class loads prompt templates from a YAML configuration file and initializes
-    specific prompt instances. Currently, it supports generating a static code analysis prompt.
+    specific prompt instances. Currently, it supports generating prompts for:
+      - Static code analysis (producing IssuesReport).
+      - Generic check issue reporting (producing IssuesReport).
+      - Dockerfile selection (producing DockerfileSelectionResponse).
+      - Docker sandbox executor parameters (producing DockerSandboxExecutorParams).
 
     Attributes:
         use_rag (bool): Flag indicating whether to use Retrieval-Augmented Generation (RAG).
         static_code_analysis_prompt (Prompt): A prompt instance for static code analysis.
+        generic_check_issue_report_prompt (Prompt): A prompt instance for generating a generic IssuesReport.
+        dockerfile_selection_prompt (Prompt): A prompt instance for selecting the appropriate Dockerfile.
+        docker_sandbox_executor_prompt (Prompt): A prompt instance for generating parameters for Docker sandbox execution.
     """
 
     def __init__(self, use_rag: bool):
@@ -58,6 +66,80 @@ class ReviewerPrompts:
 
         self.static_code_analysis_prompt = Prompt(
             adapter=PromptTemplateAdapter(static_code_analysis_prompt_template)
+        )
+
+        generic_check_issue_report_prompt_template = PromptTemplate(
+            template=self.get_template('generic_check_issue_report_prompt_template'),
+            input_variables=['check_name', 'check_description', 'raw_check_output'],
+            partial_variables={
+                "format_instructions": PydanticOutputParser(
+                    pydantic_object=IssuesReport
+                ).get_format_instructions()
+            }
+        )
+        self.generic_check_issue_report_prompt = Prompt(
+            adapter=PromptTemplateAdapter(generic_check_issue_report_prompt_template)
+        )
+
+        # Dockerfile Selection Prompt
+        dockerfile_selection_prompt_template = PromptTemplate(
+            template=self.get_template('dockerfile_selection_prompt_template'),
+            input_variables=['job_description', 'available_dockerfiles'],
+            partial_variables={
+                "format_instructions": PydanticOutputParser(
+                    pydantic_object=DockerfileSelectionResponse
+                ).get_format_instructions()
+            }
+        )
+        self.dockerfile_selection_prompt = Prompt(
+            adapter=PromptTemplateAdapter(dockerfile_selection_prompt_template)
+        )
+
+        # Docker Sandbox Executor Prompt
+        docker_sandbox_executor_prompt_template = PromptTemplate(
+            template=self.get_template('docker_sandbox_executor_prompt_template'),
+            input_variables=['task_description', 'docker_image_description'],
+            partial_variables={
+                "format_instructions": PydanticOutputParser(
+                    pydantic_object=DockerSandboxExecutorParams
+                ).get_format_instructions()
+            }
+        )
+        self.docker_sandbox_executor_prompt = Prompt(
+            adapter=PromptTemplateAdapter(docker_sandbox_executor_prompt_template)
+        )
+
+        language_selection_prompt_template = PromptTemplate(
+            template=self.get_template('language_selection_prompt_template'),
+            input_variables=['requirements', 'available_languages'],
+            partial_variables={
+                "format_instructions": PydanticOutputParser(
+                    pydantic_object=LanguageSelectionResponse
+                ).get_format_instructions()
+            }
+        )
+        self.language_selection_prompt = Prompt(
+            adapter=PromptTemplateAdapter(language_selection_prompt_template)
+        )
+
+        file_path_selection_prompt_template = PromptTemplate(
+            template=self.get_template('file_path_selection_prompt_template'),
+            input_variables=[
+                'check_name',
+                'check_description',
+                'project_directory',
+                'directory_listing',
+                'command',
+                'command_description'
+            ],
+            partial_variables={
+                "format_instructions": PydanticOutputParser(
+                    pydantic_object=LanguageSelectionResponse
+                ).get_format_instructions()
+            }
+        )
+        self.file_path_selection_prompt = Prompt(
+            adapter=PromptTemplateAdapter(file_path_selection_prompt_template)
         )
 
     def get_template(self, key: str) -> str:

@@ -141,11 +141,11 @@ def main():
             action_obj.resume(user_id)
             logger.info("The 'resume' action completed successfully.")
 
-        elif requested_action == "microservice_status":
+        elif requested_action == "insights":
             if len(sys.argv) < 5:
                 logger.error(
-                    "Insufficient arguments for 'microservice_status' action. Expected: <project_id> <service_id> <user_id>. "
-                    "Usage: 'microservice_status <project_id> <service_id> <user_id>'."
+                    "Insufficient arguments for 'microservice_insights' action. Expected: <project_id> <service_id> <user_id>. "
+                    "Usage: 'microservice_insights <project_id> <service_id> <user_id>'."
                 )
                 sys.exit(1)
 
@@ -160,10 +160,10 @@ def main():
             genpod_context.update(
                 project_id=project_id, microservice_id=service_id, user_id=user_id
             )
-            logger.info("Context updated for the 'microservice_status' action.")
+            logger.info("Context updated for the 'microservice_insights' action.")
 
-            action_obj.microservice_status(user_id, project_id, service_id)
-            logger.info("The 'microservice_status' action completed successfully.")
+            action_obj.microservice_insights(user_id, project_id, service_id)
+            logger.info("The 'microservice_insights' action completed successfully.")
 
         elif requested_action == "add_project":
             if len(sys.argv) < 3:

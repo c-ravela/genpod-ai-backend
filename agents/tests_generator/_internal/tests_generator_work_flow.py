@@ -316,9 +316,27 @@ class TestCoderWorkFlow(BaseWorkFlow[TestsGeneratorPrompts]):
         logger.debug("Starting skeleton updation for issue at file: %s", state.current_planned_issue.file_path)
         
         planned_issue = state.current_planned_issue
+        file_path = planned_issue.file_path
 
-        file_content = FS.read_file(planned_issue.file_path)
+        if not file_path or not os.path.isfile(file_path):
+            reason = "missing" if not file_path else "not a valid file"
+            planned_issue.status = Status.ABANDONED
+            logger.warning(
+                f"[skeleton_updation_node] Abandoning issue {planned_issue.id}: "
+                f"{reason} '{file_path}'"
+            )
+            return state
+
+        try:
+            file_content = FS.read_file(file_path)
+        except Exception as e:
+            planned_issue.status = Status.ABANDONED
+            logger.error(
+                f"[skeleton_updation_node] Abandoning issue {planned_issue.id} due to read error: {e}"
+            )
+            return state
         logger.debug("Read file content from: %s", planned_issue.file_path)
+
         params = {
             'file_content': file_content,
             'issue_details': planned_issue.issue_details(),
@@ -366,9 +384,27 @@ class TestCoderWorkFlow(BaseWorkFlow[TestsGeneratorPrompts]):
         logger.debug("Starting test code updation for issue at file: %s", state.current_planned_issue.file_path)
     
         planned_issue = state.current_planned_issue
+        file_path = planned_issue.file_path
 
-        file_content = FS.read_file(planned_issue.file_path)
-        logger.debug("Read file content from: %s", planned_issue.file_path)
+        # 1) Graceful abandon if path is missing or invalid
+        if not file_path or not os.path.isfile(file_path):
+            reason = "missing" if not file_path else "not a valid file"
+            planned_issue.status = Status.ABANDONED
+            logger.warning(
+                f"[test_code_updation_node] Abandoning issue {planned_issue.id}: "
+                f"{reason} '{file_path}'"
+            )
+            return state
+
+        # 2) Try reading; on error, abandon
+        try:
+            file_content = FS.read_file(file_path)
+        except Exception as e:
+            planned_issue.status = Status.ABANDONED
+            logger.error(
+                f"[test_code_updation_node] Abandoning issue {planned_issue.id} due to read error: {e}"
+            )
+            return state
 
         params = {
             'file_content': file_content,

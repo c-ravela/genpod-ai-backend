@@ -1,12 +1,10 @@
-from enum import Enum
+# reviewer_node_enum.py
+from dataclasses import dataclass
 
 
-class ReviewerNodeEnum(str, Enum):
-    """Reviewer Node Enum"""
-
+@dataclass
+class ReviewerNodeEnum:
+    """Enumeration for Reviewer workflow nodes."""
     ENTRY = "entry"
-    STATIC_CODE_ANALYSIS = "static_code_analysis"
+    RUN_CHECKS = "run_checks"
     EXIT = "exit"
-
-    def __str__(self):
-        return self.value

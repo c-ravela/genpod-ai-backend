@@ -31,7 +31,7 @@ class Queue(BaseModel, Generic[QueueType]):
 
     items: List[QueueType] = Field(
         description="List of items in the queue",
-        default=[]
+        default_factory=list
     )
 
     def add_item(self, item: QueueType) -> None:
@@ -74,7 +74,7 @@ class Queue(BaseModel, Generic[QueueType]):
         Returns:
             List[QueueType]: A list containing all items in the queue.
         """
-        return self.items
+        return list(self.items)
 
     def update_item(self, updated_item: QueueType) -> None:
         """
@@ -123,6 +123,27 @@ class Queue(BaseModel, Generic[QueueType]):
         """
         self.items.clear()
         self.next = 0
+
+    def requeue_item(self, item: QueueType) -> None:
+        """
+        Remove `item` from wherever it is and insert it so that it will
+        be the very next one returned by `get_next_item()`. If `item`
+        isn't found in the queue, this is a no-op.
+        """
+        try:
+            idx = self.items.index(item)
+        except ValueError:
+            return
+
+        # remove from old spot
+        self.items.pop(idx)
+
+        # if that was before our pointer, back the pointer up so we don't skip
+        if idx < self.next:
+            self.next -= 1
+
+        # insert at the pointer so it’s next in line
+        self.items.insert(self.next, item)
 
     def __str__(self) -> str:
         """
@@ -309,14 +330,24 @@ class Issue(BaseModel):
         examples=["Undefined variable 'x' in function 'foo'."]
     )
 
-    suggestions: Optional[List[str]] = Field(
-        default=None,
+    suggestions: List[str] = Field(
+        default_factory=list,
         description="Suggestions for resolving the issue.",
         title="Suggestions",
         examples=[
             "Define the variable 'x' before use",
             "Check variable scope and initialization"
         ]
+    )
+
+    human_reviewed: bool = Field(
+        default=False,
+        description="Whether this issue has already been processed by a human reviewer."
+    )
+
+    duplicate_counter: int = Field(
+        default=0,
+        description="Number of issues filtered out as duplicates in this run."
     )
 
     def issue_details(self) -> str:
@@ -414,7 +445,7 @@ class PlannedIssue(BaseModel):
     )
 
     suggestions: List[str] = Field(
-        default=[],
+        default_factory=list,
         description="Suggestions for resolving the issue.",
         title="Suggestions",
         examples=[
@@ -426,13 +457,13 @@ class PlannedIssue(BaseModel):
     function_signatures: FileFunctionSignatures = Field(
         description="The skeleton or template of the function that needs to be "
                     "implemented.",
-        default=FileFunctionSignatures(function_signatures={}),
+        default_factory=lambda: FileFunctionSignatures(function_signatures={}),
         examples=["def function_name(args): pass"]
     )
 
     test_code: dict[str, str] = Field(
         description="The generated unit test code for the function.",
-        default={},
+        default_factory=dict,
         examples=["def test_function_name(): assert function_name() == expected_output"]
     )
 
@@ -480,13 +511,17 @@ class RequirementsDocument(BaseModel):
     Represents a comprehensive document that encapsulates the various
     requirements of a project. This class includes details about the
     project's architecture, tasks, coding standards, implementation
-    process, and licensing information. It also provides methods to
-    generate a Markdown representation of the document.
+    process, licensing information, and now also the recommended technology stack.
+    It also provides methods to generate a Markdown representation of the document.
     """
 
     project_summary: str = Field(
         default="",
         description="A brief overview of the project, summarizing its goals and objectives."
+    )
+    tech_stack: str = Field(
+        default="",
+        description="The recommended technology stack for the project. This should include programming language(s), frameworks, libraries, database solutions, dependency management tools, testing frameworks, and any relevant deployment or containerization recommendations, including version details where applicable."
     )
     system_architecture: str = Field(
         default="",
@@ -524,11 +559,12 @@ class RequirementsDocument(BaseModel):
 
         Returns:
             str: A Markdown string representing the requirements document with 
-                sections for each attribute.
+                 sections for each attribute.
         """
 
         sections = [
             ("Project Summary", self.project_summary),
+            ("Tech Stack", self.tech_stack),
             ("System Architecture", self.system_architecture),
             ("File Structure", self.file_structure),
             ("Microservice Design", self.microservice_design),
@@ -539,11 +575,10 @@ class RequirementsDocument(BaseModel):
         ]
         
         markdown_sections = "\n\n".join(
-            f"{content}" for title, content in sections
+            f"{content}" for title, content in sections if content
         )
 
         return f"# Project Requirements Document\n\n{markdown_sections}"
-
 
 class WebSearchResult(BaseModel):
     title: str = Field(default="No Title", description="The title of the search result.")

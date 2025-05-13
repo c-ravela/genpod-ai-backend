@@ -10,7 +10,8 @@ from langchain_core.runnables.base import RunnableSequence
 from pydantic import BaseModel, ValidationError
 
 from core.prompt import BasePrompt
-from llms.llm_metrics_callback import *
+from llms.llm_metrics_callback import (LLMMetricsCallback, MetricsContext,
+                                       TokenUsage)
 from models import AdditionalInfoRequest
 from utils.decorators import auto_repr
 from utils.logger import logger
@@ -210,8 +211,7 @@ class LLM(ABC, Generic[TLLMInstance], metaclass=LLMMeta):
                     final_response = AdditionalInfoRequest(**parsed)
                 except ValidationError as e2:
                     raise ValueError(
-                        f"Response does not match expected model ({response_model.__name__}) "
-                        f"nor AdditionalInfoRequest: {e}; {e2}"
+                        f"Failed {response_model.__name__}: {e}. Failed AdditionalInfoRequest: {e2}"
                     )
             return final_response
         else:

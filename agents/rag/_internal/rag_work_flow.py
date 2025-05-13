@@ -269,9 +269,11 @@ class RAGWorkFlow(BaseWorkFlow[RAGPrompts]):
         func_name = "generate_response_node"
         logger.info("%s: Generating response for query: '%s'.", func_name, state.query)
 
+        texts = [doc.page_content for doc in state.documents]
+        context_str = "\n\n---\n\n".join(texts)
         llm_output = self.invoke_with_pydantic_model(
             self.prompts.rag_generation_prompt,
-            {'question': state.query, 'context': state.documents},
+            {'question': state.query, 'context': context_str},
             PromptResponse
         )
         prompt_response = llm_output.response
@@ -279,10 +281,13 @@ class RAGWorkFlow(BaseWorkFlow[RAGPrompts]):
 
         if prompt_response.is_unknown:
             logger.info("%s: LLM indicated an unknown response. Marking as NOT_ANSWERED.", func_name)
+            state.response = ""
             state.response_type = RagResponseType.NOT_ANSWERED
-        else:
-            logger.info("%s: Valid response generated. Marking as ANSWERED.", func_name)
-            state.response_type = RagResponseType.ANSWERED
+            state.current_mode_stage = QueryAnswerStage.TRANSFORM_QUERY
+            return state
+
+        logger.info("%s: Valid response generated. Marking as ANSWERED.", func_name)
+        state.response_type = RagResponseType.ANSWERED
 
         state.response = prompt_response.response
         state.current_mode_stage = QueryAnswerStage.GRADE_RESPONSE
@@ -309,12 +314,14 @@ class RAGWorkFlow(BaseWorkFlow[RAGPrompts]):
         func_name = "grade_response_node"
         logger.info("%s: Starting response grading.", func_name)
 
+        texts = [doc.page_content for doc in state.documents]
+        facts = "\n\n---\n\n".join(texts)
         # Evaluate for hallucination issues.
         llm_output = self.invoke_with_pydantic_model(
             self.prompts.hallucination_grader_prompt,
             {
                 'generation': state.response,
-                'documents': state.documents
+                'documents': facts
             },
             BinaryScore
         )
@@ -327,17 +334,17 @@ class RAGWorkFlow(BaseWorkFlow[RAGPrompts]):
             logger.debug("%s: Updated hallucination_count to %d, retry_count remains %d.", func_name,
                          state.hallucination_count, state.retry_count)
 
-            if state.hallucination_count >= MAX_HALLUCINATION_LIMIT:
+            if state.hallucination_count < MAX_HALLUCINATION_LIMIT:
+                logger.info("%s: Retrying response generation. Reverting to GENERATE_RESPONSE stage.", func_name)
+                state.response = ""
+                state.response_type = RagResponseType.NOT_ADDRESSED
+                state.current_mode_stage = QueryAnswerStage.GENERATE_RESPONSE
+            else:
                 logger.info("%s: Maximum hallucination attempts reached. Rejecting response.", func_name)
                 state.response = ""
                 state.response_type = RagResponseType.REJECTED
                 state.current_mode_stage = QueryAnswerStage.FINISHED
-                return state
 
-            logger.info("%s: Retrying response generation. Reverting to GENERATE_RESPONSE stage.", func_name)
-            state.current_mode_stage = QueryAnswerStage.GENERATE_RESPONSE
-            state.response_type = RagResponseType.NOT_ADDRESSED
-            state.response = ""
             return state
 
         # Evaluate overall answer quality.
@@ -357,10 +364,10 @@ class RAGWorkFlow(BaseWorkFlow[RAGPrompts]):
             state.current_mode_stage = QueryAnswerStage.TRANSFORM_QUERY
             state.response_type = RagResponseType.NOT_ADDRESSED
             state.response = ""
-            return state
+        else:
+            logger.info("%s: Response passed grading. Marking workflow as FINISHED.", func_name)
+            state.current_mode_stage = QueryAnswerStage.FINISHED
 
-        logger.info("%s: Response passed grading. Marking workflow as FINISHED.", func_name)
-        state.current_mode_stage = QueryAnswerStage.FINISHED
         return state
 
     @record_node(RAGNodeEnum.EXIT)
@@ -416,8 +423,8 @@ class RAGWorkFlow(BaseWorkFlow[RAGPrompts]):
                 document_id=document_id,
                 document_version=document_version,
                 question=state.query,
-                raw_response=document.page_content,
-                size_of_data=len(document.page_content),
+                raw_response=state.response,
+                size_of_data=len(state.response),
                 created_by=self._genpod_context.user_id,
                 updated_by=self._genpod_context.user_id
             )

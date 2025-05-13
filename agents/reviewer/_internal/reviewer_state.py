@@ -25,6 +25,9 @@ class ReviewerInput(BaseInputState):
     requirements_document: RequirementsDocument = Field(
         description="Requirements documents for the project"
     )
+    previous_issues: IssuesQueue = Field(
+        description="Issues already reported in prior runs."
+    )
 
 
 class ReviewerOutput(BaseOutputState):
@@ -64,4 +67,8 @@ class ReviewerState(BaseState):
     issues: IssuesQueue = Field(
         default_factory=IssuesQueue,
         description="List of issues found during the review process."
+    )
+    previous_issues: IssuesQueue = Field(
+        default_factory=IssuesQueue,
+        description="Issues already reported in prior runs (injected by Supervisor)."
     )

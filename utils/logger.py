@@ -1,11 +1,13 @@
 import logging
 import os
 import re
+import shutil
 from datetime import datetime
 from logging.handlers import RotatingFileHandler
-import shutil  # For removing directories
+
 import yaml
 from pythonjsonlogger import jsonlogger
+
 
 def load_logger_config():
     """

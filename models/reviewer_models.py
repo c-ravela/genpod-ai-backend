@@ -11,7 +11,6 @@ class FileIssue(BaseModel):
 
     file_path: str = Field(
         description="The path to the file where the issue was found.",
-        default="",
         title="File Path",
         examples=["/path/to/file.py"]
     )
@@ -25,7 +24,6 @@ class FileIssue(BaseModel):
 
     description: str = Field(
         description="A detailed description of the issue.",
-        default="",
         title="Issue Description",
         examples=["Undefined variable 'x' in function 'foo'."]
     )
@@ -108,3 +106,64 @@ class IssuesReport(BaseModel):
                     raise ValueError(f'Invalid item in file_issues: {e}')
 
         return values
+
+
+class DockerfileSelectionResponse(BaseModel):
+    """
+    Represents the response for the Dockerfile selection prompt.
+    
+    Attributes:
+        id (str): The id of the selected Dockerfile object.
+    """
+    id: str = Field(
+        ...,
+        description="The id of the selected Dockerfile object."
+    )
+
+
+class DockerSandboxExecutorParams(BaseModel):
+    """
+    Represents the parameters required to execute code in a Docker sandbox.
+    
+    Attributes:
+        language (str): The programming language to use for sandbox execution.
+        command (str): The command to execute inside the container.
+        libraries (Optional[List[str]]): Optional list of libraries to install prior to execution.
+    """
+    language: str = Field(
+        ...,
+        description="The programming language to use for sandbox execution."
+    )
+    command: str = Field(
+        ...,
+        description="The command to execute inside the container."
+    )
+    libraries: Optional[List[str]] = Field(
+        None,
+        description="Optional list of libraries to install prior to execution."
+    )
+
+class LanguageSelectionResponse(BaseModel):
+    """
+    Represents the selected programming language for the project.
+
+    Attributes:
+        language (str): The programming language selected based on the provided requirements.
+    """
+    language: str = Field(
+        ...,
+        description="The programming language selected for the project based on the provided requirements."
+    )
+
+
+class FilePathSelectionResponse(BaseModel):
+    """
+    Represents the selected file or directory path for executing a check (e.g., lint or test).
+    
+    Attributes:
+        file_path (str): The file or directory path chosen for the check.
+    """
+    file_path: str = Field(
+        ...,
+        description="The file or directory path selected for executing the check."
+    )

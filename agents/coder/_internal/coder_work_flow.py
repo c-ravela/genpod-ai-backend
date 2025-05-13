@@ -409,26 +409,30 @@ class CoderWorkFlow(BaseWorkFlow[CoderPrompts]):
     def resolve_issue_node(self, state: CoderState) -> CoderState:
         """
         Resolves a detected issue by invoking the language model to generate a code generation plan
-        that addresses the issue. This function constructs the prompt using project details, the error
-        message, issue details, file path, file content, function signatures, and unit test code. The cleaned
-        response from the language model is then appended to the current code generation plan list, and
-        the coder state's mode stage is updated accordingly.
-
-        Args:
-            state (CoderState): The current state of the coder containing project information, the current
-                                planned issue details, error messages, and other related data.
-
-        Returns:
-            CoderState: The updated state after processing the issue resolution.
+        that addresses the issue. If the file is missing or unreadable, abandon the issue instead.
         """
-        logger.debug("%s: Starting resolve_issue_node for planned issue: %s", self.agent_name, state.current_planned_issue)
-        
+        func_name = "resolve_issue_node"
         planned_issue = state.current_planned_issue
+        file_path = planned_issue.file_path
 
+        # 1) Graceful abandon if no file or unreadable
+        if not file_path or not os.path.isfile(file_path):
+            reason = "missing" if not file_path else "not a valid file"
+            planned_issue.status = Status.ABANDONED
+            logger.warning(f"[{func_name}] Abandoning issue {planned_issue.id}: {reason} '{file_path}'")
+            return state
+
+        try:
+            file_content = FS.read_file(file_path)
+        except Exception as e:
+            planned_issue.status = Status.ABANDONED
+            logger.error(f"[{func_name}] Abandoning issue {planned_issue.id} due to read error: {e}")
+            return state
+
+        logger.debug(f"[{func_name}] Read file content from: {file_path}")
+
+        # 2) Existing issue‐resolution logic
         project_path = os.path.join(state.project_directory, state.project_name)
-        logger.debug("%s: Constructed project path: %s", self.agent_name, project_path)
-        
-        file_content = FS.read_file(planned_issue.file_path)
         prompt_params = {
             "project_name": state.project_name,
             "project_path": project_path,
@@ -439,31 +443,26 @@ class CoderWorkFlow(BaseWorkFlow[CoderPrompts]):
                 f"{planned_issue.issue_details()}\n"
                 f"Please review and address this issue promptly."
             ),
-            "file_path": planned_issue.file_path,
+            "file_path": file_path,
             "file_content": file_content,
             "function_signatures": planned_issue.function_signatures,
             "unit_test_code": planned_issue.test_code
         }
-        logger.debug("%s: Prepared prompt parameters for issue resolution: %s", self.agent_name, prompt_params)
-        
+        logger.debug(f"[{func_name}] Prepared prompt parameters for issue resolution: {prompt_params}")
+
         llm_output = self.invoke_with_pydantic_model(
             self.prompts.issue_resolution_prompt,
             prompt_params,
             CodeGenerationPlan
         )
-        logger.debug("%s: Received LLM output: %s", self.agent_name, llm_output)
+        logger.debug(f"[{func_name}] Received LLM output: {llm_output}")
 
         cleaned_response = llm_output.response
-        logger.debug("%s: Cleaned response from LLM: %s", self.agent_name, cleaned_response)
-
-        # Append the cleaned response to the current code generation plan list.
+        logger.info(f"[{func_name}] Appending cleaned response to code generation plan list.")
         self.current_code_generation_plan_list.append(cleaned_response)
-        logger.info("%s: Appended cleaned response to the code generation plan list.", self.agent_name)
 
         state.current_mode_stage = ResolveIssueStage.SAVE_CODE
-        logger.debug("%s: Updated state.current_mode_stage to SAVE_CODE", self.agent_name)
-
-        logger.debug("%s: Exiting resolve_issue_node with updated state: %s", self.agent_name, state)
+        logger.debug(f"[{func_name}] Updated state.current_mode_stage to SAVE_CODE, state: {state}")
         return state
 
     @record_node(CoderNodeEnum.EXIT)
