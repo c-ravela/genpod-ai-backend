@@ -1,6 +1,6 @@
 import os
 import warnings
-from dataclasses import dataclass, fields
+from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Dict, Iterator, Optional, Tuple
 
