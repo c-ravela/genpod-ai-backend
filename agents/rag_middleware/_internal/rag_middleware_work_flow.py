@@ -366,7 +366,7 @@ class RAGMiddlewareWorkFlow(BaseWorkFlow[RAGMiddlewarePrompts]):
         rag_output: RAGQueryOutput = state.rag_agent_output
         logger.debug("%s: Raw RAG output: %s", func_name, rag_output)
 
-        if self.use_research_agent and rag_output.response_type not in (RagResponseType.ANSWERED, RagResponseType.REJECTED, RagResponseType.FROM_CACHE):
+        if self.use_research_agent and rag_output.response_type not in (RagResponseType.ANSWERED, RagResponseType.FROM_CACHE):
             state.current_mode_stage = RAGQueryStage.FALLBACK_RESEARCH
             return state
 
