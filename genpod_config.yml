@@ -31,39 +31,22 @@ agents:
   architect:
     description: Designs the high-level system and architecture, creating project requirements.
   coder:
-    <<: *claude_base
     description: Writes and optimizes code, focusing on clean practices and performance.
   research:
     description: Conducts in-depth research by aggregating and synthesizing online sources for actionable insights.
   rag_middleware:
     description: Mediates the RAG flow—selects the right RAG agent, forwards queries, and returns answers.
   planner:
-    <<: *claude_base
     description: Manages planning, timelines, and task prioritization for smooth progress.
   tests_generator:
-    <<: *claude_base
     description: Generates and validates test cases to ensure standards and quality checks are met.
   reviewer:
     description: Reviews code, suggests improvements, and ensures outputs meet quality and performance standards.
 
-rag_agents:
+rag_agents: {}
   # Any number of RAG agents can be defined here and will be picked up dynamically
-  mismo-3.6-rag:
-    description: Specialized RAG agent for MISMO 3.6 standards, providing accurate, comprehensive responses.
-    collection_name: MISMO-version-3.6-docs
-    vector_database_path: <path to vector db>
-  fr_2025a_rag:
-    description: |
-      The document provides instructions and guidelines for reporting financial data, specifically related to the FR 2052a report. It covers 
-      topics such as the scope of the consolidated entity, rules of consolidation, frequency and timing of data submission, and what must be 
-      reported. It includes details on reporting inflows, handling non-performing loans, and categorizing different types of financial 
-      transactions and entities, such as retail and small business. The document also outlines specific reporting requirements for options 
-      and derivatives, as well as the treatment of encumbered assets.
-    collection_name: my_collection
-    vector_database_path: <path to vector db>
 
-max_graph_recursion_limit: 1500
-
+max_graph_recursion_limit: 10000
 
 providers:
   openai:
@@ -120,4 +103,21 @@ providers:
         api_key: null
       claude-instant-1.2:
         description: Claude Instant v1.2, optimized for low-latency, high-throughput applications.
+        api_key: null
+
+  google:
+    setting:
+      api_key: $GOOGLE_API_KEY
+    models:
+      gemini-2.5-pro-preview-05-06:
+        description: Gemini 2.5 Pro preview, supports text, image, video, and audio inputs with advanced reasoning.
+        api_key: null
+      gemini-2.5-flash-preview-04-17:
+        description: Gemini 2.5 Flash preview, ultra-fast inference with optional “thinking” mode for deeper reasoning.
+        api_key: null
+      gemini-2.0-flash:
+        description: Gemini 2.0 Flash, token-based pricing model for text and audio inputs with fast text outputs.
+        api_key: null
+      gemini-2.0-flash-lite:
+        description: Gemini 2.0 Flash Lite, lightweight variant optimized for low-latency and cost-effective throughput.
         api_key: null
