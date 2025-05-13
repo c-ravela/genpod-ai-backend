@@ -9,19 +9,27 @@ from utils.logger import logger
 
 PRICING_PER_MODEL = {
     "openai": {
-        "chatgpt-4o-latest": {"input_tokens": 5.00, "output_tokens": 15.00},
-        "gpt-4o-2024-08-06": {"input_tokens": 2.50, "output_tokens": 10.00},
-        "gpt-4o-2024-05-13": {"input_tokens": 5.00, "output_tokens": 15.00},
-        "gpt-4o-2024-11-20": {"input_tokens": 2.50, "cached_input_tokens": 1.25, "output_tokens": 10.00},
-        "gpt-3.5-turbo": {"input_tokens": 3.00, "output_tokens": 6.00},
+        "chatgpt-4o-latest": {"input_tokens": 5.00,  "output_tokens": 15.00},
+        "gpt-4o-2024-08-06": {"input_tokens": 2.50,  "output_tokens": 10.00},
+        "gpt-4o-2024-05-13": {"input_tokens": 5.00,  "output_tokens": 15.00},
+        "gpt-4o-2024-11-20": {"input_tokens": 2.50,  "cached_input_tokens": 1.25, "output_tokens": 10.00},
+        "gpt-3.5-turbo": {"input_tokens": 3.00,  "output_tokens": 6.00},
         "o1-preview-2024-09-12": {"input_tokens": 15.00, "cached_input_tokens": 7.50, "output_tokens": 60.00},
-        "o1-mini-2024-09-12": {"input_tokens": 3.00, "cached_input_tokens": 1.50, "output_tokens": 12.00},
-        "o3-mini": {"input_tokens": 1.10, "cached_input_tokens": 0.55, "output_tokens": 4.40},
+        "o1-mini-2024-09-12": {"input_tokens": 3.00,  "cached_input_tokens": 1.50, "output_tokens": 12.00},
+        "o3-mini": {"input_tokens": 1.10,  "cached_input_tokens": 0.55, "output_tokens": 4.40},
     },
-    "ollama": {"llama3": {}},
+    "ollama": {
+        "llama3": {}
+    },
     "anthropic": {
         "claude-3-5-sonnet-20240620": {"input_tokens": 3.00, "prompt_caching_write": 3.75, "prompt_caching_read": 0.30, "output_tokens": 15.00},
         "claude-instant-1.2": {"input_tokens": 0.80, "output_tokens": 2.40},
+    },
+    "google": {
+        "gemini-2.5-pro-preview-05-06": {"input_tokens": 1.25, "output_tokens": 10.00},
+        "gemini-2.5-flash-preview-04-17": {"input_tokens": 0.15, "audio_input_tokens": 1.00, "output_tokens": 3.50},
+        "gemini-2.0-flash": {"input_tokens": 0.15, "audio_input_tokens": 1.00, "output_tokens": 0.60},
+        "gemini-2.0-flash-lite": {"input_tokens": 0.075, "audio_input_tokens": 0.075, "output_tokens": 0.30},
     },
 }
 
