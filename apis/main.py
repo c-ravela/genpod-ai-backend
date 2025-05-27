@@ -5,7 +5,6 @@ from typing import List, Optional, Dict, Type, Any
 
 from rich.live import Live
 
-from agents.rag import RAGAgent
 from agents.rag_middleware import RAGMiddleware, register_rag_agent
 from agents.research import ResearchAgent
 from agents.supervisor import SupervisorAgent, SupervisorInput
@@ -24,6 +23,7 @@ from models.constants import PStatus
 from utils.logger import logger
 from utils.microservice_insights import MicroserviceInsights
 from core.agent import BaseAgent
+from agents.rag.rag_factory import create_rag
 
 
 class MethodNames(Enum):
@@ -220,15 +220,17 @@ class ActionManager:
 
         # Instantiate and register RAGAgents
         for info in self.rag_agent_registry.values():
-            rag = RAGAgent(
-                id=info.agent_id,
-                name=info.agent_name,
-                description=info.description,
-                llm=info.llm,
-                collection_name=info.collection_name,
-                persist_directory=info.vector_database_path,
-                recursion_limit=info.recursion_limit,
-                persistence_db_path=self.database_path,
+            rag = create_rag(
+                rag_type            = info.rag_type,
+                agent_id            = info.agent_id,
+                agent_name          = info.agent_name,
+                description         = info.description,
+                llm                 = info.llm,
+                recursion_limit     = info.recursion_limit,
+                persistence_db_path = self.database_path,
+                collection_name     = info.collection_name,
+                persist_directory   = info.vector_database_path,
+                config_path         = info.config_path,
             )
             register_rag_agent(rag, info.description)
             rag_sessions[rag.id] = self._create_session_for_agent(rag)
@@ -269,15 +271,17 @@ class ActionManager:
             tid = session_map.get(info.agent_id)
             if not tid:
                 continue
-            agent = RAGAgent(
-                id=info.agent_id,
-                name=info.agent_name,
-                description=info.description,
-                llm=info.llm,
-                collection_name=info.collection_name,
-                persist_directory=info.vector_database_path,
-                recursion_limit=info.recursion_limit,
-                persistence_db_path=self.database_path,
+            agent = create_rag(
+                rag_type            = info.rag_type,
+                agent_id            = info.agent_id,
+                agent_name          = info.agent_name,
+                description         = info.description,
+                llm                 = info.llm,
+                recursion_limit     = info.recursion_limit,
+                persistence_db_path = self.database_path,
+                collection_name     = info.collection_name,
+                persist_directory   = info.vector_database_path,
+                config_path         = info.config_path,
             )
             register_rag_agent(agent, info.description)
             agent.set_thread_id(tid)

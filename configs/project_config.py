@@ -4,11 +4,13 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Dict, Iterator, Optional, Tuple
 
-from pydantic import BaseModel, Field, field_validator
+from pydantic import BaseModel, Field, field_validator, model_validator
 
 from llms import LLM, llm_factory
 from utils.decorators import auto_repr
 from utils.yaml_utils import read_yaml
+
+from models.rag_types import RAGType
 
 # Supported LLMs categorized by provider
 SUPPORTED_LLMS = {
@@ -135,19 +137,32 @@ class AgentSettings(BaseModel):
 
 class RAGAgentSettings(BaseModel):
     """
-    Configuration for a RAG (Retrieval-Augmented Generation) agent, including its
-    vector database path, collection name, and optional LLM override.
+    Configuration for a RAG agent:
+
+      • which workflow variant (langchain_vector vs. llama_index)
+      • where its vector DB lives
+      • which collection to query
+      • graph recursion depth
+      • optional override of its LLM settings
+      • for llama_index only: path to the retriever config file
     """
     description: str
+    rag_type: RAGType
+
     vector_database_path: Path
+
     collection_name: str
+    recursion_limit: int = Field(
+        default=5000,
+        ge=1,
+        description="Max graph recursion limit for this RAG agent"
+    )
+
     llm_config: Optional[LLMSettings] = None
+    config_path: Optional[Path] = None
 
     @field_validator("vector_database_path", mode="before")
-    def _check_vector_path(cls, v):
-        """
-        Ensure the provided vector_database_path exists and is a directory.
-        """
+    def _check_persist_dir(cls, v):
         p = Path(v)
         if not p.exists() or not p.is_dir():
             raise ValueError(f"vector_database_path '{v}' does not exist or is not a directory.")
@@ -155,12 +170,29 @@ class RAGAgentSettings(BaseModel):
 
     @field_validator("collection_name", mode="before")
     def _check_collection(cls, v):
-        """
-        Ensure the collection_name is non-empty.
-        """
         if not v.strip():
             raise ValueError("collection_name must not be empty.")
         return v
+
+    @field_validator("config_path", mode="before")
+    def _check_config_path_exists(cls, v):
+        # allow None here; presence enforced in model_validator
+        if v is None:
+            return None
+        p = Path(v)
+        if not p.exists() or not p.is_file():
+            raise ValueError(f"config_path '{v}' does not exist or is not a file.")
+        return p
+
+    @model_validator(mode="after")
+    def _require_config_for_llama_index(cls, model: "RAGAgentSettings") -> "RAGAgentSettings":
+        """
+        Enforce that `config_path` is provided when using the llama_index workflow.
+        """
+
+        if model.rag_type == RAGType.LLAMA_INDEX and model.config_path is None:
+            raise ValueError("`config_path` is required for rag_type='llama_index'")
+        return model
 
 
 class DefaultSettings(BaseModel):
@@ -205,12 +237,23 @@ class RAGAgentInfo:
     """
     agent_name: str
     agent_id: str
+    rag_type: RAGType
+
     alias: str = ""
     description: str = ""
+
+    # Where the vector DB is persisted (for both pipelines)
     vector_database_path: str = ""
     collection_name: str = ""
+
+    # How deep the state‐graph may recurse
+    recursion_limit: int = 5000
+
+    # Only used by llama_index agents (must be a valid file path then)
+    config_path: Optional[str] = None
+
+    # Populated later via llm_factory
     llm: Optional[LLM] = None
-    recursion_limit: int = 25
 
 
 class AgentRegistry:
@@ -452,12 +495,15 @@ class ProjectConfig:
         """
         for alias, rag_cfg in cfg.rag_agents.items():
             rag = RAGAgentInfo(
-                agent_name=alias,
-                agent_id=alias,
-                alias=alias,
-                description=rag_cfg.description,
-                vector_database_path=str(rag_cfg.vector_database_path),
-                collection_name=rag_cfg.collection_name,
+                agent_name       = alias,
+                agent_id         = alias,
+                alias            = alias,
+                description      = rag_cfg.description,
+                rag_type         = rag_cfg.rag_type,
+                vector_database_path = str(rag_cfg.vector_database_path),
+                collection_name  = rag_cfg.collection_name,
+                recursion_limit  = rag_cfg.recursion_limit,
+                config_path      = str(rag_cfg.config_path) if rag_cfg.config_path else None,
             )
 
             llm_cfg = rag_cfg.llm_config or cfg.default.llm_config  # type: ignore
