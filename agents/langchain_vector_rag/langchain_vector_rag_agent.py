@@ -1,5 +1,5 @@
-from agents.rag._internal.rag_graph import RAGGraph
-from agents.rag._internal.rag_work_flow import RAGWorkFlow
+from agents.langchain_vector_rag._internal.langchain_vector_rag_graph import RAGGraph
+from agents.langchain_vector_rag._internal.langchain_vector_rag_work_flow import RAGWorkFlow
 from core.agent import BaseAgent
 from llms import LLM
 from utils.logger import logger

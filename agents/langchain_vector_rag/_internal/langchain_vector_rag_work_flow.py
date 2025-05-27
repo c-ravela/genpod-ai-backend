@@ -4,10 +4,10 @@ from langchain_chroma import Chroma
 from langchain_core.documents import Document
 from langchain_openai import OpenAIEmbeddings
 
-from agents.rag._internal.rag_mode_enum import QueryAnswerStage, RAGMode
-from agents.rag._internal.rag_node_enum import RAGNodeEnum
-from agents.rag._internal.rag_prompt import RAGPrompts
-from agents.rag._internal.rag_state import RAGOuput, RAGState
+from agents.langchain_vector_rag._internal.langchain_vector_rag_modes import QueryAnswerStage, RAGMode
+from agents.langchain_vector_rag._internal.langchain_vector_rag_nodes import RAGNodeEnum
+from agents.langchain_vector_rag._internal.langchain_vector_rag_prompt import RAGPrompts
+from agents.langchain_vector_rag._internal.langchain_vector_rag_state import RAGOuput, RAGState
 from apis.rag_analytics.controller import RAGAnalyticsController
 from context.context import GenpodContext
 from core.decorators import (handle_errors_and_reset, record_node,
