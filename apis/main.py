@@ -8,20 +8,20 @@ from rich.live import Live
 from agents.rag_middleware import RAGMiddleware, register_rag_agent
 from agents.research import ResearchAgent
 from agents.supervisor import SupervisorAgent, SupervisorInput
-from apis.microservice.controller import MicroserviceController
-from apis.microservice_llm_metrics.controller import \
-    MicroserviceLLMMetricsController
-from apis.microservice_session.controller import MicroserviceSessionController
+from apis.application.controller import ApplicationController
+from apis.application_llm_metrics.controller import \
+    ApplicationLLMMetricsController
+from apis.application_session.controller import ApplicationSessionController
 from apis.project.controller import ProjectController
 from configs.project_config import AgentRegistry, RAGAgentInfo, AgentInfo
 from context.context import GenpodContext
-from database.entities.microservice_sessions import MicroserviceSession
-from database.entities.microservices import Microservice
+from database.entities.application_sessions import ApplicationSession
+from database.entities.applications import Application
 from database.entities.projects import Project
 from genpod import Team
 from models.constants import PStatus
 from utils.logger import logger
-from utils.microservice_insights import MicroserviceInsights
+from utils.application_insights import ApplicationInsights
 from core.agent import BaseAgent
 from agents.rag.rag_factory import create_rag
 
@@ -49,26 +49,26 @@ METHOD_TO_AGENT = create_method_to_agent_mapping(AgentRegistry)
 
 class ActionManager:
     """
-    Manager class for handling microservice actions including team member setup,
+    Manager class for handling application actions including team member setup,
     supervisor interactions, and RAG (Retrieval-Augmented Generation) setup.
     """
 
     def __init__(
         self,
-        microservice: Microservice,
+        application: Application,
         agent_registry: AgentRegistry,
         rag_agent_registry: Dict[str, RAGAgentInfo],
         database_path: str,
         graph_recursion_limit: int,
     ):
         logger.debug("Initializing ActionManager.")
-        self.microservice = microservice
+        self.application = application
         self.agent_registry = agent_registry
         self.rag_agent_registry = rag_agent_registry
         self.database_path = database_path
         self.graph_recursion_limit = graph_recursion_limit
-        self.microservice_controller = MicroserviceController()
-        self.session_controller = MicroserviceSessionController()
+        self.application_controller = ApplicationController()
+        self.session_controller = ApplicationSessionController()
         self._genpod_context = GenpodContext.get_context()
         self.is_rag_enabled = False
         self.supervisor: Optional[SupervisorAgent] = None
@@ -88,12 +88,12 @@ class ActionManager:
         """
         Helper method to create a session for a given agent and return the session ID.
         """
-        session = MicroserviceSession(
+        session = ApplicationSession(
             agent_id=agent.id,
-            project_id=self.microservice.project_id,
-            microservice_id=self.microservice.id,
-            created_by=self.microservice.created_by,
-            updated_by=self.microservice.created_by
+            project_id=self.application.project_id,
+            application_id=self.application.id,
+            created_by=self.application.created_by,
+            updated_by=self.application.created_by
         )
         self.session_controller.create(session)
         agent.set_thread_id(session.id)
@@ -161,35 +161,35 @@ class ActionManager:
 
     def process_supervisor_response(self, supervisor_response: List[dict]):
         """
-        Process supervisor responses and update the microservice if necessary.
+        Process supervisor responses and update the application if necessary.
         """
         logger.info("Processing supervisor response.")
         try:
-            new_microservice_name = self.microservice.microservice_name
-            new_project_status = self.microservice.status
+            new_application_name = self.application.application_name
+            new_project_status = self.application.status
 
             for res in supervisor_response:
                 for _, super_state in res.items():
-                    if ('microservice_name' in super_state and
-                            super_state['microservice_name'] != new_microservice_name):
-                        new_microservice_name = super_state['microservice_name']
+                    if ('application_name' in super_state and
+                            super_state['application_name'] != new_application_name):
+                        new_application_name = super_state['application_name']
                     if ('project_status' in super_state and
                             str(super_state['project_status']) != new_project_status):
                         new_project_status = str(super_state['project_status'])
 
-            if (new_microservice_name != self.microservice.microservice_name or
-                    new_project_status != self.microservice.status):
+            if (new_application_name != self.application.application_name or
+                    new_project_status != self.application.status):
                 logger.debug(
-                    f"Updating microservice: name '{self.microservice.microservice_name}'→"
-                    f"'{new_microservice_name}', status '{self.microservice.status}'→"
+                    f"Updating application: name '{self.application.application_name}'→"
+                    f"'{new_application_name}', status '{self.application.status}'→"
                     f"'{new_project_status}'."
                 )
-                self.microservice.microservice_name = new_microservice_name
-                self.microservice.status = new_project_status
-                self.microservice_controller.update(self.microservice)
-                logger.info(f"Microservice updated: {self.microservice}")
+                self.application.application_name = new_application_name
+                self.application.status = new_project_status
+                self.application_controller.update(self.application)
+                logger.info(f"Application updated: {self.application}")
             else:
-                logger.debug("No updates required for microservice based on supervisor response.")
+                logger.debug("No updates required for application based on supervisor response.")
         except Exception as e:
             logger.error(f"Error processing supervisor response: {e}")
             raise
@@ -367,30 +367,30 @@ class ActionManager:
         response = self.send_to_supervisor(payload)
         self.process_supervisor_response(response)
 
-    def microservice_insights(
+    def application_insights(
         self,
         user_id: int,
         project_id: int,
-        microservice_id: int
+        application_id: int
     ) -> None:
         """
-        Continuously retrieve and display insights for a microservice.
+        Continuously retrieve and display insights for a application.
         """
-        logger.info("Starting to monitor microservice insights.")
+        logger.info("Starting to monitor application insights.")
         try:
-            ms_ctrl = MicroserviceController()
-            metrics_ctrl = MicroserviceLLMMetricsController()
+            ms_ctrl = ApplicationController()
+            metrics_ctrl = ApplicationLLMMetricsController()
 
-            picked_microservice = ms_ctrl.get_microservice(microservice_id)
-            if not picked_microservice:
-                logger.warning(f"No active service for ID: {microservice_id}")
-                print(f"No active service found for ID {microservice_id}.")
+            picked_application = ms_ctrl.get_application(application_id)
+            if not picked_application:
+                logger.warning(f"No active application found for ID: {application_id}")
+                print(f"No active application found for ID {application_id}.")
                 return
 
-            session_details = Action._get_session_details(user_id, project_id, picked_microservice.id)
+            session_details = Action._get_session_details(user_id, project_id, picked_application.id)
             if not session_details:
-                logger.warning("No sessions found for insights.")
-                print("No sessions found for this service.")
+                logger.warning("No sessions found for this application.")
+                print("No sessions found for this application.")
                 return
             session_map = {s.agent_id: s.id for s in session_details}
 
@@ -412,13 +412,13 @@ class ActionManager:
             supervisor.set_thread_id(sup_tid)
 
             _team = Team(self.agent_registry, self.database_path)
-            insights = MicroserviceInsights({})
+            insights = ApplicationInsights({})
 
             with Live(insights.build_renderable(), screen=True, refresh_per_second=2) as live:
                 while True:
                     last_saved_state = supervisor.graph.get_last_saved_state()
-                    token_metrics = metrics_ctrl.get_token_metrics_by_microservice(
-                        microservice_id, project_id, user_id
+                    token_metrics = metrics_ctrl.get_token_metrics_by_application(
+                        application_id, project_id, user_id
                     )
                     active_node = last_saved_state.get("active_node", "")
                     agent_info = METHOD_TO_AGENT.get("call_architect")
@@ -442,15 +442,15 @@ class ActionManager:
                     time.sleep(5)
 
         except KeyboardInterrupt:
-            logger.info("Microservice insights monitoring stopped by user.")
+            logger.info("Application insights monitoring stopped by user.")
         except Exception as e:
-            logger.error(f"Error retrieving microservice insights: {e}")
+            logger.error(f"Error retrieving application insights: {e}")
             raise
 
 
 class Action:
     """
-    Action class responsible for managing projects and microservice operations.
+    Action class responsible for managing projects and application operations.
     """
 
     def __init__(
@@ -499,15 +499,15 @@ class Action:
         license_url: str
     ):
         """
-        Generate a new microservice for a given project.
+        Generate a new application for a given project.
         """
-        logger.info("Starting microservice generation.")
+        logger.info("Starting application generation.")
         try:
             project = self._get_project(project_id, user_id)
             if project is None:
                 raise ValueError("Project not found.")
 
-            microservice = Microservice(
+            application = Application(
                 project_id=project.id,
                 status=str(PStatus.NEW),
                 project_location=project_path,
@@ -518,7 +518,7 @@ class Action:
             )
 
             manager = ActionManager(
-                microservice,
+                application,
                 self.agents,
                 self.rag_agents,
                 self.database_path,
@@ -531,17 +531,17 @@ class Action:
             )
 
             final_human_input = f"Human Prompt: {human_prompt}"
-            manager.microservice.prompt = final_human_input
-            manager.microservice_controller.create(manager.microservice)
-            logger.info(f"Microservice created with ID {manager.microservice.id} for project ID {manager.microservice.project_id}.")
+            manager.application.prompt = final_human_input
+            manager.application_controller.create(manager.application)
+            logger.info(f"Application created with ID {manager.application.id} for project ID {manager.application.project_id}.")
 
             self._genpod_context.update(user_prompt=final_human_input)
             delay_seconds = 5
             print(
-                f"Service registered with the database.\n"
-                f"Assigned Service ID: {manager.microservice.id}\n"
-                f"You can locate this service under Project ID: {manager.microservice.project_id}.\n"
-                f"Service generation will begin in approximately {delay_seconds} seconds. Please wait..."
+                f"Application registered with the database.\n"
+                f"Assigned Application ID: {manager.application.id}\n"
+                f"You can locate this application under Project ID: {manager.application.project_id}.\n"
+                f"Application generation will begin in approximately {delay_seconds} seconds. Please wait..."
             )
             time.sleep(delay_seconds)
 
@@ -550,30 +550,30 @@ class Action:
 
             supervisor_data = SupervisorInput(
                 user_prompt=final_human_input,
-                project_directory=manager.microservice.project_location,
-                project_id=manager.microservice.project_id,
-                microservice_id=manager.microservice.id,
-                license_header=manager.microservice.license_text,
-                license_url=manager.microservice.license_file_url
+                project_directory=manager.application.project_location,
+                project_id=manager.application.project_id,
+                application_id=manager.application.id,
+                license_header=manager.application.license_text,
+                license_url=manager.application.license_file_url
             )
 
             manager.run_supervisor_flow(supervisor_data)
 
-            logger.info("Microservice generation completed successfully.")
+            logger.info("Application generation completed successfully.")
             print(
-                f"Your service was generated successfully! Project ID: {manager.microservice.project_id}, "
-                f"Service ID: {manager.microservice.id}, "
-                f"Service Name: {manager.microservice.microservice_name}, Location: {manager.microservice.project_location}."
+                f"Your application was generated successfully! Project ID: {manager.application.project_id}, "
+                f"Application ID: {manager.application.id}, "
+                f"Application Name: {manager.application.application_name}, Location: {manager.application.project_location}."
             )
         except Exception as e:
-            logger.error(f"Failed to generate microservice: {e}")
+            logger.error(f"Failed to generate application: {e}")
             raise
 
     def resume(self, user_id: int):
         """
-        Resume an existing microservice project.
+        Resume an existing application project.
         """
-        logger.info("Resuming microservice.")
+        logger.info("Resuming application.")
         try:
             picked_project_id = Action._get_project_details(user_id)
             if not picked_project_id:
@@ -581,21 +581,21 @@ class Action:
                 logger.warning("No projects found for the user during resume operation.")
                 return
 
-            picked_microservice = Action._get_microservice_details(user_id, picked_project_id)
-            if not picked_microservice:
-                print("No active services available for this project.")
-                logger.warning("No active microservices found for the selected project.")
+            picked_application = Action._get_application_details(user_id, picked_project_id)
+            if not picked_application:
+                print("No active applications available for this project.")
+                logger.warning("No active applications found for the selected project.")
                 return
 
-            sessions = Action._get_session_details(user_id, picked_project_id, picked_microservice.id)
+            sessions = Action._get_session_details(user_id, picked_project_id, picked_application.id)
             if sessions is None:
-                print("No sessions found for this service.")
-                logger.warning("No sessions found for the selected microservice.")
+                print("No sessions found for this application.")
+                logger.warning("No sessions found for the selected application.")
                 return
             session_map: Dict[str,int] = {s.agent_id: s.id for s in sessions}
 
             manager = ActionManager(
-                picked_microservice,
+                picked_application,
                 self.agents,
                 self.rag_agents,
                 self.database_path,
@@ -611,28 +611,28 @@ class Action:
             # Run with the correct genpod_team attached
             manager.run_supervisor_flow()
 
-            logger.info("Microservice resumed successfully.")
+            logger.info("Application resumed successfully.")
             print(
-                f"Your service was resumed successfully! Project ID: {picked_microservice.project_id}, "
-                f"Service ID: {picked_microservice.id}, "
-                f"Name: {picked_microservice.microservice_name}, Location: {picked_microservice.project_location}."
+                f"Your application was resumed successfully! Project ID: {picked_application.project_id}, "
+                f"Application ID: {picked_application.id}, "
+                f"Name: {picked_application.application_name}, Location: {picked_application.project_location}."
             )
         except Exception as e:
-            logger.error(f"Failed to resume microservice: {e}")
+            logger.error(f"Failed to resume application: {e}")
             raise
 
-    def microservice_insights(
+    def application_insights(
         self,
         user_id: int,
         project_id: int,
-        microservice_id: int
+        application_id: int
     ) -> None:
         """
-        Continuously retrieve and display insights for a microservice.
+        Continuously retrieve and display insights for a application.
         """
-        logger.info("Starting to monitor microservice insights.")
+        logger.info("Starting to monitor application insights.")
         manager = ActionManager(
-            Microservice(
+            Application(
                 project_id=project_id,
                 status="",
                 project_location="",
@@ -646,7 +646,7 @@ class Action:
             self.database_path,
             self.graph_recursion_limit
         )
-        manager.microservice_insights(user_id, project_id, microservice_id)
+        manager.application_insights(user_id, project_id, application_id)
 
     @staticmethod
     def _prompt_user_for_project_generation(
@@ -702,51 +702,51 @@ class Action:
             raise
 
     @staticmethod
-    def _get_microservice_details(user_id: int, project_id: int) -> Optional[Microservice]:
+    def _get_application_details(user_id: int, project_id: int) -> Optional[Application]:
         """
-        Retrieve and validate microservice details for the given project.
+        Retrieve and validate application details for the given project.
         """
-        logger.info(f"Retrieving microservice details for user ID: {user_id}, project ID: {project_id}")
-        microservice_controller = MicroserviceController()
+        logger.info(f"Retrieving application details for user ID: {user_id}, project ID: {project_id}")
+        application_controller = ApplicationController()
         try:
-            microservices = microservice_controller.get_microservices_by_project_id(user_id, project_id)
-            if not microservices:
-                logger.warning(f"No microservices found for project ID: {project_id}")
+            applications = application_controller.get_applications_by_project_id(user_id, project_id)
+            if not applications:
+                logger.warning(f"No applications found for project ID: {project_id}")
                 return None
 
-            active_microservices = [ms for ms in microservices if ms.status != "DONE"]
-            if not active_microservices:
-                logger.warning(f"No active microservices found for project ID: {project_id}")
+            active_applications = [ms for ms in applications if ms.status != "DONE"]
+            if not active_applications:
+                logger.warning(f"No active applications found for project ID: {project_id}")
                 return None
 
             Action._list_items(
-                active_microservices,
-                lambda ms: f"  - ID: {ms.id}, Name: {ms.microservice_name}, Status: {ms.status}",
-                "Active Microservices"
+                active_applications,
+                lambda ms: f"  - ID: {ms.id}, Name: {ms.application_name}, Status: {ms.status}",
+                "Active Applications"
             )
             selected_id = Action._prompt_user(
-                "Please enter the ID of the microservice you want to resume",
-                lambda ms_id: any(ms.id == ms_id for ms in active_microservices),
-                "Invalid microservice ID. Please try again."
+                "Please enter the ID of the application you want to resume",
+                lambda ms_id: any(ms.id == ms_id for ms in active_applications),
+                "Invalid application ID. Please try again."
             )
-            return next((ms for ms in active_microservices if ms.id == selected_id), None)
+            return next((ms for ms in active_applications if ms.id == selected_id), None)
         except Exception as e:
-            logger.exception("An error occurred while retrieving microservice details.")
+            logger.exception("An error occurred while retrieving application details.")
             raise
 
     @staticmethod
-    def _get_session_details(user_id: int, project_id: int, microservice_id: int) -> Optional[List[MicroserviceSession]]:
+    def _get_session_details(user_id: int, project_id: int, application_id: int) -> Optional[List[ApplicationSession]]:
         """
-        Retrieve session details for the specified user, project, and microservice.
+        Retrieve session details for the specified user, project, and application.
         """
-        logger.info(f"Retrieving session details for user ID: {user_id}, project ID: {project_id}, microservice ID: {microservice_id}")
-        session_controller = MicroserviceSessionController()
+        logger.info(f"Retrieving session details for user ID: {user_id}, project ID: {project_id}, application ID: {application_id}")
+        session_controller = ApplicationSessionController()
         try:
-            sessions = session_controller.get_sessions(project_id, microservice_id, user_id)
+            sessions = session_controller.get_sessions(project_id, application_id, user_id)
             if not sessions:
-                logger.warning(f"No sessions found for project ID: {project_id}, microservice ID: {microservice_id}")
+                logger.warning(f"No sessions found for project ID: {project_id}, application ID: {application_id}")
                 return None
-            logger.info(f"Retrieved {len(sessions)} sessions for project ID: {project_id}, microservice ID: {microservice_id}")
+            logger.info(f"Retrieved {len(sessions)} sessions for project ID: {project_id}, application ID: {application_id}")
             return sessions
         except Exception as e:
             logger.exception("An error occurred while retrieving session details.")
