@@ -26,8 +26,8 @@ class SupervisorInput(BaseModel):
     project_id: int = Field(
         description="Unique identifier of the project associated with the supervisor task."
     )
-    microservice_id: int = Field(
-        description="Unique identifier of the microservice being managed."
+    application_id: int = Field(
+        description="Unique identifier of the application being managed."
     )
     license_header: str = Field(
         description="Text of the license header to prepend to each generated file."
@@ -42,8 +42,8 @@ def _default_planned_issue() -> PlannedIssue:
 
 class SupervisorOutput(BaseOutputState):
     """ Output State for Supervisor """
-    microservice_name: str = Field(
-        description="Name of the microservice suggested by Architect"
+    application_name: str = Field(
+        description="Name of the application suggested by Architect"
     )
     project_status: PStatus = Field(
         description="The current status of the project."
@@ -111,9 +111,9 @@ class SupervisorState(BaseState):
         default=-1,
         description="Unique identifier of the project (default -1 indicates an uninitialized state)."
     )
-    microservice_id: int = Field(
+    application_id: int = Field(
         default=-1,
-        description="Unique identifier of the microservice (default -1 indicates an uninitialized state)."
+        description="Unique identifier of the application (default -1 indicates an uninitialized state)."
     )
     project_status: PStatus = Field(
         default=PStatus.RECEIVED,
@@ -127,9 +127,9 @@ class SupervisorState(BaseState):
         default="",
         description="URL from which the full license text can be obtained."
     )
-    microservice_name: str = Field(
+    application_name: str = Field(
         default="",
-        description="Name of the microservice suggested by architect."
+        description="Name of the application suggested by architect."
     )
     agents_status: str = Field(
         default="",
