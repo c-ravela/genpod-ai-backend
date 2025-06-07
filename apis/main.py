@@ -1,10 +1,11 @@
 import os
 import time
 from enum import Enum
-from typing import List, Optional, Dict, Type, Any
+from typing import Any, Dict, List, Optional, Type
 
 from rich.live import Live
 
+from agents.rag.rag_factory import create_rag
 from agents.rag_middleware import RAGMiddleware, register_rag_agent
 from agents.research import ResearchAgent
 from agents.supervisor import SupervisorAgent, SupervisorInput
@@ -13,17 +14,16 @@ from apis.application_llm_metrics.controller import \
     ApplicationLLMMetricsController
 from apis.application_session.controller import ApplicationSessionController
 from apis.project.controller import ProjectController
-from configs.project_config import AgentRegistry, RAGAgentInfo, AgentInfo
+from configs.project_config import AgentInfo, AgentRegistry, RAGAgentInfo
 from context.context import GenpodContext
+from core.agent import BaseAgent
 from database.entities.application_sessions import ApplicationSession
 from database.entities.applications import Application
 from database.entities.projects import Project
 from genpod import Team
 from models.constants import PStatus
-from utils.logger import logger
 from utils.application_insights import ApplicationInsights
-from core.agent import BaseAgent
-from agents.rag.rag_factory import create_rag
+from utils.logger import logger
 
 
 class MethodNames(Enum):

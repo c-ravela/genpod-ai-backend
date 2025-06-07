@@ -20,7 +20,6 @@ from tools.docker_sandbox import (docker_sandbox_description,
 from utils.logger import logger
 from utils.yaml_utils import read_yaml
 
-
 CHECKS_CONFIG_PATH = path.join(getcwd(), "agents", "reviewer", "checks.yaml")
 LANGUAGE_TOOLS_CONFIG_PATH = path.join(getcwd(), "agents", "reviewer", "reviewer_tools.yml")
 
