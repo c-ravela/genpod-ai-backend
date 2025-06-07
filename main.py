@@ -3,7 +3,7 @@
 This script initializes the tracing session, loads configuration and context,
 establishes a database connection, and executes one of several actions based on
 command-line input. It supports actions such as project generation, resuming a
-project, checking microservice status, and adding a new project.
+project, checking application status, and adding a new project.
 
 Usage:
     python main.py <action> [<additional arguments>]
@@ -11,7 +11,7 @@ Usage:
 Actions:
     generate: Generate a new project (requires <project_id> and <user_id>)
     resume: Resume an existing project (requires <user_id>)
-    microservice_status: Check microservice status (requires <project_id>, <service_id>, <user_id>)
+    application_status: Check application status (requires <project_id>, <application_id>, <user_id>)
     add_project: Add a new project (requires <user_id>)
 
 Note:
@@ -38,7 +38,7 @@ def main():
     if len(sys.argv) < 2:
         logger.error(
             "No action specified. Provide one of: 'generate', 'resume', "
-            "'microservice_status', or 'add_project'."
+            "'application_status', or 'add_project'."
         )
         sys.exit(1)
 
@@ -141,29 +141,29 @@ def main():
             action_obj.resume(user_id)
             logger.info("The 'resume' action completed successfully.")
 
-        elif requested_action == "insights":
+        elif requested_action == "application_insights":
             if len(sys.argv) < 5:
                 logger.error(
-                    "Insufficient arguments for 'microservice_insights' action. Expected: <project_id> <service_id> <user_id>. "
-                    "Usage: 'microservice_insights <project_id> <service_id> <user_id>'."
+                    "Insufficient arguments for 'application_insights' action. Expected: <project_id> <application_id> <user_id>. "
+                    "Usage: 'application_insights <project_id> <application_id> <user_id>'."
                 )
                 sys.exit(1)
 
             project_id = int(sys.argv[2])
-            service_id = int(sys.argv[3])
+            application_id = int(sys.argv[3])
             user_id = int(sys.argv[4])
             logger.debug(
-                f"'Microservice status' action parameters: Project ID = {project_id}, "
-                f"Service ID = {service_id}, User ID = {user_id}"
+                f"'Application Insights' action parameters: Project ID = {project_id}, "
+                f"Application ID = {application_id}, User ID = {user_id}"
             )
 
             genpod_context.update(
-                project_id=project_id, microservice_id=service_id, user_id=user_id
+                project_id=project_id, application_id=application_id, user_id=user_id
             )
-            logger.info("Context updated for the 'microservice_insights' action.")
+            logger.info("Context updated for the 'application_insights' action.")
 
-            action_obj.microservice_insights(user_id, project_id, service_id)
-            logger.info("The 'microservice_insights' action completed successfully.")
+            action_obj.application_insights(user_id, project_id, application_id)
+            logger.info("The 'application_insights' action completed successfully.")
 
         elif requested_action == "add_project":
             if len(sys.argv) < 3:
@@ -183,7 +183,7 @@ def main():
             logger.info("The 'add_project' action completed successfully.")
         else:
             logger.error(
-                f"Unrecognized action: {requested_action}. Valid actions are 'generate', 'resume', 'microservice_status', or 'add_project'."
+                f"Unrecognized action: {requested_action}. Valid actions are 'generate', 'resume', 'application_insights', or 'add_project'."
             )
             sys.exit(1)
 
