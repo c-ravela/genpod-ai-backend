@@ -12,7 +12,7 @@ class GenpodContext:
     __slots__ = (
        "user_prompt",
        "project_id",
-       "microservice_id",
+       "application_id",
        "agents_session",
        "user_id",
        "project_path",
@@ -39,7 +39,7 @@ class GenpodContext:
             # Initialize fields
             self.user_prompt: Optional[str] = None
             self.project_id: Optional[int] = None
-            self.microservice_id: Optional[int] = None
+            self.application_id: Optional[int] = None
             self.agents_session: Optional[Dict[str, int]] = None
             self.user_id: Optional[int] = None
             self.project_path:  Optional[str] = None
