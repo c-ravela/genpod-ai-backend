@@ -88,16 +88,16 @@ Available Commands:
        Log out of the $TOOL_TITLE system.
 
    .generate <project_id>
-       Generate a new service.
+       Generate a new application.
 
    .add_project
        Add a new project to the system.
 
    .resume
-       Resume an existing service.
+       Resume an existing application.
 
-   .progress <project_id> <service_id>
-       Display the real-time progress of a service by ID.
+   .progress <project_id> <application_id>
+       Display the real-time progress of a application by ID.
 
    .version
        Display the version of $TOOL_TITLE CLI.
@@ -207,11 +207,11 @@ main_loop() {
             .progress)
                 validate_logged_in || continue
                 if [[ -z "$input" ]]; then
-                    echo "❌ Missing project ID. Usage: .progress <project_id> <service_id>"
+                    echo "❌ Missing project ID. Usage: .progress <project_id> <application_id>"
                 elif [[ -z "$input2" ]]; then
-                    echo "❌ Missing service ID. Usage: .progress <project_id> <service_id>"
+                    echo "❌ Missing Application ID. Usage: .progress <project_id> <application_id>"
                 else
-                    python3 main.py microservice_status "$input" "$input2" "$USER_ID"
+                    python3 main.py application_insights "$input" "$input2" "$USER_ID"
                 fi
                 ;;
             .version)
