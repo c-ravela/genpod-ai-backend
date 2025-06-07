@@ -22,9 +22,9 @@ class Project(Base):
     created_at = Column(DateTime, nullable=False, server_default=func.now())
     updated_at = Column(DateTime, nullable=False, server_default=func.now(), onupdate=func.now())
 
-    microservice = relationship("Microservice", back_populates="project", cascade="all, delete-orphan")
-    microservice_sessions = relationship("MicroserviceSession", back_populates="project", cascade="all, delete-orphan")
-    llm_metrics = relationship("MicroserviceLLMMetrics", back_populates="project", cascade="all, delete-orphan")
+    application = relationship("Application", back_populates="project", cascade="all, delete-orphan")
+    application_sessions = relationship("ApplicationSession", back_populates="project", cascade="all, delete-orphan")
+    llm_metrics = relationship("ApplicationLLMMetrics", back_populates="project", cascade="all, delete-orphan")
     rag_analytics = relationship("RAGAnalytics", back_populates="project", cascade="all, delete-orphan")
 
     @auto_init
