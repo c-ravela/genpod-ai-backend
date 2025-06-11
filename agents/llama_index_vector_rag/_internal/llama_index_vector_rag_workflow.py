@@ -143,7 +143,7 @@ class LlamaIndexVectorRAGWorkFlow(BaseWorkFlow[LlamaIndexVectorRAGPrompts]):
                 record = RAGAnalytics(
                     agent_id=agent_context.agent_id,
                     project_id=self._genpod_context.project_id,
-                    microservice_id=self._genpod_context.microservice_id,
+                    application_id=self._genpod_context.application_id,
                     session_id=agent_context.agent_session_id,
                     task_id=self._genpod_context.current_task.task_id,
                     document_id=doc_id,

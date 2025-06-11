@@ -1,5 +1,6 @@
 from enum import Enum
 
+
 class RAGType(str, Enum):
     """
     Which RAG pipeline to spin up.

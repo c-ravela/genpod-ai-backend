@@ -80,7 +80,7 @@ class RAGAnalyticsService:
             updateable_fields = {
                 'agent_id',
                 'project_id',
-                'microservice_id',
+                'application_id',
                 'session_id',
                 'task_id',
                 'document_name',

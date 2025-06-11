@@ -38,9 +38,9 @@ def _get_items_list(data: Dict[str, Any], key: str) -> List[Any]:
     items = getattr(container, "items", []) if container else []
     return items or []
 
-class MicroserviceInsights:
+class ApplicationInsights:
     """
-    Generate and render insights for a microservice project side‑by‑side
+    Generate and render insights for a application project side by side
     using Rich Tables and Columns.
     """
 
@@ -52,7 +52,7 @@ class MicroserviceInsights:
         self.token_metrics = token_metrics or []
         self.current_agent = current_agent or {}
         self.console = Console()
-        logger.info("MicroserviceInsights initialized.")
+        logger.info("ApplicationInsights initialized.")
 
     def _get_field(self, obj: Union[Dict[str, Any], Any], field: str) -> Any:
         if isinstance(obj, dict):
@@ -87,7 +87,7 @@ class MicroserviceInsights:
         t = Table(title="Project Overview", box=box.ROUNDED, expand=True)
         t.add_column("Metric", no_wrap=True)
         t.add_column("Value", overflow="fold")
-        t.add_row("Service Name",      self.data.get('microservice_name', 'N/A'))
+        t.add_row("Application Name",      self.data.get('application_name', 'N/A'))
         t.add_row("Current Status",    str(self.data.get('project_status', 'N/A')))
         t.add_row("Completion (%)",    self._compute_completion_percentage())
         t.add_row("Agents Status",     self.data.get('agents_status', 'N/A'))
