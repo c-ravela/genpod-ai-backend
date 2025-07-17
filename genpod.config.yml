@@ -11,6 +11,7 @@ default:
     model: gpt-4o-2024-11-20
     config:
       top_p: 0.4
+      temperature: 0.3
       max_retries: 3
       streaming: true
   max_retries: 3               # Fallback retry count
@@ -29,6 +30,13 @@ agents:
   supervisor:
     description: Oversees and coordinates the task execution of other agents, ensuring efficiency and alignment.
   architect:
+    llm_config:
+      provider: openai
+      model: gpt-4o-2024-11-20
+      config:
+        top_p: 0.4
+        temperature: 0.5
+        max_retries: 3
     description: Designs the high-level system and architecture, creating project requirements.
   coder:
     description: Writes and optimizes code, focusing on clean practices and performance.
@@ -39,12 +47,12 @@ agents:
   planner:
     description: Manages planning, timelines, and task prioritization for smooth progress.
   tests_generator:
+    # <<: *claude_base
     description: Generates and validates test cases to ensure standards and quality checks are met.
   reviewer:
     description: Reviews code, suggests improvements, and ensures outputs meet quality and performance standards.
 
 rag_agents: {}
-  # Any number of RAG agents can be defined here and will be picked up dynamically
 
 max_graph_recursion_limit: 10000
 
