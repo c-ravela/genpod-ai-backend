@@ -1,0 +1,25 @@
+tool_selection_prompt_template:
+  template: |
+    Task: {task}
+    
+    Available Tools:
+    {available_tools}
+    
+    Which tool is most suitable for this task based on the descriptions?
+    Return ONLY the tool name.
+
+parameter_mapping_prompt_template:
+  template: |
+    Task: {task}
+    Tool: {tool_name}
+    Tool Description: {tool_description}
+    
+    Required Parameters:
+    {tool_schema}
+    
+    Available Context:
+    {context}
+    
+    Map the context values to the tool parameters needed for this task.
+    Return a JSON object with parameter mappings only.
+    Example: {{"file_path": "/path/to/file", "query": "search term"}}
