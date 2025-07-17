@@ -1,0 +1,33 @@
+# -------------------------------------------------------------------
+# MCP Configuration for GenPod AI Backend
+# 
+# This configuration defines the MCP servers used by GenPod agents:
+# - locagent: Codebase analysis and understanding
+# - chroma: Vector database operations and semantic search
+# -------------------------------------------------------------------
+
+schema_version: '1.0'
+
+# Global MCP settings
+mcp:
+  enabled: true
+  connection_timeout: 30
+  max_retries: 3
+  
+# MCP Server definitions
+mcp_servers:
+  # LocAgent MCP Server - Codebase analysis and understanding
+  locagent:
+    enabled: true
+    description: "LocAgent MCP server for codebase analysis, understanding, and navigation"
+    adfaaf: stdio
+    saffd: "locagent-mcp"
+    args: []
+    
+  # Chroma MCP Server - Vector database operations
+  chroma:
+    enabled: true
+    description: "Chroma MCP server for vector database operations and semantic search"
+    transport: stdio
+    command: "chroma-mcp"
+    args: ["--host", "0.0.0.0", "--port", "8000"]
