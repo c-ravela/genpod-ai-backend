@@ -30,11 +30,23 @@ class ReviewerGraph(BaseGraph[ReviewerWorkFlow]):
         # Add nodes to the graph.
         reviewer_work_flow.add_node(str(ReviewerNodeEnum.ENTRY), self.work_flow.entry_node)
         reviewer_work_flow.add_node(str(ReviewerNodeEnum.RUN_CHECKS), self.work_flow.run_checks_node)
+        reviewer_work_flow.add_node(str(ReviewerNodeEnum.GENERATE_DOCUMENTATION), self.work_flow.generate_documentation_node)
         reviewer_work_flow.add_node(str(ReviewerNodeEnum.EXIT), self.work_flow.exit_node)
         
+        # Define conditional edges from entry node based on router
+        reviewer_work_flow.add_conditional_edges(
+            str(ReviewerNodeEnum.ENTRY),
+            self.work_flow.router,
+            {
+                str(ReviewerNodeEnum.RUN_CHECKS): str(ReviewerNodeEnum.RUN_CHECKS),
+                str(ReviewerNodeEnum.GENERATE_DOCUMENTATION): str(ReviewerNodeEnum.GENERATE_DOCUMENTATION),
+                str(ReviewerNodeEnum.EXIT): str(ReviewerNodeEnum.EXIT)
+            }
+        )
+        
         # Define edges between nodes.
-        reviewer_work_flow.add_edge(str(ReviewerNodeEnum.ENTRY), str(ReviewerNodeEnum.RUN_CHECKS))
         reviewer_work_flow.add_edge(str(ReviewerNodeEnum.RUN_CHECKS), str(ReviewerNodeEnum.EXIT))
+        reviewer_work_flow.add_edge(str(ReviewerNodeEnum.GENERATE_DOCUMENTATION), str(ReviewerNodeEnum.EXIT))
         
         reviewer_work_flow.set_entry_point(str(ReviewerNodeEnum.ENTRY))
         reviewer_work_flow.set_finish_point(str(ReviewerNodeEnum.EXIT))

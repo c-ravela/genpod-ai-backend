@@ -72,3 +72,11 @@ class ReviewerState(BaseState):
         default_factory=IssuesQueue,
         description="Issues already reported in prior runs (injected by Supervisor)."
     )
+    is_reviewed: bool = Field(
+        default=False,
+        description="Indicates whether the review is complete with no issues, ready for documentation generation."
+    )
+    documentation_generated: bool = Field(
+        default=False,
+        description="Indicates whether project documentation has been generated."
+    )

@@ -223,3 +223,7 @@ class SupervisorState(BaseState):
         default=False,
         description="Whether there are abandoned duplicate issues that require human review."
     )
+    is_reviewed: bool = Field(
+        default=False,
+        description="Indicates whether the code review has been completed with no issues found."
+    )

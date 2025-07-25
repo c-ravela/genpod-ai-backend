@@ -403,10 +403,23 @@ class SupervisorWorkFlow(BaseWorkFlow[SupervisorPrompts]):
                 logger.info("SupervisorWorkFlow call_supervisor: New issues detected; moving to RESOLVING.")
                 return state
 
-            # 3) If no abandoned *and* no real issues, we’re done
-            state.has_abandoned_duplicate_issues = False
-            state.project_status = PStatus.DONE
-            logger.info("SupervisorWorkFlow call_supervisor: No issues or abandoned duplicates; marking DONE.")
+            if not state.is_reviewed:
+                # No issues found, but documentation not yet generated
+                state.is_reviewed = True
+                state.current_task = Task(
+                    task_status=Status.NEW,
+                    description="Generate project documentation"
+                )
+                logger.info("SupervisorWorkFlow call_supervisor: No issues found; creating documentation generation task.")
+                return state
+            
+            # 4) If is_reviewed is True and current task is DONE, then we're truly done
+            if state.is_reviewed and state.current_task.task_status == Status.DONE:
+                state.has_abandoned_duplicate_issues = False
+                state.project_status = PStatus.DONE
+                logger.info("SupervisorWorkFlow call_supervisor: Documentation generated; marking project as DONE.")
+                return state
+            
             return state
 
         elif state.project_status == PStatus.RESOLVING:

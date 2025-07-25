@@ -4,6 +4,7 @@ from enum import Enum
 class ReviewerMode(str, Enum):
     """Reviewer operational mode."""
     UNDER_REVIEW = "under_review"
+    DOCUMENTATION = "documentation"
     FINISHED = "finished"
 
     def __str__(self):
