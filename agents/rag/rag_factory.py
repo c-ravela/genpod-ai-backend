@@ -1,9 +1,9 @@
 from typing import Optional
 
-from core.agent import BaseAgent
-from llms.llm import LLM
 from agents.langchain_vector_rag import RAGAgent
 from agents.llama_index_vector_rag import LlamaIndexVectorRAGAgent
+from core.agent import BaseAgent
+from llms.llm import LLM
 from models.rag_types import RAGType
 
 

@@ -4,10 +4,14 @@ from langchain_chroma import Chroma
 from langchain_core.documents import Document
 from langchain_openai import OpenAIEmbeddings
 
-from agents.langchain_vector_rag._internal.langchain_vector_rag_modes import QueryAnswerStage, RAGMode
-from agents.langchain_vector_rag._internal.langchain_vector_rag_nodes import RAGNodeEnum
-from agents.langchain_vector_rag._internal.langchain_vector_rag_prompt import RAGPrompts
-from agents.langchain_vector_rag._internal.langchain_vector_rag_state import RAGOuput, RAGState
+from agents.langchain_vector_rag._internal.langchain_vector_rag_modes import (
+    QueryAnswerStage, RAGMode)
+from agents.langchain_vector_rag._internal.langchain_vector_rag_nodes import \
+    RAGNodeEnum
+from agents.langchain_vector_rag._internal.langchain_vector_rag_prompt import \
+    RAGPrompts
+from agents.langchain_vector_rag._internal.langchain_vector_rag_state import (
+    RAGOuput, RAGState)
 from apis.rag_analytics.controller import RAGAnalyticsController
 from context.context import GenpodContext
 from core.decorators import (handle_errors_and_reset, record_node,
@@ -417,7 +421,7 @@ class RAGWorkFlow(BaseWorkFlow[RAGPrompts]):
             analytics_record = RAGAnalytics(
                 agent_id=agent_context.agent_id,
                 project_id=self._genpod_context.project_id,
-                microservice_id=self._genpod_context.microservice_id,
+                application_id=self._genpod_context.application_id,
                 session_id=agent_context.agent_session_id,
                 task_id=self._genpod_context.current_task.task_id,
                 document_id=document_id,

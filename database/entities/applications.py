@@ -7,16 +7,16 @@ from database.database_base import Base
 from utils.decorators import auto_init
 
 
-class Microservice(Base):
+class Application(Base):
     """
-    Represents the 'microservices' table in the database.
+    Represents the 'applications' table in the database.
     """
 
-    __tablename__ = 'microservices'
+    __tablename__ = 'applications'
 
     id = Column(Integer, primary_key=True, autoincrement=True)
-    microservice_name = Column(String(255), nullable=True)
-    microservice_description = Column(String(500), nullable=True)
+    application_name = Column(String(255), nullable=True)
+    application_description = Column(String(500), nullable=True)
     prompt = Column(String, nullable=False)
     project_id = Column(Integer, ForeignKey('projects.id'), nullable=False)
     status = Column(String(50), nullable=False)
@@ -28,17 +28,17 @@ class Microservice(Base):
     created_at = Column(DateTime, nullable=False, default=func.now())
     updated_at = Column(DateTime, nullable=False, default=func.now(), onupdate=func.now())
 
-    project = relationship("Project", back_populates="microservice")
-    sessions = relationship("MicroserviceSession", back_populates="microservice", cascade="all, delete-orphan")
-    llm_metrics = relationship("MicroserviceLLMMetrics", back_populates="microservice", cascade="all, delete-orphan")
-    rag_analytics = relationship("RAGAnalytics", back_populates="microservice", cascade="all, delete-orphan")
+    project = relationship("Project", back_populates="application")
+    sessions = relationship("ApplicationSession", back_populates="application", cascade="all, delete-orphan")
+    llm_metrics = relationship("ApplicationLLMMetrics", back_populates="application", cascade="all, delete-orphan")
+    rag_analytics = relationship("RAGAnalytics", back_populates="application", cascade="all, delete-orphan")
 
     @auto_init
     def __init__(
         self,
         id: int = None,
-        microservice_name: str = None,
-        microservice_description: str = None,
+        application_name: str = None,
+        application_description: str = None,
         prompt: str = None,
         project_id: int = None,
         status: str = None,

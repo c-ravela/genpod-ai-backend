@@ -16,8 +16,8 @@ class RAGAnalytics(Base):
     id = Column(Integer, primary_key=True, autoincrement=True)
     agent_id = Column(String(255), nullable=False)
     project_id = Column(Integer, ForeignKey('projects.id'), nullable=False)
-    microservice_id = Column(Integer, ForeignKey('microservices.id'), nullable=False)
-    session_id = Column(Integer, ForeignKey('microservice_sessions.id'), nullable=False)
+    application_id = Column(Integer, ForeignKey('applications.id'), nullable=False)
+    session_id = Column(Integer, ForeignKey('application_sessions.id'), nullable=False)
     task_id = Column(String, nullable=False)
     document_id = Column(String, nullable=True)
     document_name = Column(String, nullable=True)
@@ -33,8 +33,8 @@ class RAGAnalytics(Base):
     updated_at = Column(DateTime, nullable=False, server_default=func.now(), onupdate=func.now())
 
     project = relationship("Project", back_populates="rag_analytics")
-    microservice = relationship("Microservice", back_populates="rag_analytics")
-    session = relationship("MicroserviceSession", back_populates="rag_analytics")
+    application = relationship("Application", back_populates="rag_analytics")
+    session = relationship("ApplicationSession", back_populates="rag_analytics")
 
     @auto_init
     def __init__(
@@ -42,7 +42,7 @@ class RAGAnalytics(Base):
         id: int = None,
         agent_id: str = None,
         project_id: int = None,
-        microservice_id: int = None,
+        application_id: int = None,
         session_id: int = None,
         task_id: str = None,
         document_id: String = None,

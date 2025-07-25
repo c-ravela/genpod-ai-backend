@@ -1,6 +1,7 @@
-from agents.llama_index_vector_rag._internal.llama_index_vector_rag_graph import LlamaIndexVectorRAGGraph
-from agents.llama_index_vector_rag._internal.llama_index_vector_rag_workflow import LlamaIndexVectorRAGWorkFlow
-
+from agents.llama_index_vector_rag._internal.llama_index_vector_rag_graph import \
+    LlamaIndexVectorRAGGraph
+from agents.llama_index_vector_rag._internal.llama_index_vector_rag_workflow import \
+    LlamaIndexVectorRAGWorkFlow
 from core.agent import BaseAgent
 from llms import LLM
 from utils.logger import logger

@@ -8,15 +8,15 @@ from database.database_base import Base
 from utils.decorators import auto_init
 
 
-class MicroserviceLLMMetrics(Base):
+class ApplicationLLMMetrics(Base):
     """
-    Represents the 'microservice_llm_metrics' table in the database.
+    Represents the 'application_llm_metrics' table in the database.
     """
-    __tablename__ = 'microservice_llm_metrics'
+    __tablename__ = 'application_llm_metrics'
     
     id = Column(Integer, primary_key=True, autoincrement=True)
     project_id = Column(Integer, ForeignKey('projects.id'), nullable=False)
-    microservice_id = Column(Integer, ForeignKey('microservices.id'), nullable=False)
+    application_id = Column(Integer, ForeignKey('applications.id'), nullable=False)
     agent_id = Column(String(255), nullable=False)
     provider = Column(String(255), nullable=False)  # LLM provider name
     model = Column(String(255), nullable=False)  # LLM model name/version
@@ -35,13 +35,13 @@ class MicroserviceLLMMetrics(Base):
     updated_by = Column(Integer, nullable=False)
 
     project = relationship("Project", back_populates="llm_metrics")
-    microservice = relationship("Microservice", back_populates="llm_metrics")
+    application = relationship("Application", back_populates="llm_metrics")
 
     @auto_init
     def __init__(
         self,
         project_id: int = None,
-        microservice_id: int = None,
+        application_id: int = None,
         agent_id: str = None,
         provider: str = None,
         model: str = None,

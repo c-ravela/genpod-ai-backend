@@ -17,9 +17,9 @@ from models import (FileIssue, FilePathSelectionResponse, Issue, IssuesQueue,
                     IssuesReport, LanguageSelectionResponse, Status)
 from tools.docker_sandbox import (docker_sandbox_description,
                                   docker_sandbox_executor)
+from tools.generate_project_documentation import GenerateProjectDocumentationTool
 from utils.logger import logger
 from utils.yaml_utils import read_yaml
-
 
 CHECKS_CONFIG_PATH = path.join(getcwd(), "agents", "reviewer", "checks.yaml")
 LANGUAGE_TOOLS_CONFIG_PATH = path.join(getcwd(), "agents", "reviewer", "reviewer_tools.yml")
@@ -75,6 +75,14 @@ class ReviewerWorkFlow(BaseWorkFlow[ReviewerPrompts]):
 
         Clears previous issues and sets the operational mode and stage.
         """
+        # Check if this is a documentation generation task
+        if state.is_reviewed and state.current_task.task_status == Status.NEW:
+            logger.info(f"{self.agent_name}: Received documentation generation task.")
+            state.operational_mode = ReviewerMode.DOCUMENTATION
+            self.project_path = path.join(state.project_directory, state.project_name)
+            return state
+
+        # Normal review process
         state.issues.clear()
         state.operational_mode = ReviewerMode.UNDER_REVIEW
         state.current_mode_stage = ReviewStage.RUN_CHECKS
@@ -235,20 +243,52 @@ class ReviewerWorkFlow(BaseWorkFlow[ReviewerPrompts]):
         logger.info(f"{self.agent_name}: Completed execution of review checks. Setting stage to FINISHED.")
         return state
 
+    @record_node(ReviewerNodeEnum.GENERATE_DOCUMENTATION)
+    @handle_errors_and_reset
+    def generate_documentation_node(self, state: ReviewerState) -> ReviewerState:
+        """
+        Node for generating project documentation.
+        """
+        logger.info(f"{self.agent_name}: Generating project documentation...")
+
+        try:
+            project_path = path.join(
+                state.project_directory,
+                state.project_name or "project"
+            )
+
+            doc_tool = GenerateProjectDocumentationTool()
+            result = doc_tool._run(project_directory=project_path)
+
+            logger.info(f"{self.agent_name}: Documentation generation completed: {result}")
+            state.documentation_generated = True
+        except Exception as e:
+            logger.error(f"{self.agent_name}: Documentation generation failed: {e}")
+            state.documentation_generated = False
+
+        return state
+
     @record_node(ReviewerNodeEnum.EXIT)
     def exit_node(self, state: ReviewerState) -> ReviewerOutput:
         """
         Finalizes the review workflow by marking the review as complete.
         """
-        if state.operational_mode == ReviewerMode.UNDER_REVIEW:
+        # If no issues found and not yet marked as reviewed
+        if len(state.issues) == 0 and not state.is_reviewed and state.operational_mode == ReviewerMode.UNDER_REVIEW:
+            state.is_reviewed = True
+            logger.info(f"{self.agent_name}: No issues found, marking as reviewed.")
+
+        # Update task status to DONE
+        if state.current_task.task_status != Status.DONE and state.is_reviewed:
+            state.current_task.task_status = Status.DONE
+            logger.info(f"{self.agent_name}: Task marked as DONE.")
+        elif state.operational_mode == ReviewerMode.UNDER_REVIEW:
             if state.current_mode_stage == ReviewStage.FINISHED:
                 state.current_task.task_status = Status.DONE
                 logger.info(f"{self.agent_name}: Review completed. Task marked as DONE.")
             else:
                 logger.warning(f"{self.agent_name}: Review incomplete. Task marked as INCOMPLETE.")
                 state.current_task.task_status = Status.INCOMPLETE
-        else:
-            logger.warning(f"{self.agent_name}: Operational mode not UNDER_REVIEW. Task status unchanged.")
 
         logger.info(f"{self.agent_name}: Exiting workflow. Total issues recorded: {len(state.issues)}.")
         return state
@@ -257,6 +297,10 @@ class ReviewerWorkFlow(BaseWorkFlow[ReviewerPrompts]):
         """
         Routes the state to the next node based on the current stage.
         """
+        # If in documentation mode, go straight to documentation generation
+        if state.operational_mode == ReviewerMode.DOCUMENTATION:
+            return str(ReviewerNodeEnum.GENERATE_DOCUMENTATION)
+            
         logger.debug(f"{self.agent_name}: Routing state with stage: {state.current_mode_stage}")
         if state.current_mode_stage == ReviewStage.RUN_CHECKS:
             return str(ReviewerNodeEnum.RUN_CHECKS)

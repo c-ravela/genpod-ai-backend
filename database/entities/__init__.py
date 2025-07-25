@@ -20,18 +20,18 @@ If new ORM models are added in the future, make sure to import them here.
 Imported Models:
 ================
 - Project
-- Microservice
-- MicroserviceSession
-- MicroserviceLLMMetrics
+- Application
+- ApplicationSession
+- ApplicationLLMMetrics
 - RAGAnalytics
 """
 
 from utils.logger import logger
 
 try:
-    from .microservice_llm_metrics import MicroserviceLLMMetrics
-    from .microservice_sessions import MicroserviceSession
-    from .microservices import Microservice
+    from .application_llm_metrics import ApplicationLLMMetrics
+    from .application_sessions import ApplicationSession
+    from .applications import Application
     from .projects import Project
     from .rag_analytics import RAGAnalytics 
 except ImportError as e:

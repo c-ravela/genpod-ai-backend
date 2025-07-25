@@ -6,10 +6,10 @@ from uuid import UUID
 from langchain_core.callbacks import BaseCallbackHandler
 from langchain_core.outputs import LLMResult
 
-from apis.microservice_llm_metrics.controller import \
-    MicroserviceLLMMetricsController
+from apis.application_llm_metrics.controller import \
+    ApplicationLLMMetricsController
 from context.context import GenpodContext
-from database.entities.microservice_llm_metrics import MicroserviceLLMMetrics
+from database.entities.application_llm_metrics import ApplicationLLMMetrics
 from utils.logger import logger
 
 
@@ -101,9 +101,9 @@ class MetricsContext:
     def save_to_db(self) -> None:
         logger.info("Saving metrics to the database.")
         self._finalize_metrics()
-        current_metrics = MicroserviceLLMMetrics(
+        current_metrics = ApplicationLLMMetrics(
             project_id=self._genpod_context.project_id,
-            microservice_id=self._genpod_context.microservice_id,
+            application_id=self._genpod_context.application_id,
             agent_id=self._genpod_context.current_agent.agent_id,
             provider=self.model_provider,
             model=self.model_name,
@@ -120,7 +120,7 @@ class MetricsContext:
             updated_by=self._genpod_context.user_id
         )
 
-        metrics_controller = MicroserviceLLMMetricsController()
+        metrics_controller = ApplicationLLMMetricsController()
         try:
             metrics_controller.create(current_metrics)
             logger.info("Metrics saved successfully.")

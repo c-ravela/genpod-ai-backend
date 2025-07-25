@@ -7,10 +7,9 @@ from typing import Any, Dict, Iterator, Optional, Tuple
 from pydantic import BaseModel, Field, field_validator, model_validator
 
 from llms import LLM, llm_factory
+from models.rag_types import RAGType
 from utils.decorators import auto_repr
 from utils.yaml_utils import read_yaml
-
-from models.rag_types import RAGType
 
 # Supported LLMs categorized by provider
 SUPPORTED_LLMS = {

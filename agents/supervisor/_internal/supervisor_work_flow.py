@@ -246,7 +246,7 @@ class SupervisorWorkFlow(BaseWorkFlow[SupervisorPrompts]):
         Initialize the supervisor state for a new project.
 
         This entry node verifies that a valid team has been assigned, sets up the initial chat history with the user's prompt,
-        initializes the project status to INITIAL, and updates the internal context with the current microservice ID.
+        initializes the project status to INITIAL, and updates the internal context with the current application ID.
 
         Args:
             state (SupervisorState): The current supervisor state with project details and user prompt.
@@ -273,7 +273,7 @@ class SupervisorWorkFlow(BaseWorkFlow[SupervisorPrompts]):
         logger.info("SupervisorWorkFlow entry_node: Supervisor state initialized successfully: %s", state)
         logger.debug("SupervisorWorkFlow entry_node: Detailed supervisor state: %s", state)
 
-        self._genpod_context.update(microservice_id=state.microservice_id)
+        self._genpod_context.update(application_id=state.application_id)
         return state
 
     @trace_span
@@ -403,10 +403,23 @@ class SupervisorWorkFlow(BaseWorkFlow[SupervisorPrompts]):
                 logger.info("SupervisorWorkFlow call_supervisor: New issues detected; moving to RESOLVING.")
                 return state
 
-            # 3) If no abandoned *and* no real issues, we’re done
-            state.has_abandoned_duplicate_issues = False
-            state.project_status = PStatus.DONE
-            logger.info("SupervisorWorkFlow call_supervisor: No issues or abandoned duplicates; marking DONE.")
+            if not state.is_reviewed:
+                # No issues found, but documentation not yet generated
+                state.is_reviewed = True
+                state.current_task = Task(
+                    task_status=Status.NEW,
+                    description="Generate project documentation"
+                )
+                logger.info("SupervisorWorkFlow call_supervisor: No issues found; creating documentation generation task.")
+                return state
+            
+            # 4) If is_reviewed is True and current task is DONE, then we're truly done
+            if state.is_reviewed and state.current_task.task_status == Status.DONE:
+                state.has_abandoned_duplicate_issues = False
+                state.project_status = PStatus.DONE
+                logger.info("SupervisorWorkFlow call_supervisor: Documentation generated; marking project as DONE.")
+                return state
+            
             return state
 
         elif state.project_status == PStatus.RESOLVING:
@@ -542,7 +555,7 @@ class SupervisorWorkFlow(BaseWorkFlow[SupervisorPrompts]):
                     state.agents_status = f'{self.team.architect.name} completed'
                     state.tasks.extend(architect_result['tasks'])
                     state.requirements_document = architect_result['requirements_document']
-                    state.microservice_name = architect_result['project_name']
+                    state.application_name = architect_result['project_name']
                 else:
                     logger.warning(f"SupervisorWorkFlow call_architect: Unexpected task status '{current_task_status}' from Architect '{self.team.architect.name}'.")
                 return state
@@ -756,7 +769,7 @@ class SupervisorWorkFlow(BaseWorkFlow[SupervisorPrompts]):
             'project_status': state.project_status,
             'project_directory': state.project_directory,
             'current_task': state.current_task,
-            'project_name': state.microservice_name,
+            'project_name': state.application_name,
             'requirements_document': state.requirements_document,
             'license_header': state.license_header,
             'license_url': state.license_url,
@@ -822,7 +835,7 @@ class SupervisorWorkFlow(BaseWorkFlow[SupervisorPrompts]):
             'project_status': state.project_status,
             'project_directory': state.project_directory,
             'current_task': state.current_task,
-            'project_name': state.microservice_name,
+            'project_name': state.application_name,
             'requirements_document': state.requirements_document,
             'current_planned_task': state.current_planned_task,
             'current_planned_issue': state.current_planned_issue,
@@ -884,7 +897,7 @@ class SupervisorWorkFlow(BaseWorkFlow[SupervisorPrompts]):
             'project_status': state.project_status,
             'project_directory': state.project_directory,
             'current_task': state.current_task,
-            'project_name': state.microservice_name,
+            'project_name': state.application_name,
             'license_header': state.license_header,
             'requirements_document': state.requirements_document,
             'chat_history': state.chat_history,
