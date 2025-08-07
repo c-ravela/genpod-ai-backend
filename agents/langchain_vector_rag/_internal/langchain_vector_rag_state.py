@@ -14,13 +14,25 @@ class RAGInput(RAGQueryInput):
     pass
 
 
-class RAGOuput(RAGQueryOutput):
+class RAGOutput(RAGQueryOutput):
     """
     Output state for the RAG Agent.
 
-    Inherits all fields from RAGQueryOutput. No additional fields are defined.
+    Inherits all fields from RAGQueryOutput with additional RAG-specific fields.
     """
-    pass
+    # Additional fields that the RAG server expects
+    query: str = Field(
+        default="",
+        description="The original query that was processed."
+    )
+    sources: list = Field(
+        default_factory=list,
+        description="List of retrieved sources used to generate the response."
+    )
+    confidence_score: float = Field(
+        default=0.0,
+        description="Confidence score for the RAG response."
+    )
 
 
 class RAGState(RAGQueryState):
