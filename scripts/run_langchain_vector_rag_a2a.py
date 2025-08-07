@@ -62,8 +62,8 @@ def main():
             logger.error("LangChain Vector RAG agent is not enabled in a2a.config.yml")
             sys.exit(1)
         
-        # Get langchain vector rag agent configuration
-        rag_info = project_config.agents.langchain_vector_rag
+        # Get langchain vector rag agent configuration from rag_agents dictionary
+        rag_info = project_config.rag_agents.get("langchain_vector_rag")
         if not rag_info:
             logger.error("LangChain Vector RAG configuration not found in project config")
             sys.exit(1)
@@ -76,7 +76,7 @@ def main():
             description=rag_info.description,
             llm=rag_info.llm,
             collection_name=rag_info.collection_name,
-            persist_directory=rag_info.persist_directory,
+            persist_directory=rag_info.vector_database_path,  # Use vector_database_path field
             recursion_limit=rag_info.recursion_limit,
             persistence_db_path=db_path  # Use same DB as project
         )

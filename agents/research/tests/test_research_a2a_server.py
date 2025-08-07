@@ -81,11 +81,10 @@ class TestResearchA2AExecutor:
         assert isinstance(result, ResearchInput)
         # ResearchInput inherits from RAGQueryInput which has query field
         assert result.query == "What are the best practices for implementing microservices architecture?"
-        assert result.user_query == "What are the best practices for implementing microservices architecture?"
     
     @pytest.mark.asyncio
     async def test_extract_input_missing_query(self, executor):
-        """Test input extraction with missing query (which maps to user_query)."""
+        """Test input extraction with missing query."""
         message = Message(
             message_id="msg-001",
             role="user",
@@ -100,13 +99,10 @@ class TestResearchA2AExecutor:
             ]
         )
         
-        # The server code checks for user_query but the model uses query
-        # We'll need to mock the extraction to work properly
         with pytest.raises(A2AInputExtractionError) as exc_info:
             await executor._extract_input(message)
         
-        assert "query" in str(exc_info.value)
-        assert "Field required" in str(exc_info.value)
+        assert "query" in str(exc_info.value) and "required" in str(exc_info.value).lower()
     
     @pytest.mark.asyncio
     async def test_execute_agent_success(self, executor, mock_research_agent, valid_input):
@@ -119,17 +115,10 @@ class TestResearchA2AExecutor:
             "chat_history": valid_input["chat_history"],
             "metadata": {
                 "document_sources": ["source1.pdf", "source2.html"],
-                "confidence_score": 0.95,
                 "search_results_count": 15
             },
             "response_type": RagResponseType.ANSWERED,
-            "response": "Microservices architecture best practices include: 1) Domain-driven design, 2) Independent deployment, 3) Fault tolerance patterns...",
-            "user_query": valid_input["query"],
-            "sources": [
-                {"title": "Microservices Patterns", "url": "https://example.com/patterns", "relevance": 0.95},
-                {"title": "Building Microservices", "url": "https://example.com/building", "relevance": 0.88}
-            ],
-            "confidence_score": 0.95
+            "response": "Microservices architecture best practices include: 1) Domain-driven design, 2) Independent deployment, 3) Fault tolerance patterns..."
         }
         
         mock_research_agent.graph.invoke.return_value = mock_output
@@ -142,7 +131,7 @@ class TestResearchA2AExecutor:
         assert isinstance(result, ResearchOutput)
         assert result.response_type == RagResponseType.ANSWERED
         assert "Microservices architecture best practices" in result.response
-        assert result.metadata["confidence_score"] == 0.95
+        assert result.metadata["search_results_count"] == 15
         
         # Verify the mock was called with correct state
         mock_research_agent.graph.invoke.assert_called_once()
@@ -165,23 +154,23 @@ class TestResearchA2AExecutor:
     
     @pytest.mark.asyncio
     async def test_format_response_with_sources(self, executor):
-        """Test response formatting with research sources."""
-        # Create mock output with sources
+        """Test response formatting with metadata."""
+        # Create mock output with metadata
         from models.models import Task
         from models.constants import ChatRoles, RagResponseType
         
         output = ResearchOutput(
             current_task=Task(task_id="task-1", description="Research task"),
             chat_history=[(ChatRoles.USER, "test message")],
-            metadata={"confidence_score": 0.92, "search_results_count": 10},
+            metadata={
+                "search_results_count": 10,
+                "sources": [
+                    {"title": "Microservices Patterns", "url": "https://example.com/patterns"},
+                    {"title": "Building Microservices", "url": "https://example.com/building"}
+                ]
+            },
             response_type=RagResponseType.ANSWERED,
-            response="Best practices include domain-driven design, independent deployment, and fault tolerance.",
-            user_query="What are microservices best practices?",
-            sources=[
-                {"title": "Microservices Patterns", "url": "https://example.com/patterns", "relevance": 0.95},
-                {"title": "Building Microservices", "url": "https://example.com/building", "relevance": 0.88}
-            ],
-            confidence_score=0.92
+            response="Best practices include domain-driven design, independent deployment, and fault tolerance."
         )
         
         # Create mock updater
@@ -201,31 +190,28 @@ class TestResearchA2AExecutor:
         assert hasattr(data_call_args[0].root, 'data')
         assert "agent_output" in data_call_args[0].root.data
         
-        # Verify artifact was added for sources
+        # Verify artifact was added for metadata
         updater.add_artifact.assert_called_once()
         artifact_call = updater.add_artifact.call_args[1]
-        assert artifact_call["name"] == "Research Sources"
-        assert artifact_call["artifact_id"] == "research-sources"
-        # The sources should be in the data part of the artifact
+        assert artifact_call["name"] == "Research Metadata"
+        assert artifact_call["artifact_id"] == "research-metadata"
+        # The metadata should be in the data part of the artifact
         artifact_data = artifact_call["parts"][0].root.data
-        assert "sources" in artifact_data
+        assert "search_results_count" in artifact_data
     
     @pytest.mark.asyncio
     async def test_format_response_no_sources(self, executor):
-        """Test response formatting without sources."""
-        # Create output without sources
+        """Test response formatting without metadata."""
+        # Create output without metadata
         from models.models import Task
         from models.constants import ChatRoles, RagResponseType
         
         output = ResearchOutput(
             current_task=Task(task_id="task-1", description="Research task"),
             chat_history=[(ChatRoles.USER, "test message")],
-            metadata={"confidence_score": 0.75},
+            metadata={},
             response_type=RagResponseType.NOT_ANSWERED,
-            response="Unable to find specific information about microservices.",
-            user_query="What are microservices?",
-            sources=[],
-            confidence_score=0.75
+            response="Unable to find specific information about microservices."
         )
         
         # Create mock updater
@@ -240,7 +226,7 @@ class TestResearchA2AExecutor:
         # Verify agent messages were sent (text summary + data output)
         assert updater.new_agent_message.call_count == 2
         
-        # Verify no artifacts were added (no sources)
+        # Verify no artifacts were added (empty metadata)
         updater.add_artifact.assert_not_called()
 
 
@@ -268,13 +254,13 @@ class TestResearchAgentCardBuilder:
         builder = ResearchAgentCardBuilder("Research", "1.0.0")
         card = (builder
                 .with_description("Test research agent")
-                .with_url("http://localhost:8008/rpc")
+                .with_url("http://localhost:8008/")
                 .with_capabilities(streaming=True, push_notifications=False)
                 .build())
         
         assert card.name == "GenPod Research Agent"
         assert card.description == "Test research agent"
-        assert card.url == "http://localhost:8008/rpc"
+        assert card.url == "http://localhost:8008/"
         assert card.capabilities.streaming is True
         assert card.capabilities.push_notifications is False
         assert len(card.skills) == 2

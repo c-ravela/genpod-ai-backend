@@ -323,13 +323,13 @@ class TestSupervisorAgentCardBuilder:
         builder = SupervisorAgentCardBuilder("Supervisor", "1.0.0")
         card = (builder
                 .with_description("Test supervisor agent")
-                .with_url("http://localhost:8005/rpc")
+                .with_url("http://localhost:8005/")
                 .with_capabilities(streaming=True, push_notifications=False)
                 .build())
         
         assert card.name == "GenPod Supervisor Agent"
         assert card.description == "Test supervisor agent"
-        assert card.url == "http://localhost:8005/rpc"
+        assert card.url == "http://localhost:8005/"
         assert card.capabilities.streaming is True
         assert card.capabilities.push_notifications is False
         assert len(card.skills) == 2

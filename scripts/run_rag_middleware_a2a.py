@@ -82,10 +82,7 @@ def main():
             description=research_info.description,
             llm=research_info.llm,
             recursion_limit=research_info.recursion_limit,
-            persistence_db_path=db_path,
-            use_rag=research_info.use_rag,
-            search_urls_yaml_file_path=research_info.search_urls_yaml_file_path,
-            fuzzy_score_cutoff=research_info.fuzzy_score_cutoff
+            persistence_db_path=db_path
         )
         
         # Create RAG Middleware agent using the same approach as Team class
@@ -97,8 +94,7 @@ def main():
             llm=middleware_info.llm,
             research_agent=research_agent,
             recursion_limit=middleware_info.recursion_limit,
-            persistence_db_path=db_path,  # Use same DB as project
-            use_research_agent=middleware_info.use_research_agent
+            persistence_db_path=db_path  # Use same DB as project
         )
         
         # Create A2A app

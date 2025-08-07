@@ -113,16 +113,13 @@ class LangChainVectorRAGA2AExecutor(BaseA2AExecutor[RAGAgent, RAGInput, RAGOutpu
             agent_output: Output from the RAG agent
             updater: Task updater for sending response
         """
-        # Create summary
-        source_count = len(agent_output.sources) if agent_output.sources else 0
-        
+        # Create summary with only existing fields
         summary = self.formatter.create_summary(
             agent_name="LangChainVectorRAG",
             action="completed retrieval-augmented generation",
             details={
-                "query": agent_output.query[:50] + "..." if len(agent_output.query) > 50 else agent_output.query,
-                "sources": source_count,
-                "confidence": agent_output.confidence_score if hasattr(agent_output, 'confidence_score') else "N/A"
+                "response_type": str(agent_output.response_type),
+                "response_length": len(agent_output.response) if agent_output.response else 0
             }
         )
         
@@ -134,13 +131,13 @@ class LangChainVectorRAGA2AExecutor(BaseA2AExecutor[RAGAgent, RAGInput, RAGOutpu
             field_name="agent_output"
         )
         
-        # Add artifacts
-        if agent_output.sources:
+        # Add metadata as artifact if it has content
+        if agent_output.metadata:
             await self.formatter.add_artifact(
                 updater=updater,
-                data={"sources": agent_output.sources},
-                name="Retrieved Sources",
-                artifact_id="retrieved-sources"
+                data=agent_output.metadata,
+                name="Retrieved Context",
+                artifact_id="retrieved-context"
             )
 
 
@@ -220,7 +217,7 @@ def create_langchain_vector_rag_a2a_app(
     agent_card = (
         LangChainVectorRAGAgentCardBuilder("LangChainVectorRAG", "1.0.0")
         .with_description(agent_config.description)
-        .with_url(f"http://{agent_config.host}:{agent_config.port}/rpc")
+        .with_url(f"http://{agent_config.host}:{agent_config.port}")
         .with_capabilities(streaming=True, push_notifications=False)
         .build()
     )

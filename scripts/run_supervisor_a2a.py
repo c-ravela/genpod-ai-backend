@@ -75,11 +75,9 @@ def main():
             name=supervisor_info.agent_name,
             description=supervisor_info.description,
             llm=supervisor_info.llm,
-            team_members=supervisor_info.team_members,
             recursion_limit=supervisor_info.recursion_limit,
             persistence_db_path=db_path,  # Use same DB as project
-            use_rag=supervisor_info.use_rag,
-            add_project_summary=supervisor_info.add_project_summary
+            use_rag=supervisor_info.use_rag
         )
         
         # Create A2A app

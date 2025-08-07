@@ -298,13 +298,13 @@ class TestPlannerAgentCardBuilder:
         builder = PlannerAgentCardBuilder("Planner", "1.0.0")
         card = (builder
                 .with_description("Test planner agent")
-                .with_url("http://localhost:8004/rpc")
+                .with_url("http://localhost:8004/")
                 .with_capabilities(streaming=True, push_notifications=False)
                 .build())
         
         assert card.name == "GenPod Planner Agent"
         assert card.description == "Test planner agent"
-        assert card.url == "http://localhost:8004/rpc"
+        assert card.url == "http://localhost:8004/"
         assert card.capabilities.streaming is True
         assert card.capabilities.push_notifications is False
         assert len(card.skills) == 2

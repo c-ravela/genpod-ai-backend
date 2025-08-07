@@ -342,13 +342,13 @@ class TestRAGMiddlewareAgentCardBuilder:
         builder = RAGMiddlewareAgentCardBuilder("RAGMiddleware", "1.0.0")
         card = (builder
                 .with_description("Test RAG middleware agent")
-                .with_url("http://localhost:8011/rpc")
+                .with_url("http://localhost:8011/")
                 .with_capabilities(streaming=True, push_notifications=False)
                 .build())
         
         assert card.name == "GenPod RAGMiddleware Agent"
         assert card.description == "Test RAG middleware agent"
-        assert card.url == "http://localhost:8011/rpc"
+        assert card.url == "http://localhost:8011/"
         assert card.capabilities.streaming is True
         assert card.capabilities.push_notifications is False
         assert len(card.skills) == 3

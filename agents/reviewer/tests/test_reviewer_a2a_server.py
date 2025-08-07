@@ -294,13 +294,13 @@ class TestReviewerAgentCardBuilder:
         builder = ReviewerAgentCardBuilder("Reviewer", "1.0.0")
         card = (builder
                 .with_description("Test reviewer agent")
-                .with_url("http://localhost:8006/rpc")
+                .with_url("http://localhost:8006/")
                 .with_capabilities(streaming=True, push_notifications=False)
                 .build())
         
         assert card.name == "GenPod Reviewer Agent"
         assert card.description == "Test reviewer agent"
-        assert card.url == "http://localhost:8006/rpc"
+        assert card.url == "http://localhost:8006/"
         assert card.capabilities.streaming is True
         assert card.capabilities.push_notifications is False
         assert len(card.skills) == 2

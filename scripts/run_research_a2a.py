@@ -76,10 +76,7 @@ def main():
             description=research_info.description,
             llm=research_info.llm,
             recursion_limit=research_info.recursion_limit,
-            persistence_db_path=db_path,  # Use same DB as project
-            use_rag=research_info.use_rag,
-            search_urls_yaml_file_path=research_info.search_urls_yaml_file_path,
-            fuzzy_score_cutoff=research_info.fuzzy_score_cutoff
+            persistence_db_path=db_path  # Use same DB as project
         )
         
         # Create A2A app

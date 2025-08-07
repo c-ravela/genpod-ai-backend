@@ -115,21 +115,19 @@ class TestLlamaIndexVectorRAGA2AExecutor:
         mock_output = {
             "current_task": valid_input["current_task"],
             "chat_history": valid_input["chat_history"],
-            "query": valid_input["query"],
             "metadata": {
                 "retrieved_nodes": 3,
                 "confidence_score": 0.91,
                 "index_used": "documents_index",
-                "processing_time": 0.8
+                "processing_time": 0.8,
+                "sources": [
+                    {"node_id": "node_1", "document": "LlamaIndex Guide", "score": 0.92},
+                    {"node_id": "node_2", "document": "Indexing Best Practices", "score": 0.87},
+                    {"node_id": "node_3", "document": "Vector Store Configuration", "score": 0.83}
+                ]
             },
             "response_type": RagResponseType.ANSWERED,
-            "response": "LlamaIndex handles document indexing through several key components: 1) Document loaders that parse various formats, 2) Node parsers that chunk documents, 3) Vector stores for embeddings...",
-            "sources": [
-                {"node_id": "node_1", "document": "LlamaIndex Guide", "score": 0.92},
-                {"node_id": "node_2", "document": "Indexing Best Practices", "score": 0.87},
-                {"node_id": "node_3", "document": "Vector Store Configuration", "score": 0.83}
-            ],
-            "confidence_score": 0.91
+            "response": "LlamaIndex handles document indexing through several key components: 1) Document loaders that parse various formats, 2) Node parsers that chunk documents, 3) Vector stores for embeddings..."
         }
         
         mock_rag_agent.graph.invoke.return_value = mock_output
@@ -140,11 +138,10 @@ class TestLlamaIndexVectorRAGA2AExecutor:
         
         # Verify
         assert isinstance(result, LlamaIndexVectorOutput)
-        assert result.query == valid_input["query"]
         assert result.response_type == RagResponseType.ANSWERED
         assert "LlamaIndex handles document indexing" in result.response
         assert result.metadata["confidence_score"] == 0.91
-        assert result.confidence_score == 0.91
+        assert len(result.metadata["sources"]) == 3
         
         # Verify the mock was called with correct state
         mock_rag_agent.graph.invoke.assert_called_once()
@@ -174,16 +171,17 @@ class TestLlamaIndexVectorRAGA2AExecutor:
         output = LlamaIndexVectorOutput(
             current_task=Task(task_id="task-1", description="RAG task"),
             chat_history=[(ChatRoles.USER, "test message")],
-            query="What are the benefits of using LlamaIndex?",
-            metadata={"confidence_score": 0.88, "retrieved_nodes": 4},
+            metadata={
+                "confidence_score": 0.88,
+                "retrieved_nodes": 4,
+                "sources": [
+                    {"node_id": "node_1", "document": "LlamaIndex Benefits", "score": 0.91},
+                    {"node_id": "node_2", "document": "RAG Advantages", "score": 0.86},
+                    {"node_id": "node_3", "document": "Vector Store Benefits", "score": 0.82}
+                ]
+            },
             response_type=RagResponseType.ANSWERED,
-            response="LlamaIndex provides several benefits including easy document ingestion, flexible querying, and efficient vector storage.",
-            sources=[
-                {"node_id": "node_1", "document": "LlamaIndex Benefits", "score": 0.91},
-                {"node_id": "node_2", "document": "RAG Advantages", "score": 0.86},
-                {"node_id": "node_3", "document": "Vector Store Benefits", "score": 0.82}
-            ],
-            confidence_score=0.88
+            response="LlamaIndex provides several benefits including easy document ingestion, flexible querying, and efficient vector storage."
         )
         
         # Create mock updater
@@ -203,14 +201,14 @@ class TestLlamaIndexVectorRAGA2AExecutor:
         assert hasattr(data_call_args[0].root, 'data')
         assert "agent_output" in data_call_args[0].root.data
         
-        # Verify artifact was added for sources
+        # Verify artifact was added for metadata
         updater.add_artifact.assert_called_once()
         artifact_call = updater.add_artifact.call_args[1]
-        assert artifact_call["name"] == "Retrieved Sources"
-        assert artifact_call["artifact_id"] == "retrieved-sources"
-        # The sources should be in the data part of the artifact
+        assert artifact_call["name"] == "Retrieved Context"
+        assert artifact_call["artifact_id"] == "retrieved-context"
+        # The metadata should be in the data part of the artifact
         artifact_data = artifact_call["parts"][0].root.data
-        assert "sources" in artifact_data
+        assert "sources" in artifact_data  # sources are in metadata now
     
     @pytest.mark.asyncio
     async def test_format_response_no_sources(self, executor):
@@ -222,12 +220,9 @@ class TestLlamaIndexVectorRAGA2AExecutor:
         output = LlamaIndexVectorOutput(
             current_task=Task(task_id="task-1", description="RAG task"),
             chat_history=[(ChatRoles.USER, "test message")],
-            query="What is artificial intelligence?",
-            metadata={"confidence_score": 0.55},
+            metadata={},
             response_type=RagResponseType.NOT_ANSWERED,
-            response="Unable to find relevant information about artificial intelligence in the knowledge base.",
-            sources=[],
-            confidence_score=0.55
+            response="Unable to find relevant information about artificial intelligence in the knowledge base."
         )
         
         # Create mock updater
@@ -242,7 +237,7 @@ class TestLlamaIndexVectorRAGA2AExecutor:
         # Verify agent messages were sent (text summary + data output)
         assert updater.new_agent_message.call_count == 2
         
-        # Verify no artifacts were added (no sources)
+        # Verify no artifacts were added (empty metadata)
         updater.add_artifact.assert_not_called()
 
 
@@ -272,13 +267,13 @@ class TestLlamaIndexVectorRAGAgentCardBuilder:
         builder = LlamaIndexVectorRAGAgentCardBuilder("LlamaIndexVectorRAG", "1.0.0")
         card = (builder
                 .with_description("Test LlamaIndex Vector RAG agent")
-                .with_url("http://localhost:8010/rpc")
+                .with_url("http://localhost:8010/")
                 .with_capabilities(streaming=True, push_notifications=False)
                 .build())
         
         assert card.name == "GenPod LlamaIndexVectorRAG Agent"
         assert card.description == "Test LlamaIndex Vector RAG agent"
-        assert card.url == "http://localhost:8010/rpc"
+        assert card.url == "http://localhost:8010/"
         assert card.capabilities.streaming is True
         assert card.capabilities.push_notifications is False
         assert len(card.skills) == 2

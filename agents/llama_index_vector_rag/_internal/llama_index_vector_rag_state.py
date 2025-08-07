@@ -17,19 +17,7 @@ class LlamaIndexVectorOutput(RAGQueryOutput):
 
     Inherits all fields from RAGQueryOutput with additional RAG-specific fields.
     """
-    # Additional fields that the RAG server expects
-    query: str = Field(
-        default="",
-        description="The original query that was processed."
-    )
-    sources: list = Field(
-        default_factory=list,
-        description="List of retrieved sources used to generate the response."
-    )
-    confidence_score: float = Field(
-        default=0.0,
-        description="Confidence score for the RAG response."
-    )
+    pass
 
 
 class LlamaIndexVectorState(RAGQueryState):

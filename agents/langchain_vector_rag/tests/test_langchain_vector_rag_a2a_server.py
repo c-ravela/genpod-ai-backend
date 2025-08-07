@@ -111,20 +111,12 @@ class TestLangChainVectorRAGA2AExecutor:
         mock_output = {
             "current_task": valid_input["current_task"],
             "chat_history": valid_input["chat_history"],
-            "query": valid_input["query"],
             "metadata": {
                 "retrieved_documents": 3,
-                "confidence_score": 0.89,
                 "processing_time": 1.2
             },
             "response_type": RagResponseType.ANSWERED,
-            "response": "LangChain provides several key features for RAG applications: 1) Document loaders for various formats, 2) Vector stores for similarity search, 3) Retrieval chains for context augmentation...",
-            "sources": [
-                {"title": "LangChain Documentation", "chunk_id": "doc_1", "score": 0.95},
-                {"title": "RAG Best Practices", "chunk_id": "doc_2", "score": 0.84},
-                {"title": "Vector Store Guide", "chunk_id": "doc_3", "score": 0.78}
-            ],
-            "confidence_score": 0.89
+            "response": "LangChain provides several key features for RAG applications: 1) Document loaders for various formats, 2) Vector stores for similarity search, 3) Retrieval chains for context augmentation..."
         }
         
         mock_rag_agent.graph.invoke.return_value = mock_output
@@ -135,11 +127,9 @@ class TestLangChainVectorRAGA2AExecutor:
         
         # Verify
         assert isinstance(result, RAGOutput)
-        assert result.query == valid_input["query"]
         assert result.response_type == RagResponseType.ANSWERED
         assert "LangChain provides several key features" in result.response
-        assert result.metadata["confidence_score"] == 0.89
-        assert result.confidence_score == 0.89
+        assert result.metadata["retrieved_documents"] == 3
         
         # Verify the mock was called with correct state
         mock_rag_agent.graph.invoke.assert_called_once()
@@ -169,16 +159,15 @@ class TestLangChainVectorRAGA2AExecutor:
         output = RAGOutput(
             current_task=Task(task_id="task-1", description="RAG task"),
             chat_history=[(ChatRoles.USER, "test message")],
-            query="What is vector similarity search?",
-            metadata={"confidence_score": 0.92, "retrieved_documents": 4},
+            metadata={
+                "retrieved_documents": 4,
+                "sources": [
+                    {"title": "Vector Search Guide", "chunk_id": "chunk_1", "score": 0.94},
+                    {"title": "Similarity Algorithms", "chunk_id": "chunk_2", "score": 0.87}
+                ]
+            },
             response_type=RagResponseType.ANSWERED,
-            response="Vector similarity search is a technique used to find documents or data points that are semantically similar to a query vector.",
-            sources=[
-                {"title": "Vector Search Guide", "chunk_id": "chunk_1", "score": 0.94},
-                {"title": "Similarity Algorithms", "chunk_id": "chunk_2", "score": 0.87},
-                {"title": "Search Optimization", "chunk_id": "chunk_3", "score": 0.81}
-            ],
-            confidence_score=0.92
+            response="Vector similarity search is a technique used to find documents or data points that are semantically similar to a query vector."
         )
         
         # Create mock updater
@@ -198,14 +187,14 @@ class TestLangChainVectorRAGA2AExecutor:
         assert hasattr(data_call_args[0].root, 'data')
         assert "agent_output" in data_call_args[0].root.data
         
-        # Verify artifact was added for sources
+        # Verify artifact was added for metadata
         updater.add_artifact.assert_called_once()
         artifact_call = updater.add_artifact.call_args[1]
-        assert artifact_call["name"] == "Retrieved Sources"
-        assert artifact_call["artifact_id"] == "retrieved-sources"
-        # The sources should be in the data part of the artifact
+        assert artifact_call["name"] == "Retrieved Context"
+        assert artifact_call["artifact_id"] == "retrieved-context"
+        # The metadata should be in the data part of the artifact
         artifact_data = artifact_call["parts"][0].root.data
-        assert "sources" in artifact_data
+        assert "retrieved_documents" in artifact_data
     
     @pytest.mark.asyncio
     async def test_format_response_no_sources(self, executor):
@@ -217,12 +206,9 @@ class TestLangChainVectorRAGA2AExecutor:
         output = RAGOutput(
             current_task=Task(task_id="task-1", description="RAG task"),
             chat_history=[(ChatRoles.USER, "test message")],
-            query="What is machine learning?",
-            metadata={"confidence_score": 0.65},
+            metadata={},
             response_type=RagResponseType.NOT_ANSWERED,
-            response="Unable to find relevant information about machine learning in the knowledge base.",
-            sources=[],
-            confidence_score=0.65
+            response="Unable to find relevant information about machine learning in the knowledge base."
         )
         
         # Create mock updater
@@ -266,13 +252,13 @@ class TestLangChainVectorRAGAgentCardBuilder:
         builder = LangChainVectorRAGAgentCardBuilder("LangChainVectorRAG", "1.0.0")
         card = (builder
                 .with_description("Test LangChain Vector RAG agent")
-                .with_url("http://localhost:8009/rpc")
+                .with_url("http://localhost:8009/")
                 .with_capabilities(streaming=True, push_notifications=False)
                 .build())
         
         assert card.name == "GenPod LangChainVectorRAG Agent"
         assert card.description == "Test LangChain Vector RAG agent"
-        assert card.url == "http://localhost:8009/rpc"
+        assert card.url == "http://localhost:8009/"
         assert card.capabilities.streaming is True
         assert card.capabilities.push_notifications is False
         assert len(card.skills) == 2

@@ -245,13 +245,13 @@ class TestArchitectAgentCardBuilder:
         builder = ArchitectAgentCardBuilder("Architect", "1.0.0")
         card = (builder
                 .with_description("Test architect agent")
-                .with_url("http://localhost:8001/rpc")
+                .with_url("http://localhost:8001")
                 .with_capabilities(streaming=True)
                 .build())
         
         assert card.name == "GenPod Architect Agent"
         assert card.description == "Test architect agent"
-        assert card.url == "http://localhost:8001/rpc"
+        assert card.url == "http://localhost:8001"
         assert card.capabilities.streaming is True
         assert len(card.skills) == 1
         

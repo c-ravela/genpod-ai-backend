@@ -350,13 +350,13 @@ class TestTestsGeneratorAgentCardBuilder:
         builder = TestsGeneratorAgentCardBuilder("TestsGenerator", "1.0.0")
         card = (builder
                 .with_description("Test tests generator agent")
-                .with_url("http://localhost:8007/rpc")
+                .with_url("http://localhost:8007/")
                 .with_capabilities(streaming=True, push_notifications=False)
                 .build())
         
         assert card.name == "GenPod TestsGenerator Agent"
         assert card.description == "Test tests generator agent"
-        assert card.url == "http://localhost:8007/rpc"
+        assert card.url == "http://localhost:8007/"
         assert card.capabilities.streaming is True
         assert card.capabilities.push_notifications is False
         assert len(card.skills) == 2

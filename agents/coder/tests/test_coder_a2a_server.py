@@ -232,13 +232,13 @@ class TestCoderAgentCardBuilder:
         builder = CoderAgentCardBuilder("Coder", "1.0.0")
         card = (builder
                 .with_description("Test coder agent")
-                .with_url("http://localhost:8002/rpc")
+                .with_url("http://localhost:8002")
                 .with_capabilities(streaming=True)
                 .build())
         
         assert card.name == "GenPod Coder Agent"
         assert card.description == "Test coder agent"
-        assert card.url == "http://localhost:8002/rpc"
+        assert card.url == "http://localhost:8002"
         assert card.capabilities.streaming is True
         assert len(card.skills) == 2
 

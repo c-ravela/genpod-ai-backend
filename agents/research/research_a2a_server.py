@@ -61,10 +61,10 @@ class ResearchA2AExecutor(BaseA2AExecutor[ResearchAgent, ResearchInput, Research
             )
             
             # Additional validation
-            if not research_input.user_query:
-                raise ValueError("user_query is required")
+            if not research_input.query:
+                raise ValueError("query is required")
                 
-            logger.debug(f"[A2A-Research] Extracted query: {research_input.user_query[:50]}...")
+            logger.debug(f"[A2A-Research] Extracted query: {research_input.query[:50]}...")
             return research_input
             
         except Exception as e:
@@ -114,15 +114,13 @@ class ResearchA2AExecutor(BaseA2AExecutor[ResearchAgent, ResearchInput, Research
             updater: Task updater for sending response
         """
         # Create summary
-        source_count = len(agent_output.sources) if agent_output.sources else 0
-        
         summary = self.formatter.create_summary(
             agent_name="Research",
             action="completed research",
             details={
-                "query": agent_output.user_query[:50] + "..." if len(agent_output.user_query) > 50 else agent_output.user_query,
-                "sources": source_count,
-                "confidence": agent_output.confidence_score if hasattr(agent_output, 'confidence_score') else "N/A"
+                "response_type": str(agent_output.response_type),
+                "response_length": len(agent_output.response) if agent_output.response else 0,
+                "metadata_keys": list(agent_output.metadata.keys()) if agent_output.metadata else []
             }
         )
         
@@ -134,13 +132,13 @@ class ResearchA2AExecutor(BaseA2AExecutor[ResearchAgent, ResearchInput, Research
             field_name="agent_output"
         )
         
-        # Add artifacts
-        if agent_output.sources:
+        # Add artifacts if metadata exists
+        if agent_output.metadata:
             await self.formatter.add_artifact(
                 updater=updater,
-                data={"sources": agent_output.sources},
-                name="Research Sources",
-                artifact_id="research-sources"
+                data=agent_output.metadata,
+                name="Research Metadata",
+                artifact_id="research-metadata"
             )
 
 
@@ -220,7 +218,7 @@ def create_research_a2a_app(
     agent_card = (
         ResearchAgentCardBuilder("Research", "1.0.0")
         .with_description(agent_config.description)
-        .with_url(f"http://{agent_config.host}:{agent_config.port}/rpc")
+        .with_url(f"http://{agent_config.host}:{agent_config.port}/")
         .with_capabilities(streaming=True, push_notifications=False)
         .build()
     )

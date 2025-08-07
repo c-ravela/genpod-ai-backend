@@ -62,8 +62,8 @@ def main():
             logger.error("LlamaIndex Vector RAG agent is not enabled in a2a.config.yml")
             sys.exit(1)
         
-        # Get llama index vector rag agent configuration
-        rag_info = project_config.agents.llama_index_vector_rag
+        # Get llama index vector rag agent configuration from rag_agents dictionary
+        rag_info = project_config.rag_agents.get("llama_index_vector_rag")
         if not rag_info:
             logger.error("LlamaIndex Vector RAG configuration not found in project config")
             sys.exit(1)

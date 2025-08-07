@@ -220,7 +220,7 @@ def create_architect_a2a_app(
     agent_card = (
         ArchitectAgentCardBuilder("Architect", "1.0.0")
         .with_description(agent_config.description)
-        .with_url(f"http://{agent_config.host}:{agent_config.port}/rpc")
+        .with_url(f"http://{agent_config.host}:{agent_config.port}")
         .with_capabilities(streaming=True, push_notifications=False)
         .build()
     )
